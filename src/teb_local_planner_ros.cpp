@@ -198,6 +198,7 @@ bool TebLocalPlannerROS::setPlan(const std::vector<geometry_msgs::PoseStamped>& 
 
 bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
 {
+  auto start_time = ros::Time::now();
   // check if plugin initialized
   if(!initialized_)
   {
@@ -210,22 +211,29 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   goal_reached_ = false;  
   
   // Get robot pose
+  auto pose_get_start_time = ros::Time::now();
   tf::Stamped<tf::Pose> robot_pose;
   costmap_ros_->getRobotPose(robot_pose);
   robot_pose_ = PoseSE2(robot_pose);
+  auto pose_get_time = ros::Time::now() - pose_get_start_time;
     
   // Get robot velocity
+  auto vel_get_start_time = ros::Time::now();
   tf::Stamped<tf::Pose> robot_vel_tf;
   odom_helper_.getRobotVel(robot_vel_tf);
   robot_vel_ = tfPoseToEigenVector2dTransRot(robot_vel_tf);
   geometry_msgs::Twist robot_vel_twist;
   robot_vel_twist.linear.x = robot_vel_[0];
-  robot_vel_twist.angular.z = robot_vel_[1];   
+  robot_vel_twist.angular.z = robot_vel_[1];
+  auto vel_get_time = ros::Time::now() - vel_get_start_time;
   
   // prune global plan to cut off parts of the past (spatially before the robot)
+  auto prune_start_time = ros::Time::now();
   pruneGlobalPlan(*tf_, robot_pose, global_plan_);
-  
+  auto prune_time = ros::Time::now() - prune_start_time;
+
   // Transform global plan to the frame of interest (w.r.t to the local costmap)
+  auto transform_start_time = ros::Time::now();
   std::vector<geometry_msgs::PoseStamped> transformed_plan;
   int goal_idx;
   tf::StampedTransform tf_plan_to_global;
@@ -235,8 +243,10 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
     ROS_WARN("Could not transform the global plan to the frame of the controller");
     return false;
   }
+  auto transform_time = ros::Time::now() - transform_start_time;
   
   // Check if the horizon should be reduced this run
+  auto hr1_start_time = ros::Time::now();
   if (horizon_reduced_)
   {
     // reduce to 50 percent:
@@ -250,7 +260,9 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
       transformed_plan.erase(transformed_plan.begin()+new_goal_idx_transformed_plan, transformed_plan.end());
     else goal_idx += horizon_reduction; // this should not happy, but safety first ;-)
   }
+  auto hr1_time = ros::Time::now() - hr1_start_time;
   
+  auto other_start_time = ros::Time::now();
   // check if global goal is reached
   tf::Stamped<tf::Pose> global_goal;
   tf::poseStampedMsgToTF(global_plan_.back(), global_goal);
@@ -289,8 +301,10 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
     
   // clear currently existing obstacles
   obstacles_.clear();
-  
+  auto other_time = ros::Time::now() - other_start_time;
+
   // Update obstacle container with costmap information or polygons provided by a costmap_converter plugin
+  auto cc_start_time = ros::Time::now();
   if (costmap_converter_)
     updateObstacleContainerWithCostmapConverter();
   else
@@ -298,15 +312,19 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   
   // also consider custom obstacles (must be called after other updates, since the container is not cleared)
   updateObstacleContainerWithCustomObstacles();
+  auto cc_time = ros::Time::now() - cc_start_time;
   
   // update via-points container
+  auto via_start_time = ros::Time::now();
   updateViaPointsContainer(transformed_plan, cfg_.trajectory.global_plan_viapoint_sep);
-    
+  auto via_time = ros::Time::now() - via_start_time;
+
   // Do not allow config changes during the following optimization step
   boost::mutex::scoped_lock cfg_lock(cfg_.configMutex());
     
   // Now perform the actual planning
-//   bool success = planner_->plan(robot_pose_, robot_goal_, robot_vel_, cfg_.goal_tolerance.free_goal_vel); // straight line init
+  auto plan_start_time = ros::Time::now();
+  // bool success = planner_->plan(robot_pose_, robot_goal_, robot_vel_, cfg_.goal_tolerance.free_goal_vel); // straight line init
   bool success = planner_->plan(transformed_plan, &robot_vel_twist, cfg_.goal_tolerance.free_goal_vel);
   if (!success)
   {
@@ -314,15 +332,19 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
     ROS_WARN("teb_local_planner was not able to obtain a local plan for the current setting.");
     return false;
   }
+  auto plan_time = ros::Time::now() - plan_start_time;
     
   // Undo temporary horizon reduction
+  auto hr2_start_time = ros::Time::now();
   if (horizon_reduced_ && (ros::Time::now()-horizon_reduced_stamp_).toSec() >= 10 && !planner_->isHorizonReductionAppropriate(transformed_plan)) // 10s are hardcoded for now...
   {
     horizon_reduced_ = false;
     ROS_INFO("Switching back to full horizon length.");
   }
+  auto hr2_time = ros::Time::now() - hr2_start_time;
      
   // Check feasibility (but within the first few states only)
+  auto fsb_start_time = ros::Time::now();
   bool feasible = planner_->isTrajectoryFeasible(costmap_model_.get(), footprint_spec_, robot_inscribed_radius_, robot_circumscribed_radius, cfg_.trajectory.feasibility_check_no_poses);
   if (!feasible)
   {
@@ -342,8 +364,10 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
        
     return false;
   }
+  auto fsb_time = ros::Time::now() - fsb_start_time;
 
   // Get the velocity command for this sampling interval
+  auto vel_start_time = ros::Time::now();
   if (!planner_->getVelocityCommand(cmd_vel.linear.x, cmd_vel.angular.z))
   {
     planner_->clearPlanner();
@@ -368,12 +392,31 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
       return false;
     }
   }
+  auto vel_time = ros::Time::now() - vel_start_time;
   
-  // Now visualize everything		    
+  // Now visualize everything
+  auto viz_start_time = ros::Time::now();
   planner_->visualize();
   visualization_->publishObstacles(obstacles_);
   visualization_->publishViaPoints(via_points_);
   visualization_->publishGlobalPlan(global_plan_);
+  auto viz_time = ros::Time::now() - viz_start_time;
+
+  auto total_time = ros::Time::now() - start_time;
+  ROS_INFO_STREAM_COND(total_time.toSec() > 0.05,"\tcompute velocity times:\n" <<
+    "\t\ttotal time                   " << std::to_string(total_time.toSec()) << "\n" <<
+    "\t\tpose get time                " << std::to_string(pose_get_time.toSec()) << "\n" <<
+    "\t\tvel get time                 " << std::to_string(vel_get_time.toSec()) << "\n" <<
+    "\t\tprune time                   " << std::to_string(prune_time.toSec()) << "\n" <<
+    "\t\ttransform time               " << std::to_string(transform_time.toSec()) << "\n" <<
+    "\t\thorizon setup time           " << std::to_string((hr1_time + hr2_time).toSec()) << "\n" <<
+    "\t\tother time                   " << std::to_string(other_time.toSec()) << "\n" <<
+    "\t\tcostmap convert time         " << std::to_string(cc_time.toSec()) << "\n" <<
+    "\t\tvia points time              " << std::to_string(via_time.toSec()) << "\n" <<
+    "\t\tplanning time                " << std::to_string(plan_time.toSec()) << "\n" <<
+    "\t\tplan feasibility check time  " << std::to_string(fsb_time.toSec()) << "\n" <<
+    "\t\tvelocity extract time        " << std::to_string(vel_time.toSec()) << "\n" <<
+    "\t\tvisualization publish time   " << std::to_string(viz_time.toSec()) << "\n=========================");
   return true;
 }
 

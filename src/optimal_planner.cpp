@@ -209,6 +209,7 @@ void TebOptimalPlanner::setVelocityGoal(const Eigen::Ref<const Eigen::Vector2d>&
 bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan, const geometry_msgs::Twist* start_vel, bool free_goal_vel)
 {    
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
+  auto prep_start_time = ros::Time::now();
   if (!teb_.isInit())
   {
     // init trajectory
@@ -233,23 +234,37 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
     setVelocityGoalFree();
   else
     vel_goal_.first = true; // we just reactivate and use the previously set velocity (should be zero if nothing was modified)
-  
+  auto prep_time = ros::Time::now() - prep_start_time;
+
   // now optimize
-  return optimizeTEB(cfg_->optim.no_inner_iterations, cfg_->optim.no_outer_iterations);
+  auto opt_start_time = ros::Time::now();
+  bool teb_opt_result = optimizeTEB(cfg_->optim.no_inner_iterations, cfg_->optim.no_outer_iterations);
+  auto opt_time = ros::Time::now() - opt_start_time;
+
+  auto total_time = ros::Time::now() - prep_start_time;
+  ROS_INFO_STREAM_COND(total_time.toSec() > 0.02, "\nhomotopy class plan times:\n" <<
+    "\ttotal plan time                " << std::to_string(total_time.toSec()) << "\n" <<
+    "\toptimizatoin preparation time  " << std::to_string(prep_time.toSec()) << "\n" <<
+    "\tteb optimize time              " << std::to_string(opt_time.toSec()) << "\n-------------------------");
+
+  return teb_opt_result;
 }
 
 
 bool TebOptimalPlanner::plan(const tf::Pose& start, const tf::Pose& goal, const geometry_msgs::Twist* start_vel, bool free_goal_vel)
 {
+  auto start_time = ros::Time::now();
   PoseSE2 start_(start);
   PoseSE2 goal_(goal);
   Eigen::Vector2d vel = start_vel ? Eigen::Vector2d(start_vel->linear.x, start_vel->angular.z) : Eigen::Vector2d::Zero();
-  return plan(start_, goal_, vel);
+  auto pre_plan_time = ros::Time::now() - start_time;
+  return plan(start_, goal_, vel, free_goal_vel, pre_plan_time.toSec());
 }
 
-bool TebOptimalPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const Eigen::Vector2d& start_vel, bool free_goal_vel)
+bool TebOptimalPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const Eigen::Vector2d& start_vel, bool free_goal_vel, double pre_plan_time)
 {	
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
+  auto prep_start_time = ros::Time::now();
   if (!teb_.isInit())
   {
     // init trajectory
@@ -271,9 +286,21 @@ bool TebOptimalPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const Ei
     setVelocityGoalFree();
   else
     vel_goal_.first = true; // we just reactivate and use the previously set velocity (should be zero if nothing was modified)
-      
+  auto prep_time = ros::Time::now() - prep_start_time;
+
   // now optimize
-  return optimizeTEB(cfg_->optim.no_inner_iterations, cfg_->optim.no_outer_iterations);
+  auto opt_start_time = ros::Time::now();
+  bool teb_opt_result = optimizeTEB(cfg_->optim.no_inner_iterations, cfg_->optim.no_outer_iterations);
+  auto opt_time = ros::Time::now() - opt_start_time;
+
+  auto total_time = ros::Time::now() - prep_start_time;
+  ROS_INFO_STREAM_COND((total_time.toSec() + pre_plan_time) > 0.05, "\nhomotopy class plan times:\n" <<
+    "\ttotal plan time                " << std::to_string(total_time.toSec() + pre_plan_time) << "\n" <<
+    "\tpre-plan time                  " << std::to_string(pre_plan_time) << "\n" <<
+    "\toptimizatoin preparation time  " << std::to_string(prep_time.toSec()) << "\n" <<
+    "\tteb optimize time              " << std::to_string(opt_time.toSec()) << "\n-------------------------");
+
+  return teb_opt_result;
 }
 
 

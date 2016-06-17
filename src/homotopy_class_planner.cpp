@@ -104,6 +104,7 @@ void HomotopyClassPlanner::setVisualization(TebVisualizationPtr visualization)
 bool HomotopyClassPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan, const geometry_msgs::Twist* start_vel, bool free_goal_vel)
 {    
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
+  auto start_time = ros::Time::now();
   
   // store initial plan for further initializations (must be valid for the lifetime of this object or clearPlanner() is called!)
   initial_plan_ = &initial_plan;
@@ -113,7 +114,8 @@ bool HomotopyClassPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& i
   PoseSE2 start(initial_plan.front().pose);
   PoseSE2 goal(initial_plan.back().pose);
   Eigen::Vector2d vel = start_vel ?  Eigen::Vector2d( start_vel->linear.x, start_vel->angular.z ) : Eigen::Vector2d::Zero();
-  return plan(start, goal, vel, free_goal_vel);
+  auto pre_plan_time = ros::Time::now() - start_time;
+  return plan(start, goal, vel, free_goal_vel, pre_plan_time.toSec());
 }
 
 
@@ -126,25 +128,49 @@ bool HomotopyClassPlanner::plan(const tf::Pose& start, const tf::Pose& goal, con
   return plan(start_pose, goal_pose, vel, free_goal_vel);
 }
 
-bool HomotopyClassPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const Eigen::Vector2d& start_vel, bool free_goal_vel)
+bool HomotopyClassPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const Eigen::Vector2d& start_vel, bool free_goal_vel, double pre_plan_time)
 {	
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
+  auto start_time = ros::Time::now();
   
   // Update old TEBs with new start, goal and velocity
+  auto teb_update_start_time = ros::Time::now();
   updateAllTEBs(start, goal, start_vel);
+  auto teb_update_time = ros::Time::now() - teb_update_start_time;
     
   // Init new TEBs based on newly explored homotopy classes
+  auto hex_start_time = ros::Time::now();
   exploreHomotopyClassesAndInitTebs(start, goal, cfg_->obstacles.min_obstacle_dist, start_vel);
+  auto hex_time = ros::Time::now() - hex_start_time;
+
   // update via-points if activated
+  auto via_start_time = ros::Time::now();
   updateReferenceTrajectoryViaPoints(cfg_->hcp.viapoints_all_candidates);
+  auto via_time = ros::Time::now() - via_start_time;
+
   // Optimize all trajectories in alternative homotopy classes
+  auto teb_start_time = ros::Time::now();
   optimizeAllTEBs(cfg_->optim.no_inner_iterations, cfg_->optim.no_outer_iterations);
+  auto teb_time = ros::Time::now() - teb_start_time;
+
+  auto other_start_time = ros::Time::now();
   // Delete any detours
   deleteTebDetours(-0.1); 
   // Select which candidate (based on alternative homotopy classes) should be used
   selectBestTeb();
 
   initial_plan_ = NULL; // clear pointer to any previous initial plan (any previous plan is useless regarding the h-signature);
+  auto other_time = ros::Time::now() - other_start_time;
+
+  auto total_time = ros::Time::now() - start_time;
+  ROS_INFO_STREAM_COND((total_time.toSec() + pre_plan_time) > 0.05, "\nhomotopy class plan times:\n" <<
+    "\ttotal plan time            " << std::to_string(total_time.toSec() + pre_plan_time) << "\n" <<
+    "\tpre-plan time              " << std::to_string(pre_plan_time) << "\n" <<
+    "\tteb update time            " << std::to_string(teb_update_time.toSec()) << "\n" <<
+    "\thomotopy exploration time  " << std::to_string(hex_time.toSec()) << "\n" <<
+    "\tvia points time            " << std::to_string(via_time.toSec()) << "\n" <<
+    "\tteb optimize time          " << std::to_string(teb_time.toSec()) << "\n" <<
+    "\tother time                 " << std::to_string(other_time.toSec()) << "\n-------------------------");
   return true;
 } 
  
