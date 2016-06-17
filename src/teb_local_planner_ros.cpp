@@ -647,16 +647,21 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf::TransformListener& tf, co
 
     // get plan_to_global_transform from plan frame to global_frame
     tf::StampedTransform plan_to_global_transform;
-    tf.waitForTransform(global_frame, ros::Time::now(),
-    plan_pose.header.frame_id, plan_pose.header.stamp,
-    plan_pose.header.frame_id, ros::Duration(0.5));
-    tf.lookupTransform(global_frame, ros::Time(),
-    plan_pose.header.frame_id, plan_pose.header.stamp, 
-    plan_pose.header.frame_id, plan_to_global_transform);
+    // tf.waitForTransform(global_frame, ros::Time::now(),
+    // plan_pose.header.frame_id, plan_pose.header.stamp,
+    // plan_pose.header.frame_id, ros::Duration(0.5));
+    // tf.lookupTransform(global_frame, ros::Time(),
+    // plan_pose.header.frame_id, plan_pose.header.stamp,
+    // plan_pose.header.frame_id, plan_to_global_transform);
+    tf.waitForTransform(global_frame, plan_pose.header.frame_id,
+                        ros::Time(0), ros::Duration(0.5));
+    tf.lookupTransform(global_frame, plan_pose.header.frame_id,
+                       ros::Time(0), plan_to_global_transform);
 
     //let's get the pose of the robot in the frame of the plan
     tf::Stamped<tf::Pose> robot_pose;
-    tf.transformPose(plan_pose.header.frame_id, global_pose, robot_pose);
+    //tf.transformPose(plan_pose.header.frame_id, global_pose, robot_pose);
+    robot_pose.setData(plan_to_global_transform.inverse() * global_pose);
 
     //we'll discard points on the plan that are outside the local costmap
     double dist_threshold = std::max(costmap.getSizeInCellsX() * costmap.getResolution() / 2.0,
