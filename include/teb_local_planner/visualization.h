@@ -65,6 +65,7 @@
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
 #include <visualization_msgs/Marker.h>
+#include <path_array_rviz_plugin/PathArray.h>
 
 namespace teb_local_planner
 {
@@ -117,6 +118,12 @@ public:
    * @param local_plan Pose array describing the local plan
    */
   void publishLocalPlan(const std::vector<geometry_msgs::PoseStamped>& local_plan) const;
+
+  /**
+   * @brief Publish a given global plan to the ros topic \e ../../global_plan
+   * @param global_plan Pose array describing the global plan
+   */
+  void publishHumansPlans(const std::map<int, std::vector<geometry_msgs::PoseStamped>>& humans_plans) const;
   
   /**
    * @brief Publish Timed_Elastic_Band related stuff (local plan, pose sequence).
@@ -231,6 +238,7 @@ protected:
 
   ros::Publisher global_plan_pub_; //!< Publisher for the global plan
   ros::Publisher local_plan_pub_; //!< Publisher for the local plan
+  ros::Publisher humans_plans_pub_; //!< Publisher for the local plan
   ros::Publisher teb_poses_pub_; //!< Publisher for the trajectory pose sequence
   ros::Publisher teb_marker_pub_; //!< Publisher for visualization markers
   ros::Publisher feedback_pub_; //!< Publisher for the feedback message for analysis and debug purposes

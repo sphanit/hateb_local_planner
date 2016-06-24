@@ -36,6 +36,9 @@
  * Author: Christoph Rösmann
  *********************************************************************/
 
+#define PREDICT_SERVICE_NAME "/human_pose_prediction/predict_human_poses"
+#define DEFAULT_HUMAN_SEGMENT hanp_msgs::TrackedSegmentType::TORSO
+
 #include <teb_local_planner/teb_local_planner_ros.h>
 
 #include <tf_conversions/tf_eigen.h>
@@ -160,6 +163,9 @@ void TebLocalPlannerROS::initialize(std::string name, tf::TransformListener* tf,
     // setup callback for custom obstacles
     custom_obst_sub_ = nh.subscribe("obstacles", 1, &TebLocalPlannerROS::customObstacleCB, this);
     
+    // setup human prediction client with persistent connection
+    predict_humans_client_ = nh.serviceClient<hanp_prediction::HumanPosePredict>(PREDICT_SERVICE_NAME, true);
+
     // set initialized flag
     initialized_ = true;
 
@@ -321,6 +327,47 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
 
   // Do not allow config changes during the following optimization step
   boost::mutex::scoped_lock cfg_lock(cfg_.configMutex());
+
+  // update humans
+  auto human_start_time = ros::Time::now();
+  hanp_prediction::HumanPosePredict predict_srv;
+  double traj_size = 10, predict_time = 5.0; //TODO: make these values configurable
+  std::vector<double> predict_times;
+  for(double i = 1.0; i <= traj_size; ++i)
+  {
+      predict_srv.request.predict_times.push_back(predict_time * (i / traj_size));
+  }
+  // predict_srv.request.predict_times = predict_times;
+  predict_srv.request.type = hanp_prediction::HumanPosePredictRequest::VELOCITY_OBSTACLE;
+  predict_srv.request.publish_markers = publish_predicted_human_markers_;
+
+  std::map<int, std::vector<geometry_msgs::PoseStamped>> transformed_human_plans;
+
+  if(predict_humans_client_ && predict_humans_client_.call(predict_srv))
+  {
+    tf::StampedTransform tf_plan_to_global;
+    for(auto human_plan_prediction : predict_srv.response.predicted_humans)
+    {
+      // transform human plans
+      std::vector<geometry_msgs::PoseStamped> transformed_human_plan;
+      if (!transformHumanPlan(*tf_, human_plan_prediction.poses, robot_pose, *costmap_, global_frame_,
+                           transformed_human_plan, &tf_plan_to_global))
+      {
+        ROS_WARN("Could not transform the human %ld plan to the frame of the controller", human_plan_prediction.track_id);
+        continue;
+      }
+
+      transformed_human_plans[human_plan_prediction.track_id] = transformed_human_plan;
+    }
+  }
+  else
+  {
+    ROS_WARN("Failed to call %s service, is human prediction server running?", PREDICT_SERVICE_NAME);
+
+    // re-initialize the service
+    //predict_humans_client_ = nh.serviceClient<hanp_prediction::HumanPosePredict>(PREDICT_SERVICE_NAME, true);
+  }
+  auto human_time = ros::Time::now() - human_start_time;
     
   // Now perform the actual planning
   auto plan_start_time = ros::Time::now();
@@ -400,10 +447,11 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   visualization_->publishObstacles(obstacles_);
   visualization_->publishViaPoints(via_points_);
   visualization_->publishGlobalPlan(global_plan_);
+  visualization_->publishHumansPlans(transformed_human_plans);
   auto viz_time = ros::Time::now() - viz_start_time;
 
   auto total_time = ros::Time::now() - start_time;
-  ROS_INFO_STREAM_COND(total_time.toSec() > 0.05,"\tcompute velocity times:\n" <<
+  ROS_INFO_STREAM_COND(total_time.toSec() > 0.02,"\tcompute velocity times:\n" <<
     "\t\ttotal time                   " << std::to_string(total_time.toSec()) << "\n" <<
     "\t\tpose get time                " << std::to_string(pose_get_time.toSec()) << "\n" <<
     "\t\tvel get time                 " << std::to_string(vel_get_time.toSec()) << "\n" <<
@@ -413,6 +461,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
     "\t\tother time                   " << std::to_string(other_time.toSec()) << "\n" <<
     "\t\tcostmap convert time         " << std::to_string(cc_time.toSec()) << "\n" <<
     "\t\tvia points time              " << std::to_string(via_time.toSec()) << "\n" <<
+    "\t\thuman time                   " << std::to_string(human_time.toSec()) << "\n" <<
     "\t\tplanning time                " << std::to_string(plan_time.toSec()) << "\n" <<
     "\t\tplan feasibility check time  " << std::to_string(fsb_time.toSec()) << "\n" <<
     "\t\tvelocity extract time        " << std::to_string(vel_time.toSec()) << "\n" <<
@@ -737,6 +786,85 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf::TransformListener& tf, co
     ROS_ERROR("Extrapolation Error: %s\n", ex.what());
     if (global_plan.size() > 0)
       ROS_ERROR("Global Frame: %s Plan Frame size %d: %s\n", global_frame.c_str(), (unsigned int)global_plan.size(), global_plan[0].header.frame_id.c_str());
+
+    return false;
+  }
+
+  return true;
+}
+
+
+
+bool TebLocalPlannerROS::transformHumanPlan(const tf::TransformListener& tf, const std::vector<geometry_msgs::PoseWithCovarianceStamped>& human_plan,
+  const tf::Stamped<tf::Pose>& global_pose,  const costmap_2d::Costmap2D& costmap, const std::string& global_frame,
+  std::vector<geometry_msgs::PoseStamped>& transformed_human_plan, tf::StampedTransform* tf_human_plan_to_global) const
+{
+  try
+  {
+    if (human_plan.empty())
+    {
+      ROS_ERROR("Received human plan with zero length");
+      return false;
+    }
+
+    const auto human_plan_pose = human_plan[0];
+
+    transformed_human_plan.clear();
+
+    // get human_plan_to_global_transform from plan frame to global_frame
+    tf::StampedTransform human_plan_to_global_transform;
+    tf.waitForTransform(global_frame, human_plan_pose.header.frame_id,
+                        ros::Time(0), ros::Duration(0.5));
+    tf.lookupTransform(global_frame, human_plan_pose.header.frame_id,
+                       ros::Time(0), human_plan_to_global_transform);
+
+    //let's get the pose of the robot in the frame of the plan
+    tf::Stamped<tf::Pose> robot_pose;
+    robot_pose.setData(human_plan_to_global_transform.inverse() * global_pose);
+
+    //we'll discard points on the plan that are outside the local costmap
+    double dist_threshold = std::max(costmap.getSizeInCellsX() * costmap.getResolution() / 2.0,
+                                     costmap.getSizeInCellsY() * costmap.getResolution() / 2.0);
+    double sq_dist_threshold = dist_threshold * dist_threshold;
+
+    //we need to loop to a point on the plan that is within a certain distance of the robot
+    tf::Stamped<tf::Pose> tf_pose_stamped;
+    geometry_msgs::PoseStamped newer_pose;
+    tf::Pose tf_pose;
+    for(auto human_pose : human_plan)
+    {
+      double x_diff = robot_pose.getOrigin().x() - human_pose.pose.pose.position.x;
+      double y_diff = robot_pose.getOrigin().y() - human_pose.pose.pose.position.y;
+      double sq_dist = x_diff * x_diff + y_diff * y_diff;
+      if (sq_dist < sq_dist_threshold)
+      {
+        tf::poseMsgToTF(human_pose.pose.pose, tf_pose);
+        tf_pose_stamped.setData(human_plan_to_global_transform * tf_pose);
+        tf_pose_stamped.stamp_ = human_plan_to_global_transform.stamp_;
+        tf_pose_stamped.frame_id_ = global_frame;
+        tf::poseStampedTFToMsg(tf_pose_stamped, newer_pose);
+
+        transformed_human_plan.push_back(newer_pose);
+      }
+    }
+
+    if (tf_human_plan_to_global) *tf_human_plan_to_global = human_plan_to_global_transform;
+  }
+  catch(tf::LookupException& ex)
+  {
+    ROS_ERROR("No Transform available Error: %s\n", ex.what());
+    return false;
+  }
+  catch(tf::ConnectivityException& ex)
+  {
+    ROS_ERROR("Connectivity Error: %s\n", ex.what());
+    return false;
+  }
+  catch(tf::ExtrapolationException& ex)
+  {
+    ROS_ERROR("Extrapolation Error: %s\n", ex.what());
+    if (human_plan.size() > 0)
+      ROS_ERROR("Global Frame: %s Plan Frame size %d: %s\n", global_frame.c_str(), (unsigned int)human_plan.size(), human_plan[0].header.frame_id.c_str());
 
     return false;
   }

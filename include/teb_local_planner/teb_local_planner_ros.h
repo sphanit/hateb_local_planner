@@ -61,6 +61,9 @@
 #include <visualization_msgs/Marker.h>
 #include <teb_local_planner/ObstacleMsg.h>
 
+// human data
+#include <hanp_prediction/HumanPosePredict.h>
+
 // transforms
 #include <angles/angles.h>
 #include <tf/tf.h>
@@ -273,7 +276,23 @@ protected:
                            const tf::Stamped<tf::Pose>& global_pose,  const costmap_2d::Costmap2D& costmap,
                            const std::string& global_frame, double max_plan_length, std::vector<geometry_msgs::PoseStamped>& transformed_plan,
                            int* current_goal_idx = NULL, tf::StampedTransform* tf_plan_to_global = NULL) const;
-    
+
+  /**
+    * @brief  Transforms the human plan from the tracker frame to the local frame.
+    *
+    * @param tf A reference to a transform listener
+    * @param human_plan The plan to be transformed
+    * @param global_pose The global pose of the robot
+    * @param costmap A reference to the costmap being used so the window size for transforming can be computed
+    * @param global_frame The frame to transform the plan to
+    * @param[out] transformed_human_plan Populated with the transformed plan
+    * @param[out] tf_human_plan_to_global Transformation between the human plan and the local planning frame
+    * @return \c true if the global plan is transformed, \c false otherwise
+    */
+  bool transformHumanPlan(const tf::TransformListener& tf, const std::vector<geometry_msgs::PoseWithCovarianceStamped>& human_plan,
+                           const tf::Stamped<tf::Pose>& global_pose,  const costmap_2d::Costmap2D& costmap,
+                           const std::string& global_frame, std::vector<geometry_msgs::PoseStamped>& transformed_human_plan,
+                           tf::StampedTransform* tf_human_plan_to_global = NULL) const;
   /**
     * @brief Estimate the orientation of a pose from the global_plan that is treated as a local goal for the local planner.
     * 
@@ -324,7 +343,11 @@ protected:
    */
   double convertTransRotVelToSteeringAngle(double v, double omega, double wheelbase, double min_turning_radius = 0) const;
   
-  
+  // /**
+  //  * @brief Transformed human poses to planning frame
+  //  */
+  // hanp_prediction::PredictedPoses transformHumanPoses(hanp_prediction::PredictedPoses&, std::string frame_id);
+
 
 
   
@@ -372,6 +395,10 @@ private:
     
   // flags
   bool initialized_; //!< Keeps track about the correct initialization of this class
+
+  // human perdiction service
+  ros::ServiceClient predict_humans_client_;
+  bool publish_predicted_human_markers_ = true;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

@@ -12,12 +12,14 @@ find_package(catkin REQUIRED COMPONENTS
   cmake_modules
   dynamic_reconfigure
   geometry_msgs
+  hanp_prediction
   interactive_markers
   message_generation
   nav_core
   nav_msgs
   roscpp
   std_msgs
+  path_array_rviz_plugin
   pluginlib
   tf
   tf_conversions
@@ -154,6 +156,7 @@ catkin_package(
 	message_runtime
 	nav_core
 	nav_msgs
+  path_array_rviz_plugin
 	pluginlib
 	roscpp
 	std_msgs

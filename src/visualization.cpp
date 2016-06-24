@@ -63,6 +63,7 @@ void TebVisualization::initialize(ros::NodeHandle& nh, const TebConfig& cfg)
   // register topics
   global_plan_pub_ = nh.advertise<nav_msgs::Path>("global_plan", 1);
   local_plan_pub_ = nh.advertise<nav_msgs::Path>("local_plan",1);
+  humans_plans_pub_ = nh.advertise<path_array_rviz_plugin::PathArray>("humans_plans",1);
   teb_poses_pub_ = nh.advertise<geometry_msgs::PoseArray>("teb_poses", 100);
   teb_marker_pub_ = nh.advertise<visualization_msgs::Marker>("teb_markers", 1000);
   feedback_pub_ = nh.advertise<teb_local_planner::FeedbackMsg>("teb_feedback", 10);  
@@ -83,6 +84,51 @@ void TebVisualization::publishLocalPlan(const std::vector<geometry_msgs::PoseSta
   if ( printErrorWhenNotInitialized() )
     return;
   base_local_planner::publishPlan(local_plan, local_plan_pub_); 
+}
+
+void TebVisualization::publishHumansPlans(const std::map<int, std::vector<geometry_msgs::PoseStamped>>& humans_plans) const
+{
+  if ( printErrorWhenNotInitialized() )
+  {
+    return;
+  }
+
+  if(humans_plans.empty())
+  {
+    return;
+  }
+
+  path_array_rviz_plugin::PathArray gui_path_array;
+
+  for (auto& human_plan : humans_plans)
+  {
+    if(human_plan.second.empty())
+    {
+      continue;
+    }
+
+    nav_msgs::Path gui_path;
+    gui_path.poses.resize(human_plan.second.size());
+    gui_path.header.frame_id = human_plan.second[0].header.frame_id;
+    gui_path.header.stamp = human_plan.second[0].header.stamp;
+
+    for(unsigned int i=0; i < human_plan.second.size(); i++)
+    {
+      gui_path.poses[i] = human_plan.second[i];
+    }
+
+    gui_path_array.paths.push_back(gui_path);
+  }
+
+  if(gui_path_array.paths.empty())
+  {
+    return;
+  }
+
+  gui_path_array.header.frame_id = gui_path_array.paths[0].poses[0].header.frame_id;
+  gui_path_array.header.stamp = gui_path_array.paths[0].poses[0].header.stamp;
+
+  humans_plans_pub_.publish(gui_path_array);
 }
 
 void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand& teb) const
