@@ -42,14 +42,14 @@
 
 namespace teb_local_planner
 {
- 
+
 
 template <typename GraphType>
 void TebVisualization::publishGraph(const GraphType& graph, const std::string& ns_prefix)
-{	 
+{
   if ( printErrorWhenNotInitialized() )
     return;
-  
+
   typedef typename boost::graph_traits<GraphType>::vertex_iterator GraphVertexIterator;
   typedef typename boost::graph_traits<GraphType>::edge_iterator GraphEdgeIterator;
 
@@ -66,7 +66,7 @@ void TebVisualization::publishGraph(const GraphType& graph, const std::string& n
   marker.type = visualization_msgs::Marker::LINE_LIST;
 #endif
   marker.action = visualization_msgs::Marker::ADD;
-  
+
   GraphEdgeIterator it_edge, end_edges;
   for (boost::tie(it_edge,end_edges) = boost::edges(graph); it_edge!=end_edges; ++it_edge)
   {
@@ -94,7 +94,7 @@ void TebVisualization::publishGraph(const GraphType& graph, const std::string& n
     point_end.y = graph[boost::target(*it_edge,graph)].pos[1];
     point_end.z = 0;
     marker.points.push_back(point_end);
-    
+
     // add color
     std_msgs::ColorRGBA color;
     color.a = 1.0;
@@ -107,12 +107,12 @@ void TebVisualization::publishGraph(const GraphType& graph, const std::string& n
     marker.colors.push_back(color);
 #endif
   }
-  
+
 #ifdef TRIANGLE
   marker.scale.x = 1;
   marker.scale.y = 1;
   marker.scale.z = 1;
-#else 
+#else
   marker.scale.x = 0.01;
 #endif
   marker.color.a = 1.0;
@@ -122,7 +122,7 @@ void TebVisualization::publishGraph(const GraphType& graph, const std::string& n
 
   // Now publish edge markers
   teb_marker_pub_.publish( marker );
-  
+
   // Visualize vertices
   marker.header.frame_id = cfg_->map_frame;
   marker.header.stamp = ros::Time::now();
@@ -130,7 +130,7 @@ void TebVisualization::publishGraph(const GraphType& graph, const std::string& n
   marker.id = 0;
   marker.type = visualization_msgs::Marker::POINTS;
   marker.action = visualization_msgs::Marker::ADD;
-  
+
   GraphVertexIterator it_vert, end_vert;
   for (boost::tie(it_vert,end_vert) = boost::vertices(graph); it_vert!=end_vert; ++it_vert)
   {
@@ -140,14 +140,14 @@ void TebVisualization::publishGraph(const GraphType& graph, const std::string& n
     point.z = 0;
     marker.points.push_back(point);
     // add color
-    
+
     std_msgs::ColorRGBA color;
     color.a = 1.0;
     if (it_vert==end_vert-1)
     {
       color.r = 1;
       color.g = 0;
-      color.b = 0;		
+      color.b = 0;
     }
     else
     {
@@ -163,7 +163,7 @@ void TebVisualization::publishGraph(const GraphType& graph, const std::string& n
     marker.colors.front().b = 1;
     marker.colors.front().g = 0;
   }
-  
+
   marker.scale.x = 0.1;
   marker.scale.y = 0.1;
   marker.color.a = 1.0;
@@ -174,13 +174,13 @@ void TebVisualization::publishGraph(const GraphType& graph, const std::string& n
   // Now publish vertex markers
   teb_marker_pub_.publish( marker );
 }
-  
+
 template <typename BidirIter>
 void TebVisualization::publishPathContainer(BidirIter first, BidirIter last, const std::string& ns)
 {
   if ( printErrorWhenNotInitialized() )
     return;
-  
+
   visualization_msgs::Marker marker;
   marker.header.frame_id = cfg_->map_frame;
   marker.header.stamp = ros::Time::now();
@@ -190,13 +190,13 @@ void TebVisualization::publishPathContainer(BidirIter first, BidirIter last, con
   marker.action = visualization_msgs::Marker::ADD;
 
   typedef typename std::iterator_traits<BidirIter>::value_type PathType; // Get type of the path (point container)
-  
+
   // Iterate through path container
   while(first != last)
-  {	  
+  {
     // iterate single path points
     typename PathType::const_iterator it_point, end_point;
-    for (it_point = first->begin(), end_point = boost::prior(first->end()); it_point != end_point; ++it_point) 
+    for (it_point = first->begin(), end_point = boost::prior(first->end()); it_point != end_point; ++it_point)
     {
       geometry_msgs::Point point_start;
       point_start.x = get_const_reference(*it_point).x();
@@ -220,6 +220,6 @@ void TebVisualization::publishPathContainer(BidirIter first, BidirIter last, con
 
   teb_marker_pub_.publish( marker );
 }
-  
-  
+
+
 } // namespace teb_local_planner
