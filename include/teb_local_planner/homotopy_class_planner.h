@@ -80,11 +80,11 @@
 
 namespace teb_local_planner
 {
-  
- 
-//! Vertex in the graph that is used to find homotopy classes (only stores 2D positions)  
+
+
+//! Vertex in the graph that is used to find homotopy classes (only stores 2D positions)
 struct HcGraphVertex
-{ 
+{
 public:
   Eigen::Vector2d pos; // position of vertices in the map
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -107,23 +107,23 @@ typedef boost::graph_traits<HcGraph>::adjacency_iterator HcGraphAdjecencyIterato
  * @class HomotopyClassPlanner
  * @brief Local planner that explores alternative homotopy classes, create a plan for each alternative
  *	  and finally return the robot controls for the current best path (repeated in each sampling interval)
- * 
+ *
  * Homotopy classes are explored using the help a search-graph. \n
  * A couple of possible candidates are sampled / generated and filtered afterwards such that only a single candidate
  * per homotopy class remain. Filtering is applied using the H-Signature, a homotopy (resp. homology) invariant: \n
  *      - S. Bhattacharya et al.: Search-based Path Planning with Homotopy Class Constraints, AAAI, 2010
  *      - C. Rösmann et al.: Planning of Multiple Robot Trajectories in Distinctive Topologies, ECMR, 2015.
- * 
+ *
  * Followed by the homotopy class search, each candidate is used as an initialization for the underlying trajectory
  * optimization (in this case utilizing the TebOptimalPlanner class with the TimedElasticBand). \n
  * Depending on the config parameters, the optimization is performed in parallel. \n
- * After the optimization is completed, the best optimized candidate is selected w.r.t. to trajectory cost, since the 
+ * After the optimization is completed, the best optimized candidate is selected w.r.t. to trajectory cost, since the
  * cost already contains important features like clearance from obstacles and transition time. \n
- * 
+ *
  * Everyhting is performed by calling one of the overloaded plan() methods. \n
- * Afterwards the velocity command to control the robot is obtained from the "best" candidate 
+ * Afterwards the velocity command to control the robot is obtained from the "best" candidate
  * via getVelocityCommand(). \n
- * 
+ *
  * All steps are repeated in the subsequent sampling interval with the exception, that already planned (optimized) trajectories
  * are preferred against new path initilizations in order to improve the hot-starting capability.
  */
@@ -133,10 +133,10 @@ public:
 
   /**
    * @brief Default constructor
-   * 
+   *
    */
   HomotopyClassPlanner();
-  
+
   /**
    * @brief Construct and initialize the HomotopyClassPlanner
    * @param cfg Const reference to the TebConfig class for internal parameters
@@ -147,12 +147,12 @@ public:
    */
   HomotopyClassPlanner(const TebConfig& cfg, ObstContainer* obstacles = NULL, RobotFootprintModelPtr robot_model = boost::make_shared<PointRobotFootprint>(),
                        TebVisualizationPtr visualization = TebVisualizationPtr(), const ViaPointContainer* via_points = NULL);
-    
+
   /**
    * @brief Destruct the HomotopyClassPlanner.
    */
   virtual ~HomotopyClassPlanner();
-  
+
   /**
    * @brief Initialize the HomotopyClassPlanner
    * @param cfg Const reference to the TebConfig class for internal parameters
@@ -163,15 +163,15 @@ public:
    */
   void initialize(const TebConfig& cfg, ObstContainer* obstacles = NULL, RobotFootprintModelPtr robot_model = boost::make_shared<PointRobotFootprint>(),
                   TebVisualizationPtr visualization = TebVisualizationPtr(), const ViaPointContainer* via_points = NULL);
-  
-  
-  
+
+
+
   /** @name Plan a trajectory */
   //@{
-  
+
   /**
    * @brief Plan a trajectory based on an initial reference plan.
-   * 
+   *
    * Provide this method to create and optimize a trajectory that is initialized
    * according to an initial reference plan (given as a container of poses).
    * @warning The current implementation extracts only the start and goal pose and calls the overloaded plan()
@@ -181,11 +181,14 @@ public:
    *		      otherwise the final velocity will be zero (default: false)
    * @return \c true if planning was successful, \c false otherwise
    */
-  virtual bool plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false);
-  
+  virtual bool plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan,
+                    const std::map<int, std::vector<geometry_msgs::PoseStamped>>& initial_humans_plans_map,
+                    const geometry_msgs::Twist* start_vel = NULL,
+                    bool free_goal_vel=false);
+
   /**
    * @brief Plan a trajectory between a given start and goal pose (tf::Pose version).
-   * 
+   *
    * Provide this method to create and optimize a trajectory that is initialized between a given start and goal pose.
    * @param start tf::Pose containing the start pose of the trajectory
    * @param goal tf::Pose containing the goal pose of the trajectory
@@ -195,10 +198,10 @@ public:
    * @return \c true if planning was successful, \c false otherwise
    */
   virtual bool plan(const tf::Pose& start, const tf::Pose& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false);
-  
+
   /**
    * @brief Plan a trajectory between a given start and goal pose.
-   * 
+   *
    * Provide this method to create and optimize a trajectory that is initialized between a given start and goal pose.
    * @param start PoseSE2 containing the start pose of the trajectory
    * @param goal PoseSE2 containing the goal pose of the trajectory
@@ -208,7 +211,7 @@ public:
    * @return \c true if planning was successful, \c false otherwise
    */
   virtual bool plan(const PoseSE2& start, const PoseSE2& goal, const Eigen::Vector2d& start_vel, bool free_goal_vel=false, double pre_plan_time=0.0);
-  
+
   /**
    * @brief Get the velocity command from a previously optimized plan to control the robot at the current sampling interval.
    * @warning Call plan() first and check if the generated plan is feasible.
@@ -217,10 +220,10 @@ public:
    * @return \c true if command is valid, \c false otherwise
    */
   virtual bool getVelocityCommand(double& v, double& omega) const;
-  
+
   /**
    * @brief Access current best trajectory candidate (that relates to the "best" homotopy class).
-   * 
+   *
    * If no trajectory is available, the pointer will be empty.
    * If only a single trajectory is available, return it.
    * Otherwise return the best one, but call selectBestTeb() before to perform the actual selection (part of the plan() methods).

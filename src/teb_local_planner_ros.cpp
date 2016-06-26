@@ -341,7 +341,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   predict_srv.request.type = hanp_prediction::HumanPosePredictRequest::VELOCITY_OBSTACLE;
   predict_srv.request.publish_markers = publish_predicted_human_markers_;
 
-  std::map<int, std::vector<geometry_msgs::PoseStamped>> transformed_human_plans;
+  std::map<int, std::vector<geometry_msgs::PoseStamped>> transformed_humans_plans_map;
 
   if(predict_humans_client_ && predict_humans_client_.call(predict_srv))
   {
@@ -357,7 +357,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
         continue;
       }
 
-      transformed_human_plans[human_plan_prediction.track_id] = transformed_human_plan;
+      transformed_humans_plans_map[human_plan_prediction.track_id] = transformed_human_plan;
     }
   }
   else
@@ -367,12 +367,13 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
     // re-initialize the service
     //predict_humans_client_ = nh.serviceClient<hanp_prediction::HumanPosePredict>(PREDICT_SERVICE_NAME, true);
   }
+  updateHumanViaPointsContainers(transformed_humans_plans_map, cfg_.trajectory.global_plan_viapoint_sep);
   auto human_time = ros::Time::now() - human_start_time;
 
   // Now perform the actual planning
   auto plan_start_time = ros::Time::now();
   // bool success = planner_->plan(robot_pose_, robot_goal_, robot_vel_, cfg_.goal_tolerance.free_goal_vel); // straight line init
-  bool success = planner_->plan(transformed_plan, &robot_vel_twist, cfg_.goal_tolerance.free_goal_vel);
+  bool success = planner_->plan(transformed_plan, transformed_humans_plans_map, &robot_vel_twist, cfg_.goal_tolerance.free_goal_vel);
   if (!success)
   {
     planner_->clearPlanner(); // force reinitialization for next time
@@ -447,7 +448,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   visualization_->publishObstacles(obstacles_);
   visualization_->publishViaPoints(via_points_);
   visualization_->publishGlobalPlan(global_plan_);
-  visualization_->publishHumansPlans(transformed_human_plans);
+  visualization_->publishHumansPlans(transformed_humans_plans_map);
   auto viz_time = ros::Time::now() - viz_start_time;
 
   auto total_time = ros::Time::now() - start_time;
@@ -619,6 +620,47 @@ void TebLocalPlannerROS::updateViaPointsContainer(const std::vector<geometry_msg
     prev_idx = i;
   }
 
+}
+
+void TebLocalPlannerROS::updateHumanViaPointsContainers(const std::map<int, std::vector<geometry_msgs::PoseStamped>>& transformed_humans_plans_map,
+                                                        double min_separation) {
+    for (auto& transformed_human_plan_kv : transformed_humans_plans_map) {
+        auto& human_id = transformed_human_plan_kv.first;
+        auto& transformed_human_plan = transformed_human_plan_kv.second;
+
+        if (humans_via_points_map_.find(human_id) != humans_via_points_map_.end())
+            humans_via_points_map_[human_id].clear();
+        else
+            humans_via_points_map_[human_id] = ViaPointContainer();
+    }
+
+    auto itr = humans_via_points_map_.begin();
+    while (itr != humans_via_points_map_.end()) {
+        if (transformed_humans_plans_map.find(itr->first) != transformed_humans_plans_map.end())
+            itr = humans_via_points_map_.erase(itr); //TODO: need to check for memory leak for vector
+        else
+            ++itr;
+    }
+
+    if (min_separation<0)
+        return;
+
+    std::size_t prev_idx;
+    for (auto& transformed_human_plan_kv : transformed_humans_plans_map) {
+        prev_idx = 0;
+        auto& human_id = transformed_human_plan_kv.first;
+        auto& transformed_human_plan = transformed_human_plan_kv.second;
+        for (std::size_t i=1; i < transformed_human_plan.size(); ++i) {
+            if (distance_points2d(transformed_human_plan[prev_idx].pose.position,
+                                  transformed_human_plan[i].pose.position)
+                < min_separation)
+                continue;
+
+            humans_via_points_map_[human_id].push_back(Eigen::Vector2d(transformed_human_plan[i].pose.position.x,
+                                                                       transformed_human_plan[i].pose.position.y));
+            prev_idx = i;
+        }
+    }
 }
 
 Eigen::Vector2d TebLocalPlannerROS::tfPoseToEigenVector2dTransRot(const tf::Pose& tf_vel)

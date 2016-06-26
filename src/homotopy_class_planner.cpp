@@ -40,8 +40,8 @@
 
 namespace teb_local_planner
 {
-  
-//!< Inline function used for calculateHSignature() in combination with VertexPose pointers   
+
+//!< Inline function used for calculateHSignature() in combination with VertexPose pointers
 inline std::complex<long double> getCplxFromVertexPosePtr(const VertexPose* pose)
 {
   return std::complex<long double>(pose->x(), pose->y());
@@ -52,14 +52,14 @@ inline std::complex<long double> getCplxFromHcGraph(HcGraphVertexType vert_descr
 {
   return std::complex<long double>(graph[vert_descriptor].pos.x(), graph[vert_descriptor].pos.y());
 };
-  
+
 //!< Inline function used for initializing the TEB in combination with HCP graph vertex descriptors
 inline const Eigen::Vector2d& getVector2dFromHcGraph(HcGraphVertexType vert_descriptor, const HcGraph& graph)
 {
   return graph[vert_descriptor].pos;
 };
-  
-//!< Inline function used for calculateHSignature() in combination with geometry_msgs::PoseStamped   
+
+//!< Inline function used for calculateHSignature() in combination with geometry_msgs::PoseStamped
 inline std::complex<long double> getCplxFromMsgPoseStamped(const geometry_msgs::PoseStamped& pose)
 {
   return std::complex<long double>(pose.pose.position.x, pose.pose.position.y);
@@ -70,7 +70,7 @@ HomotopyClassPlanner::HomotopyClassPlanner() : obstacles_(NULL), via_points_(NUL
                                                initial_plan_(NULL), initialized_(false)
 {
 }
-  
+
 HomotopyClassPlanner::HomotopyClassPlanner(const TebConfig& cfg, ObstContainer* obstacles, RobotFootprintModelPtr robot_model,
                                            TebVisualizationPtr visual, const ViaPointContainer* via_points) : initial_plan_(NULL)
 {
@@ -89,7 +89,7 @@ void HomotopyClassPlanner::initialize(const TebConfig& cfg, ObstContainer* obsta
   via_points_ = via_points;
   robot_model_ = robot_model;
   initialized_ = true;
-  
+
   setVisualization(visual);
 }
 
@@ -100,17 +100,19 @@ void HomotopyClassPlanner::setVisualization(TebVisualizationPtr visualization)
 }
 
 
- 
-bool HomotopyClassPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan, const geometry_msgs::Twist* start_vel, bool free_goal_vel)
-{    
+
+bool HomotopyClassPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan,
+                                const std::map<int, std::vector<geometry_msgs::PoseStamped>>& initial_humans_plans_map,
+                                const geometry_msgs::Twist* start_vel, bool free_goal_vel)
+{
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
   auto start_time = ros::Time::now();
-  
+
   // store initial plan for further initializations (must be valid for the lifetime of this object or clearPlanner() is called!)
   initial_plan_ = &initial_plan;
   // store the h signature of the initial plan to enable searching a matching teb later.
   initial_plan_h_sig_ = calculateHSignature(initial_plan.begin(), initial_plan.end(), getCplxFromMsgPoseStamped, obstacles_, cfg_->hcp.h_signature_prescaler);
-    
+
   PoseSE2 start(initial_plan.front().pose);
   PoseSE2 goal(initial_plan.back().pose);
   Eigen::Vector2d vel = start_vel ?  Eigen::Vector2d( start_vel->linear.x, start_vel->angular.z ) : Eigen::Vector2d::Zero();
@@ -129,15 +131,15 @@ bool HomotopyClassPlanner::plan(const tf::Pose& start, const tf::Pose& goal, con
 }
 
 bool HomotopyClassPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const Eigen::Vector2d& start_vel, bool free_goal_vel, double pre_plan_time)
-{	
+{
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
   auto start_time = ros::Time::now();
-  
+
   // Update old TEBs with new start, goal and velocity
   auto teb_update_start_time = ros::Time::now();
   updateAllTEBs(start, goal, start_vel);
   auto teb_update_time = ros::Time::now() - teb_update_start_time;
-    
+
   // Init new TEBs based on newly explored homotopy classes
   auto hex_start_time = ros::Time::now();
   exploreHomotopyClassesAndInitTebs(start, goal, cfg_->obstacles.min_obstacle_dist, start_vel);
@@ -155,7 +157,7 @@ bool HomotopyClassPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const
 
   auto other_start_time = ros::Time::now();
   // Delete any detours
-  deleteTebDetours(-0.1); 
+  deleteTebDetours(-0.1);
   // Select which candidate (based on alternative homotopy classes) should be used
   selectBestTeb();
 
@@ -172,8 +174,8 @@ bool HomotopyClassPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const
     "\tteb optimize time          " << std::to_string(teb_time.toSec()) << "\n" <<
     "\tother time                 " << std::to_string(other_time.toSec()) << "\n-------------------------");
   return true;
-} 
- 
+}
+
 bool HomotopyClassPlanner::getVelocityCommand(double& v, double& omega) const
 {
   TebOptimalPlannerConstPtr best_teb = bestTeb();
@@ -183,8 +185,8 @@ bool HomotopyClassPlanner::getVelocityCommand(double& v, double& omega) const
     omega = 0;
     return false;
   }
- 
-  return best_teb->getVelocityCommand(v, omega); 
+
+  return best_teb->getVelocityCommand(v, omega);
 }
 
 
@@ -197,19 +199,19 @@ void HomotopyClassPlanner::visualize()
     // Visualize graph
     if (cfg_->hcp.visualize_hc_graph)
       visualization_->publishGraph(graph_);
-        
+
     // Visualize active tebs as marker
     visualization_->publishTebContainer(tebs_);
-    
+
     // Visualize best teb and feedback message if desired
     TebOptimalPlannerConstPtr best_teb = bestTeb();
     if (best_teb)
     {
       visualization_->publishLocalPlanAndPoses(best_teb->teb());
-      
+
       if (best_teb->teb().sizePoses() > 0) //TODO maybe store current pose (start) within plan method as class field.
         visualization_->publishRobotFootprintModel(best_teb->teb().Pose(0), *robot_model_);
-    
+
       // feedback message
       if (cfg_->trajectory.publish_feedback)
       {
@@ -229,11 +231,11 @@ void HomotopyClassPlanner::createGraph(const PoseSE2& start, const PoseSE2& goal
 {
   // Clear existing graph and paths
   clearGraph();
-  
+
   // Direction-vector between start and goal and normal-vector:
   Eigen::Vector2d diff = goal.position()-start.position();
-  
-  if (diff.norm()<cfg_->goal_tolerance.xy_goal_tolerance) 
+
+  if (diff.norm()<cfg_->goal_tolerance.xy_goal_tolerance)
   {
     ROS_DEBUG("HomotopyClassPlanner::createProbRoadmapGraph(): xy-goal-tolerance already reached.");
     if (tebs_.empty())
@@ -243,20 +245,20 @@ void HomotopyClassPlanner::createGraph(const PoseSE2& start, const PoseSE2& goal
     }
     return;
   }
-  
+
   Eigen::Vector2d normal(-diff[1],diff[0]); // normal-vector
   normal.normalize();
   normal = normal*dist_to_obst; // scale with obstacle_distance;
-  
+
   // Insert Vertices
   HcGraphVertexType start_vtx = boost::add_vertex(graph_); // start vertex
   graph_[start_vtx].pos = start.position();
   diff.normalize();
-  
+
   // store nearest obstacle keypoints -> only used if limit_obstacle_heading is enabled
   std::pair<HcGraphVertexType,HcGraphVertexType> nearest_obstacle; // both vertices are stored
   double min_dist = DBL_MAX;
-  
+
   if (obstacles_!=NULL)
   {
     for (ObstContainer::const_iterator it_obst = obstacles_->begin(); it_obst != obstacles_->end(); ++it_obst)

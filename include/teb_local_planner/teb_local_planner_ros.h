@@ -219,6 +219,8 @@ protected:
    */
   void updateViaPointsContainer(const std::vector<geometry_msgs::PoseStamped>& transformed_plan, double min_separation);
 
+  void updateHumanViaPointsContainers(const std::map<int, std::vector<geometry_msgs::PoseStamped>>& transformed_humans_plans_map, double min_separation);
+
 
   /**
     * @brief Callback for the dynamic_reconfigure node.
@@ -363,6 +365,7 @@ private:
   PlannerInterfacePtr planner_; //!< Instance of the underlying optimal planner class
   ObstContainer obstacles_; //!< Obstacle vector that should be considered during local trajectory optimization
   ViaPointContainer via_points_; //!< Container of via-points that should be considered during local trajectory optimization
+  std::map<int, ViaPointContainer> humans_via_points_map_;
   TebVisualizationPtr visualization_; //!< Instance of the visualization class (local/global plan, obstacles, ...)
   boost::shared_ptr<base_local_planner::CostmapModel> costmap_model_;
   TebConfig cfg_; //!< Config class that stores and manages all related parameters

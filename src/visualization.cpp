@@ -86,52 +86,47 @@ void TebVisualization::publishLocalPlan(const std::vector<geometry_msgs::PoseSta
   base_local_planner::publishPlan(local_plan, local_plan_pub_);
 }
 
-void TebVisualization::publishHumansPlans(const std::map<int, std::vector<geometry_msgs::PoseStamped>>& humans_plans) const
+void TebVisualization::publishHumansPlans(const std::map<int, std::vector<geometry_msgs::PoseStamped>>& humans_plans_map) const
 {
-  if ( printErrorWhenNotInitialized() )
-  {
-    return;
-  }
+    if (printErrorWhenNotInitialized())
+        return;
 
-  if(humans_plans.empty())
-  {
-    return;
-  }
+    if(humans_plans_map.empty())
+        return;
 
-  path_array_rviz_plugin::PathArray gui_path_array;
+    path_array_rviz_plugin::PathArray gui_path_array;
 
-  for (auto& human_plan : humans_plans)
-  {
-    if(human_plan.second.empty())
+    for (auto& human_plan_kv : humans_plans_map)
     {
-      continue;
+        auto& human_id = human_plan_kv.first;
+        auto& human_plan = human_plan_kv.second;
+
+        if(human_plan.empty())
+            continue;
+
+        nav_msgs::Path path;
+        path.poses.resize(human_plan.size());
+        path.header.frame_id = human_plan[0].header.frame_id;
+        path.header.stamp = human_plan[0].header.stamp;
+        for(unsigned int i=0; i < human_plan.size(); i++)
+        {
+            path.poses[i] = human_plan[i];
+        }
+
+        path_array_rviz_plugin::Path gui_path;
+        gui_path.path_id = human_id;
+        gui_path.path = path;
+
+        gui_path_array.paths.push_back(gui_path);
     }
 
-    nav_msgs::Path path;
-    path.poses.resize(human_plan.second.size());
-    path.header.frame_id = human_plan.second[0].header.frame_id;
-    path.header.stamp = human_plan.second[0].header.stamp;
-    for(unsigned int i=0; i < human_plan.second.size(); i++)
-    {
-      path.poses[i] = human_plan.second[i];
-    }
+    if(gui_path_array.paths.empty())
+        return;
 
-    path_array_rviz_plugin::Path gui_path;
-    gui_path.path_id = human_plan.first;
-    gui_path.path = path;
+    gui_path_array.header.frame_id = gui_path_array.paths[0].path.poses[0].header.frame_id;
+    gui_path_array.header.stamp = gui_path_array.paths[0].path.poses[0].header.stamp;
 
-    gui_path_array.paths.push_back(gui_path);
-  }
-
-  if(gui_path_array.paths.empty())
-  {
-    return;
-  }
-
-  gui_path_array.header.frame_id = gui_path_array.paths[0].path.poses[0].header.frame_id;
-  gui_path_array.header.stamp = gui_path_array.paths[0].path.poses[0].header.stamp;
-
-  humans_plans_pub_.publish(gui_path_array);
+    humans_plans_pub_.publish(gui_path_array);
 }
 
 void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand& teb) const
