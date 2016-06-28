@@ -74,25 +74,25 @@ int main( int argc, char** argv )
 {
   ros::init(argc, argv, "test_optim_node");
   ros::NodeHandle n("~");
- 
-  
+
+
   // load ros parameters from node handle
   config.loadRosParamFromNodeHandle(n);
- 
+
   ros::Timer cycle_timer = n.createTimer(ros::Duration(0.025), CB_mainCycle);
   ros::Timer publish_timer = n.createTimer(ros::Duration(0.1), CB_publishCycle);
-  
+
   // setup dynamic reconfigure
   dynamic_recfg = boost::make_shared< dynamic_reconfigure::Server<TebLocalPlannerReconfigureConfig> >(n);
   dynamic_reconfigure::Server<TebLocalPlannerReconfigureConfig>::CallbackType cb = boost::bind(CB_reconfigure, _1, _2);
   dynamic_recfg->setCallback(cb);
-  
+
   // setup callback for custom obstacles
   custom_obst_sub = n.subscribe("obstacles", 1, CB_customObstacle);
-  
+
   // setup callback for clicked points (in rviz) that are considered as via-points
   clicked_points_sub = n.subscribe("/clicked_point", 5, CB_clicked_points);
-  
+
   // interactive marker server for simulated dynamic obstacles
   interactive_markers::InteractiveMarkerServer marker_server("marker_obstacles");
 
@@ -102,46 +102,46 @@ int main( int argc, char** argv )
 //  obst_vector.push_back( boost::make_shared<LineObstacle>(1,1.5,1,-1.5) ); //90 deg
 //  obst_vector.push_back( boost::make_shared<LineObstacle>(1,0,-1,0) ); //180 deg
 //  obst_vector.push_back( boost::make_shared<PointObstacle>(-1.5,-0.5) );
-  
+
   /*
   PolygonObstacle* polyobst = new PolygonObstacle;
   polyobst->pushBackVertex(1, -1);
   polyobst->pushBackVertex(0, 1);
   polyobst->pushBackVertex(1, 1);
   polyobst->pushBackVertex(2, 1);
- 
+
   polyobst->finalizePolygon();
   obst_vector.emplace_back(polyobst);
   */
-  
+
   for (unsigned int i=0; i<obst_vector.size(); ++i)
   {
-    //CreateInteractiveMarker(obst_vector.at(i)[0],obst_vector.at(i)[1],i,&marker_server, &CB_obstacle_marker);  
+    //CreateInteractiveMarker(obst_vector.at(i)[0],obst_vector.at(i)[1],i,&marker_server, &CB_obstacle_marker);
     // Add interactive markers for all point obstacles
     boost::shared_ptr<PointObstacle> pobst = boost::dynamic_pointer_cast<PointObstacle>(obst_vector.at(i));
     if (pobst)
     {
-      CreateInteractiveMarker(pobst->x(),pobst->y(),i, config.map_frame, &marker_server, &CB_obstacle_marker);  
+      CreateInteractiveMarker(pobst->x(),pobst->y(),i, config.map_frame, &marker_server, &CB_obstacle_marker);
     }
   }
   marker_server.applyChanges();
-  
-  
+
+
   // Add via points
   //via_points.push_back( Eigen::Vector2d( 0.0, 1.5 ) );
-  
+
   // Setup visualization
   visual = TebVisualizationPtr(new TebVisualization(n, config));
-  
+
   // Setup robot shape model
   RobotFootprintModelPtr robot_model = TebLocalPlannerROS::getRobotFootprintFromParamServer(n);
-  
+
   // Setup planner (homotopy class planning or just the local teb planner)
   if (config.hcp.enable_homotopy_class_planning)
     planner = PlannerInterfacePtr(new HomotopyClassPlanner(config, &obst_vector, robot_model, visual, &via_points));
   else
     planner = PlannerInterfacePtr(new TebOptimalPlanner(config, &obst_vector, robot_model, visual, &via_points));
-  
+
 
   no_fixed_obstacles = obst_vector.size();
   ros::spin();
@@ -225,19 +225,19 @@ void CB_obstacle_marker(const visualization_msgs::InteractiveMarkerFeedbackConst
   std::stringstream ss(feedback->marker_name);
   unsigned int index;
   ss >> index;
-  
-  if (index>=no_fixed_obstacles) 
+
+  if (index>=no_fixed_obstacles)
     return;
   PointObstacle* pobst = static_cast<PointObstacle*>(obst_vector.at(index).get());
-  pobst->position() = Eigen::Vector2d(feedback->pose.position.x,feedback->pose.position.y);	  
+  pobst->position() = Eigen::Vector2d(feedback->pose.position.x,feedback->pose.position.y);
 }
 
 void CB_customObstacle(const teb_local_planner::ObstacleMsg::ConstPtr& obst_msg)
 {
   // resize such that the vector contains only the fixed obstacles specified inside the main function
   obst_vector.resize(no_fixed_obstacles);
-  
-  // Add custom obstacles obtained via message (assume that all obstacles coordiantes are specified in the default planning frame)  
+
+  // Add custom obstacles obtained via message (assume that all obstacles coordiantes are specified in the default planning frame)
   for (std::vector<geometry_msgs::PolygonStamped>::const_iterator obst_it = obst_msg->obstacles.begin(); obst_it != obst_msg->obstacles.end(); ++obst_it)
   {
     if (obst_it->polygon.points.size() == 1 )

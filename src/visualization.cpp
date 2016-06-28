@@ -63,7 +63,8 @@ void TebVisualization::initialize(ros::NodeHandle& nh, const TebConfig& cfg)
   // register topics
   global_plan_pub_ = nh.advertise<nav_msgs::Path>("global_plan", 1);
   local_plan_pub_ = nh.advertise<nav_msgs::Path>("local_plan",1);
-  humans_plans_pub_ = nh.advertise<path_array_rviz_plugin::PathArray>("humans_plans",1);
+  humans_global_plans_pub_ = nh.advertise<path_array_rviz_plugin::PathArray>("humans_global_plans",1);
+  humans_local_plans_pub_ = nh.advertise<path_array_rviz_plugin::PathArray>("humans_local_plans",1);
   teb_poses_pub_ = nh.advertise<geometry_msgs::PoseArray>("teb_poses", 100);
   teb_marker_pub_ = nh.advertise<visualization_msgs::Marker>("teb_markers", 1000);
   feedback_pub_ = nh.advertise<teb_local_planner::FeedbackMsg>("teb_feedback", 10);
@@ -86,7 +87,7 @@ void TebVisualization::publishLocalPlan(const std::vector<geometry_msgs::PoseSta
   base_local_planner::publishPlan(local_plan, local_plan_pub_);
 }
 
-void TebVisualization::publishHumansPlans(const std::map<int, std::vector<geometry_msgs::PoseStamped>>& humans_plans_map) const
+void TebVisualization::publishHumansPlans(const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>>& humans_plans_map) const
 {
     if (printErrorWhenNotInitialized())
         return;
@@ -126,7 +127,7 @@ void TebVisualization::publishHumansPlans(const std::map<int, std::vector<geomet
     gui_path_array.header.frame_id = gui_path_array.paths[0].path.poses[0].header.frame_id;
     gui_path_array.header.stamp = gui_path_array.paths[0].path.poses[0].header.stamp;
 
-    humans_plans_pub_.publish(gui_path_array);
+    humans_global_plans_pub_.publish(gui_path_array);
 }
 
 void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand& teb) const
@@ -159,6 +160,51 @@ void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand& teb) con
     }
     local_plan_pub_.publish(teb_path);
     teb_poses_pub_.publish(teb_poses);
+}
+
+void TebVisualization::publishHumanPlanAndPoses(const std::map<uint64_t, TimedElasticBand>& humans_tebs_map) const {
+    if (printErrorWhenNotInitialized() || humans_tebs_map.empty())
+        return;
+
+    path_array_rviz_plugin::PathArray gui_teb_path_array;
+
+    for (auto& human_teb_kv : humans_tebs_map) {
+        auto& human_id = human_teb_kv.first;
+        auto& human_teb = human_teb_kv.second;
+
+        if(human_teb.sizePoses() == 0)
+            continue;
+
+        nav_msgs::Path teb_path;
+        //teb_path.poses.resize(human_teb.sizePoses());
+        teb_path.header.frame_id = cfg_->map_frame;
+        teb_path.header.stamp = ros::Time::now();
+        for(unsigned int i=0; i < human_teb.sizePoses(); i++)
+        {
+            geometry_msgs::PoseStamped pose;
+            pose.header.frame_id = teb_path.header.frame_id;
+            pose.header.stamp = teb_path.header.stamp;
+            pose.pose.position.x = human_teb.Pose(i).x();
+            pose.pose.position.y = human_teb.Pose(i).y();
+            pose.pose.position.z = 0.0;
+            pose.pose.orientation = tf::createQuaternionMsgFromYaw(human_teb.Pose(i).theta());
+            teb_path.poses.push_back(pose);
+        }
+
+        path_array_rviz_plugin::Path gui_teb_path;
+        gui_teb_path.path_id = human_id;
+        gui_teb_path.path = teb_path;
+
+        gui_teb_path_array.paths.push_back(gui_teb_path);
+    }
+
+    if(gui_teb_path_array.paths.empty())
+        return;
+
+    gui_teb_path_array.header.frame_id = gui_teb_path_array.paths[0].path.poses[0].header.frame_id;
+    gui_teb_path_array.header.stamp = gui_teb_path_array.paths[0].path.poses[0].header.stamp;
+
+    humans_local_plans_pub_.publish(gui_teb_path_array);
 }
 
 

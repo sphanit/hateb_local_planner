@@ -48,7 +48,7 @@
 
 
 // Definitions
-#define USE_ANALYTIC_JACOBI // if available for a specific edge, use analytic jacobi 
+#define USE_ANALYTIC_JACOBI // if available for a specific edge, use analytic jacobi
 
 
 namespace teb_local_planner
@@ -57,14 +57,14 @@ namespace teb_local_planner
 /**
  * @class TebConfig
  * @brief Config class for the teb_local_planner and its components.
- */  
+ */
 class TebConfig
 {
 public:
-  
+
   std::string odom_topic; //!< Topic name of the odometry message, provided by the robot driver or simulator
   std::string map_frame; //!< Global planning frame
-  
+
   //! Trajectory related parameters
   struct Trajectory
   {
@@ -81,7 +81,7 @@ public:
     bool publish_feedback; //!< Publish planner feedback containing the full trajectory and a list of active obstacles (should be enabled only for evaluation or debugging purposes)
     bool shrink_horizon_backup; //!< Allows the planner to shrink the horizon temporary (50%) in case of automatically detected issues.
   } trajectory; //!< Trajectory related parameters
-    
+
   //! Robot related parameters
   struct Robot
   {
@@ -90,11 +90,16 @@ public:
     double max_vel_theta; //!< Maximum angular velocity of the robot
     double acc_lim_x; //!< Maximum translational acceleration of the robot
     double acc_lim_theta; //!< Maximum angular acceleration of the robot
-    double min_turning_radius; //!< Minimum turning radius of a carlike robot (diff-drive robot: zero); 
+    double min_turning_radius; //!< Minimum turning radius of a carlike robot (diff-drive robot: zero);
     double wheelbase; //!< The distance between the drive shaft and steering axle (only required for a carlike robot with 'cmd_angle_instead_rotvel' enabled); The value might be negative for back-wheeled robots!
     bool cmd_angle_instead_rotvel; //!< Substitute the rotational velocity in the commanded velocity message by the corresponding steering angle (check 'axles_distance')
   } robot; //!< Robot related parameters
-  
+
+  struct Human {
+      double radius;
+      double min_human_dist;
+  } human;
+
   //! Goal tolerance related parameters
   struct GoalTolerance
   {
@@ -115,18 +120,18 @@ public:
     int costmap_converter_rate; //!< The rate that defines how often the costmap_converter plugin processes the current costmap (the value should not be much higher than the costmap update rate)
   } obstacles; //!< Obstacle related parameters
 
-  
+
   //! Optimization related parameters
   struct Optimization
   {
     int no_inner_iterations; //!< Number of solver iterations called in each outerloop iteration
     int no_outer_iterations; //!< Each outerloop iteration automatically resizes the trajectory and invokes the internal optimizer with no_inner_iterations
-    
+
     bool optimization_activate; //!< Activate the optimization
     bool optimization_verbose; //!< Print verbose information
-    
+
     double penalty_epsilon; //!< Add a small safety margin to penalty functions for hard-constraint approximations
-    
+
     double weight_max_vel_x; //!< Optimization weight for satisfying the maximum allowed translational velocity
     double weight_max_vel_theta; //!< Optimization weight for satisfying the maximum allowed angular velocity
     double weight_acc_lim_x; //!< Optimization weight for satisfying the maximum allowed translational acceleration
@@ -136,11 +141,11 @@ public:
     double weight_kinematics_turning_radius; //!< Optimization weight for enforcing a minimum turning radius (carlike robots)
     double weight_optimaltime; //!< Optimization weight for contracting the trajectory w.r.t transition time
     double weight_obstacle; //!< Optimization weight for satisfying a minimum separation from obstacles
-    double weight_dynamic_obstacle; //!< Optimization weight for satisfying a minimum separation from dynamic obstacles    
+    double weight_dynamic_obstacle; //!< Optimization weight for satisfying a minimum separation from dynamic obstacles
     double weight_viapoint; //!< Optimization weight for minimizing the distance to via-points
   } optim; //!< Optimization related parameters
-  
-  
+
+
   struct HomotopyClasses
   {
     bool enable_homotopy_class_planning; //!< Activate homotopy class planning (Requires much more resources that simple planning, since multiple trajectories are optimized at once).
@@ -151,20 +156,20 @@ public:
     double selection_obst_cost_scale; //!< Extra scaling of obstacle cost terms just for selecting the 'best' candidate.
     double selection_viapoint_cost_scale; //!< Extra scaling of via-point cost terms just for selecting the 'best' candidate.
     bool selection_alternative_time_cost; //!< If true, time cost is replaced by the total transition time.
-    
+
     int roadmap_graph_no_samples; //! < Specify the number of samples generated for creating the roadmap graph, if simple_exploration is turend off.
     double roadmap_graph_area_width; //!< Random keypoints/waypoints are sampled in a rectangular region between start and goal. Specify the width of that region in meters.
     double h_signature_prescaler; //!< Scale number of obstacle value in order to allow huge number of obstacles. Do not choose it extremly low, otherwise obstacles cannot be distinguished from each other (0.2<H<=1).
     double h_signature_threshold; //!< Two h-signatures are assumed to be equal, if both the difference of real parts and complex parts are below the specified threshold.
-    
+
     double obstacle_keypoint_offset; //!< If simple_exploration is turned on, this parameter determines the distance on the left and right side of the obstacle at which a new keypoint will be cretead (in addition to min_obstacle_dist).
     double obstacle_heading_threshold; //!< Specify the value of the normalized scalar product between obstacle heading and goal heading in order to take them (obstacles) into account for exploration [0,1]
-    
+
     bool viapoints_all_candidates; //!< If true, all trajectories of different topologies are attached to the current set of via-points, otherwise only the trajectory sharing the same one as the initial/global plan.
-    
+
     bool visualize_hc_graph; //!< Visualize the graph that is created for exploring new homotopy classes.
   } hcp;
-  
+
 
  /**
   * @brief Construct the TebConfig using default values.
@@ -172,7 +177,7 @@ public:
   *	     the default variables will be overwritten: \n
   *	     E.g. if \e base_local_planner is utilized as plugin for the navigation stack, the initialize() method will register a
   * 	     dynamic_reconfigure server. A subset (not all but most) of the parameters are considered for dynamic modifications.
-  * 	     All parameters considered by the dynamic_reconfigure server (and their \b default values) are 
+  * 	     All parameters considered by the dynamic_reconfigure server (and their \b default values) are
   * 	     set in \e PROJECT_SRC/cfg/TebLocalPlannerReconfigure.cfg. \n
   * 	     In addition the rosparam server can be queried to get parameters e.g. defiend in a launch file.
   * 	     The plugin source (or a possible binary source) can call loadRosParamFromNodeHandle() to update the parameters.
@@ -181,12 +186,12 @@ public:
   */
   TebConfig()
   {
-    
+
     odom_topic = "odom";
-    map_frame = "odom"; 
-    
+    map_frame = "odom";
+
     // Trajectory
-    
+
     trajectory.teb_autosize = true;
     trajectory.dt_ref = 0.3;
     trajectory.dt_hysteresis = 0.1;
@@ -199,9 +204,9 @@ public:
     trajectory.feasibility_check_no_poses = 5;
     trajectory.publish_feedback = false;
     trajectory.shrink_horizon_backup = true;
-    
+
     // Robot
-         
+
     robot.max_vel_x = 0.4;
     robot.max_vel_x_backwards = 0.2;
     robot.max_vel_theta = 0.3;
@@ -210,15 +215,19 @@ public:
     robot.min_turning_radius = 0;
     robot.wheelbase = 1.0;
     robot.cmd_angle_instead_rotvel = false;
-    
+
+    // Human
+    human.radius = 0.2;
+    human.min_human_dist = 0.2;
+
     // GoalTolerance
-    
+
     goal_tolerance.xy_goal_tolerance = 0.2;
     goal_tolerance.yaw_goal_tolerance = 0.2;
     goal_tolerance.free_goal_vel = false;
-    
+
     // Obstacles
-    
+
     obstacles.min_obstacle_dist = 0.5;
     obstacles.include_costmap_obstacles = true;
     obstacles.costmap_obstacles_behind_robot_dist = 0.5;
@@ -226,9 +235,9 @@ public:
     obstacles.costmap_converter_plugin = "";
     obstacles.costmap_converter_spin_thread = true;
     obstacles.costmap_converter_rate = 5;
-    
+
     // Optimization
-    
+
     optim.no_inner_iterations = 5;
     optim.no_outer_iterations = 4;
     optim.optimization_activate = true;
@@ -245,38 +254,38 @@ public:
     optim.weight_obstacle = 10;
     optim.weight_dynamic_obstacle = 10;
     optim.weight_viapoint = 1;
-    
+
     // Homotopy Class Planner
-   
+
     hcp.enable_homotopy_class_planning = true;
     hcp.enable_multithreading = true;
     hcp.simple_exploration = false;
-    hcp.max_number_classes = 5; 
+    hcp.max_number_classes = 5;
     hcp.selection_cost_hysteresis = 1.0;
     hcp.selection_obst_cost_scale = 100.0;
     hcp.selection_viapoint_cost_scale = 1.0;
     hcp.selection_alternative_time_cost = false;
-        
+
     hcp.obstacle_keypoint_offset = 0.1;
-    hcp.obstacle_heading_threshold = 0.45; 
+    hcp.obstacle_heading_threshold = 0.45;
     hcp.roadmap_graph_no_samples = 15;
     hcp.roadmap_graph_area_width = 6; // [m]
     hcp.h_signature_prescaler = 1;
     hcp.h_signature_threshold = 0.1;
-    
+
     hcp.viapoints_all_candidates = true;
-    
+
     hcp.visualize_hc_graph = false;
 
 
   }
-  
+
   /**
    * @brief Load parmeters from the ros param server.
    * @param nh const reference to the local ros::NodeHandle
    */
   void loadRosParamFromNodeHandle(const ros::NodeHandle& nh);
-  
+
   /**
    * @brief Reconfigure parameters from the dynamic_reconfigure config.
    * Change parameters dynamically (e.g. with <c>rosrun rqt_reconfigure rqt_reconfigure</c>).
@@ -286,29 +295,29 @@ public:
    * @param cfg Config class autogenerated by dynamic_reconfigure according to the cfg-file mentioned above.
    */
   void reconfigure(TebLocalPlannerReconfigureConfig& cfg);
-  
+
   /**
    * @brief Check parameters and print warnings in case of discrepancies
-   * 
+   *
    * Call this method whenever parameters are changed using public interfaces to inform the user
    * about some improper uses.
    */
   void checkParameters() const;
-  
+
   /**
    * @brief Check if some deprecated parameters are found and print warnings
    * @param nh const reference to the local ros::NodeHandle
    */
   void checkDeprecated(const ros::NodeHandle& nh) const;
-  
+
   /**
    * @brief Return the internal config mutex
    */
   boost::mutex& configMutex() {return config_mutex_;}
-  
+
 private:
   boost::mutex config_mutex_; //!< Mutex for config accesses and changes
-  
+
 };
 
 

@@ -123,7 +123,7 @@ public:
    * @brief Publish a given global plan to the ros topic \e ../../global_plan
    * @param global_plan Pose array describing the global plan
    */
-  void publishHumansPlans(const std::map<int, std::vector<geometry_msgs::PoseStamped>>& humans_plans) const;
+  void publishHumansPlans(const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>>& humans_plans) const;
 
   /**
    * @brief Publish Timed_Elastic_Band related stuff (local plan, pose sequence).
@@ -133,6 +133,7 @@ public:
    * @param teb const reference to a Timed_Elastic_Band
    */
   void publishLocalPlanAndPoses(const TimedElasticBand& teb) const;
+  void publishHumanPlanAndPoses(const std::map<uint64_t, TimedElasticBand>& humans_tebs_map) const;
 
   /**
    * @brief Publish the visualization of the robot model
@@ -238,7 +239,8 @@ protected:
 
   ros::Publisher global_plan_pub_; //!< Publisher for the global plan
   ros::Publisher local_plan_pub_; //!< Publisher for the local plan
-  ros::Publisher humans_plans_pub_; //!< Publisher for the local plan
+  ros::Publisher humans_global_plans_pub_; //!< Publisher for the local plan
+  ros::Publisher humans_local_plans_pub_; //!< Publisher for the local plan
   ros::Publisher teb_poses_pub_; //!< Publisher for the trajectory pose sequence
   ros::Publisher teb_marker_pub_; //!< Publisher for visualization markers
   ros::Publisher feedback_pub_; //!< Publisher for the feedback message for analysis and debug purposes

@@ -182,7 +182,7 @@ public:
    * @return \c true if planning was successful, \c false otherwise
    */
   virtual bool plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan,
-                    const std::map<int, std::vector<geometry_msgs::PoseStamped>>& initial_humans_plans_map,
+                    const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>>& initial_humans_plans_map,
                     const geometry_msgs::Twist* start_vel = NULL,
                     bool free_goal_vel=false);
 
@@ -230,10 +230,10 @@ public:
    * @return Shared pointer to the best TebOptimalPlanner that contains the selected trajectory (TimedElasticBand).
    */
   TebOptimalPlannerPtr bestTeb() const {return tebs_.empty() ? TebOptimalPlannerPtr() : tebs_.size()==1 ? tebs_.front() : best_teb_;}
-    
+
   /**
    * @brief Check whether the planned trajectory is feasible or not.
-   * 
+   *
    * This method currently checks only that the trajectory, or a part of the trajectory is collision free.
    * Obstacles are here represented as costmap instead of the internal ObstacleContainer.
    * @param costmap_model Pointer to the costmap model
@@ -241,34 +241,34 @@ public:
    * @param inscribed_radius The radius of the inscribed circle of the robot
    * @param circumscribed_radius The radius of the circumscribed circle of the robot
    * @param look_ahead_idx Number of poses along the trajectory that should be verified, if -1, the complete trajectory will be checked.
-   * @return \c true, if the robot footprint along the first part of the trajectory intersects with 
+   * @return \c true, if the robot footprint along the first part of the trajectory intersects with
    *         any obstacle in the costmap, \c false otherwise.
    */
   virtual bool isTrajectoryFeasible(base_local_planner::CostmapModel* costmap_model, const std::vector<geometry_msgs::Point>& footprint_spec,
                                     double inscribed_radius = 0.0, double circumscribed_radius=0.0, int look_ahead_idx=-1);
-  
+
   //@}
-  
+
   /** @name Visualization */
   //@{
-  
+
   /**
    * @brief Register a TebVisualization class to enable visiualization routines (e.g. publish the local plan and pose sequence)
    * @param visualization shared pointer to a TebVisualization instance
    * @see visualizeTeb
    */
   void setVisualization(TebVisualizationPtr visualization);
-  
+
    /**
     * @brief Publish the local plan, pose sequence and additional information via ros topics (e.g. subscribe with rviz).
-    * 
+    *
     * Make sure to register a TebVisualization instance before using setVisualization() or an overlaoded constructor.
     * @see setVisualization
     */
   virtual void visualize();
-  
+
   //@}
-  
+
   /** @name Important steps that are called during planning */
   //@{
     

@@ -44,7 +44,7 @@ namespace teb_local_planner
 
 
 TimedElasticBand::TimedElasticBand()
-{		
+{
 }
 
 TimedElasticBand::~TimedElasticBand()
@@ -90,13 +90,13 @@ void TimedElasticBand::addPoseAndTimeDiff(double x, double y, double angle, doub
     addPose(x,y,angle,false);
     addTimeDiff(dt,false);
   }
-  else 
+  else
     ROS_ERROR("Method addPoseAndTimeDiff: Add one single Pose first. Timediff describes the time difference between last conf and given conf");
   return;
 }
 
 
- 
+
 void TimedElasticBand::addPoseAndTimeDiff(const PoseSE2& pose, double dt)
 {
   if (sizePoses() != sizeTimeDiffs())
@@ -114,7 +114,7 @@ void TimedElasticBand::addPoseAndTimeDiff(const Eigen::Ref<const Eigen::Vector2d
   {
     addPose(position, theta,false);
     addTimeDiff(dt,false);
-  } else 
+  } else
     ROS_ERROR("Method addPoseAndTimeDiff: Add one single Pose first. Timediff describes the time difference between last conf and given conf");
   return;
 }
@@ -180,7 +180,7 @@ void TimedElasticBand::clearTimedElasticBand()
   for (PoseSequence::iterator pose_it = pose_vec_.begin(); pose_it != pose_vec_.end(); ++pose_it)
     delete *pose_it;
   pose_vec_.clear();
-  
+
   for (TimeDiffSequence::iterator dt_it = timediff_vec_.begin(); dt_it != timediff_vec_.end(); ++dt_it)
     delete *dt_it;
   timediff_vec_.clear();
@@ -190,7 +190,7 @@ void TimedElasticBand::clearTimedElasticBand()
 void TimedElasticBand::setPoseVertexFixed(unsigned int index, bool status)
 {
   ROS_ASSERT(index<sizePoses());
-  pose_vec_.at(index)->setFixed(status);   
+  pose_vec_.at(index)->setFixed(status);
 }
 
 void TimedElasticBand::setTimeDiffVertexFixed(unsigned int index, bool status)
@@ -208,19 +208,19 @@ void TimedElasticBand::autoResize(double dt_ref, double dt_hysteresis, int min_s
     if(TimeDiff(i) > dt_ref + dt_hysteresis)
     {
       //ROS_DEBUG("teb_local_planner: autoResize() inserting new bandpoint i=%u, #TimeDiffs=%lu",i,sizeTimeDiffs());
-      
+
       double newtime = 0.5*TimeDiff(i);
 
       TimeDiff(i) = newtime;
       insertPose(i+1, PoseSE2::average(Pose(i),Pose(i+1)) );
       insertTimeDiff(i+1,newtime);
-      
+
       ++i; // skip the newly inserted pose
     }
     else if(TimeDiff(i) < dt_ref - dt_hysteresis && (int)sizeTimeDiffs()>min_samples) // only remove samples if size is larger than min_samples.
     {
       //ROS_DEBUG("teb_local_planner: autoResize() deleting bandpoint i=%u, #TimeDiffs=%lu",i,sizeTimeDiffs());
-      
+
       if(i < (sizeTimeDiffs()-1))
       {
         TimeDiff(i+1) = TimeDiff(i+1) + TimeDiff(i);
@@ -257,30 +257,30 @@ double TimedElasticBand::getAccumulatedDistance() const
 bool TimedElasticBand::initTEBtoGoal(const PoseSE2& start, const PoseSE2& goal, double diststep, double timestep, int min_samples)
 {
   if (!isInit())
-  {   
+  {
     addPose(start); // add starting point
     setPoseVertexFixed(0,true); // StartConf is a fixed constraint during optimization
-	    
+
     if (diststep!=0)
     {
       Eigen::Vector2d point_to_goal = goal.position()-start.position();
       double dir_to_goal = std::atan2(point_to_goal[1],point_to_goal[0]); // direction to goal
       double dx = diststep*std::cos(dir_to_goal);
       double dy = diststep*std::sin(dir_to_goal);
-      
+
       double dist_to_goal = point_to_goal.norm();
       double no_steps_d = dist_to_goal/std::abs(diststep); // ignore negative values
       unsigned int no_steps = (unsigned int) std::floor(no_steps_d);
-      
+
       for (unsigned int i=1; i<=no_steps; i++) // start with 1! starting point had index 0
       {
-				if (i==no_steps && no_steps_d==(float) no_steps) 
+				if (i==no_steps && no_steps_d==(float) no_steps)
 					break; // if last conf (depending on stepsize) is equal to goal conf -> leave loop
 					addPoseAndTimeDiff(start.x()+i*dx,start.y()+i*dy,dir_to_goal,timestep);
       }
 
     }
-    
+
     // if number of samples is not larger than min_samples, insert manually
     if ( (int)sizePoses() < min_samples-1 )
     {

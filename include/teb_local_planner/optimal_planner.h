@@ -67,6 +67,7 @@
 #include <teb_local_planner/g2o_types/edge_obstacle.h>
 #include <teb_local_planner/g2o_types/edge_dynamic_obstacle.h>
 #include <teb_local_planner/g2o_types/edge_via_point.h>
+#include <teb_local_planner/g2o_types/edge_human_robot.h>
 
 // messages
 #include <nav_msgs/Path.h>
@@ -119,8 +120,12 @@ public:
    * @param visual Shared pointer to the TebVisualization class (optional)
    * @param via_points Container storing via-points (optional)
    */
-  TebOptimalPlanner(const TebConfig& cfg, ObstContainer* obstacles = NULL, RobotFootprintModelPtr robot_model = boost::make_shared<PointRobotFootprint>(),
-                    TebVisualizationPtr visual = TebVisualizationPtr(), const ViaPointContainer* via_points = NULL);
+  TebOptimalPlanner(const TebConfig& cfg, ObstContainer* obstacles = NULL,
+                    RobotFootprintModelPtr robot_model = boost::make_shared<PointRobotFootprint>(),
+                    TebVisualizationPtr visual = TebVisualizationPtr(),
+                    const ViaPointContainer* via_points = NULL,
+                    CircularRobotFootprintPtr human_model = boost::make_shared<CircularRobotFootprint>(),
+                    const std::map<uint64_t, ViaPointContainer>* humans_via_points_map = NULL);
 
   /**
    * @brief Destruct the optimal planner.
@@ -135,8 +140,12 @@ public:
     * @param visual Shared pointer to the TebVisualization class (optional)
     * @param via_points Container storing via-points (optional)
     */
-  void initialize(const TebConfig& cfg, ObstContainer* obstacles = NULL, RobotFootprintModelPtr robot_model = boost::make_shared<PointRobotFootprint>(),
-                  TebVisualizationPtr visual = TebVisualizationPtr(), const ViaPointContainer* via_points = NULL);
+  void initialize(const TebConfig& cfg, ObstContainer* obstacles = NULL,
+                  RobotFootprintModelPtr robot_model = boost::make_shared<PointRobotFootprint>(),
+                  TebVisualizationPtr visual = TebVisualizationPtr(),
+                  const ViaPointContainer* via_points = NULL,
+                  CircularRobotFootprintPtr human_model = boost::make_shared<CircularRobotFootprint>(),
+                  const std::map<uint64_t, ViaPointContainer>* humans_via_points_map = NULL);
 
 
 
@@ -161,7 +170,7 @@ public:
    * @return \c true if planning was successful, \c false otherwise
    */
   virtual bool plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan,
-                    const std::map<int, std::vector<geometry_msgs::PoseStamped>>& initial_humans_plans_map,
+                    const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>>& initial_humans_plans_map,
                     const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false);
 
   /**
@@ -600,6 +609,7 @@ protected:
    * @see optimizeGraph
    */
   void AddEdgesObstacles();
+  void AddEdgesObstaclesForHumans();
 
   /**
    * @brief Add all edges (local cost functions) related to minimizing the distance to via-points
@@ -608,6 +618,7 @@ protected:
    * @see optimizeGraph
    */
   void AddEdgesViaPoints();
+  void AddEdgesViaPointsForHumans();
 
   /**
    * @brief Add all edges (local cost functions) related to keeping a distance from dynamic (moving) obstacles.
@@ -617,6 +628,7 @@ protected:
    * @see optimizeGraph
    */
   void AddEdgesDynamicObstacles();
+  void AddEdgesDynamicObstaclesForHumans();
 
   /**
    * @brief Add all edges (local cost functions) for satisfying kinematic constraints of a differential drive robot
@@ -634,6 +646,8 @@ protected:
    */
   void AddEdgesKinematicsCarlike();
 
+  void AddEdgesHumanRobot();
+
   //@}
 
 
@@ -648,24 +662,25 @@ protected:
   const TebConfig* cfg_; //!< Config class that stores and manages all related parameters
   ObstContainer* obstacles_; //!< Store obstacles that are relevant for planning
   const ViaPointContainer* via_points_; //!< Store via points for planning
-  const std::map<int, ViaPointContainer>* humans_via_points_map_;
-  
+  const std::map<uint64_t, ViaPointContainer>* humans_via_points_map_;
+
   double cost_; //!< Store cost value of the current hyper-graph
-  
+
   // internal objects (memory management owned)
   TebVisualizationPtr visualization_; //!< Instance of the visualization class
   TimedElasticBand teb_; //!< Actual trajectory object
-  std::map<int, TimedElasticBand> humans_tebs_map_;
+  std::map<uint64_t, TimedElasticBand> humans_tebs_map_;
   RobotFootprintModelPtr robot_model_; //!< Robot model
+  CircularRobotFootprintPtr human_model_;
   boost::shared_ptr<g2o::SparseOptimizer> optimizer_; //!< g2o optimizer for trajectory optimization
   std::pair<bool, Eigen::Vector2d> vel_start_; //!< Store the initial velocity at the start pose
   std::pair<bool, Eigen::Vector2d> vel_goal_; //!< Store the final velocity at the goal pose
 
   bool initialized_; //!< Keeps track about the correct initialization of this class
   bool optimized_; //!< This variable is \c true as long as the last optimization has been completed successful
-  
+
 public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW    
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 //! Abbrev. for shared instances of the TebOptimalPlanner

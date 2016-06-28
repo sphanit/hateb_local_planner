@@ -102,7 +102,7 @@ void HomotopyClassPlanner::setVisualization(TebVisualizationPtr visualization)
 
 
 bool HomotopyClassPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan,
-                                const std::map<int, std::vector<geometry_msgs::PoseStamped>>& initial_humans_plans_map,
+                                const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>>& initial_humans_plans_map,
                                 const geometry_msgs::Twist* start_vel, bool free_goal_vel)
 {
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
@@ -268,13 +268,13 @@ void HomotopyClassPlanner::createGraph(const PoseSE2& start, const PoseSE2& goal
       double dist = start2obst.norm();
       if (start2obst.dot(diff)/dist<0.1)
         continue;
-      
-      // Add Keypoints	
+
+      // Add Keypoints
       HcGraphVertexType u = boost::add_vertex(graph_);
       graph_[u].pos = (*it_obst)->getCentroid() + normal;
       HcGraphVertexType v = boost::add_vertex(graph_);
       graph_[v].pos = (*it_obst)->getCentroid() - normal;
-      
+
       // store nearest obstacle
       if (obstacle_heading_threshold && dist<min_dist)
       {
@@ -282,19 +282,19 @@ void HomotopyClassPlanner::createGraph(const PoseSE2& start, const PoseSE2& goal
         nearest_obstacle.first = u;
         nearest_obstacle.second = v;
       }
-    }	
+    }
   }
-  
+
   HcGraphVertexType goal_vtx = boost::add_vertex(graph_); // goal vertex
   graph_[goal_vtx].pos = goal.position();
-  
+
   // Insert Edges
   HcGraphVertexIterator it_i, end_i, it_j, end_j;
   for (boost::tie(it_i,end_i) = boost::vertices(graph_); it_i!=end_i-1; ++it_i) // ignore goal in this loop
   {
     for (boost::tie(it_j,end_j) = boost::vertices(graph_); it_j!=end_j; ++it_j) // check all forward connections
     {
-      if (it_i==it_j) 
+      if (it_i==it_j)
         continue;
       // TODO: make use of knowing in which order obstacles are inserted and that for each obstacle 2 vertices are added,
       // therefore we must only check one of them.
@@ -304,8 +304,8 @@ void HomotopyClassPlanner::createGraph(const PoseSE2& start, const PoseSE2& goal
       if (distij.dot(diff)<=obstacle_heading_threshold)
         continue;
 
-    
-      // Check start angle to nearest obstacle 
+
+      // Check start angle to nearest obstacle
       if (obstacle_heading_threshold && *it_i==start_vtx && min_dist!=DBL_MAX)
       {
         if (*it_j == nearest_obstacle.first || *it_j == nearest_obstacle.second)
@@ -314,7 +314,7 @@ void HomotopyClassPlanner::createGraph(const PoseSE2& start, const PoseSE2& goal
           keypoint_dist.normalize();
           Eigen::Vector2d start_orient_vec( cos(start.theta()), sin(start.theta()) ); // already normalized
           // check angle
-          if (start_orient_vec.dot(keypoint_dist) <= obstacle_heading_threshold) 
+          if (start_orient_vec.dot(keypoint_dist) <= obstacle_heading_threshold)
           {
             ROS_DEBUG("createGraph() - deleted edge: limit_obstacle_heading");
             continue;
@@ -323,28 +323,28 @@ void HomotopyClassPlanner::createGraph(const PoseSE2& start, const PoseSE2& goal
       }
 
       // Collision Check
-      
+
       if (obstacles_!=NULL)
       {
         bool collision = false;
         for (ObstContainer::const_iterator it_obst = obstacles_->begin(); it_obst != obstacles_->end(); ++it_obst)
         {
-          if ( (*it_obst)->checkLineIntersection(graph_[*it_i].pos,graph_[*it_j].pos, 0.5*dist_to_obst) ) 
+          if ( (*it_obst)->checkLineIntersection(graph_[*it_i].pos,graph_[*it_j].pos, 0.5*dist_to_obst) )
           {
             collision = true;
             break;
           }
         }
-        if (collision) 
+        if (collision)
           continue;
       }
-      
+
       // Create Edge
-      boost::add_edge(*it_i,*it_j,graph_);			
+      boost::add_edge(*it_i,*it_j,graph_);
     }
   }
-  
-   
+
+
   // Find all paths between start and goal!
   std::vector<HcGraphVertexType> visited;
   visited.push_back(start_vtx);
@@ -357,12 +357,12 @@ void HomotopyClassPlanner::createProbRoadmapGraph(const PoseSE2& start, const Po
 {
   // Clear existing graph and paths
   clearGraph();
-  
+
   // Direction-vector between start and goal and normal-vector:
   Eigen::Vector2d diff = goal.position()-start.position();
   double start_goal_dist = diff.norm();
-  
-  if (start_goal_dist<cfg_->goal_tolerance.xy_goal_tolerance) 
+
+  if (start_goal_dist<cfg_->goal_tolerance.xy_goal_tolerance)
   {
     ROS_DEBUG("HomotopyClassPlanner::createProbRoadmapGraph(): xy-goal-tolerance already reached.");
     if (tebs_.empty())
@@ -377,23 +377,23 @@ void HomotopyClassPlanner::createProbRoadmapGraph(const PoseSE2& start, const Po
 
   // Now sample vertices between start, goal and a specified width between both sides
   // Let's start with a square area between start and goal (maybe change it later to something like a circle or whatever)
-  
+
   double area_width = cfg_->hcp.roadmap_graph_area_width;
-    
-  boost::random::uniform_real_distribution<double> distribution_x(0, start_goal_dist);  
-  boost::random::uniform_real_distribution<double> distribution_y(0, area_width); 
-  
+
+  boost::random::uniform_real_distribution<double> distribution_x(0, start_goal_dist);
+  boost::random::uniform_real_distribution<double> distribution_y(0, area_width);
+
   double phi = atan2(diff.coeffRef(1),diff.coeffRef(0)); // rotate area by this angle
   Eigen::Rotation2D<double> rot_phi(phi);
-  
+
   Eigen::Vector2d area_origin = start.position() - 0.5*area_width*normal; // bottom left corner of the origin
-  
+
   // Insert Vertices
   HcGraphVertexType start_vtx = boost::add_vertex(graph_); // start vertex
   graph_[start_vtx].pos = start.position();
   diff.normalize(); // normalize in place
-  
-  
+
+
   // Start sampling
   for (int i=0; i < no_samples; ++i)
   {
@@ -403,7 +403,7 @@ void HomotopyClassPlanner::createProbRoadmapGraph(const PoseSE2& start, const Po
     {
       // Sample coordinates
       sample = area_origin + rot_phi*Eigen::Vector2d(distribution_x(rnd_generator_), distribution_y(rnd_generator_));
-      
+
       // Test for collision
       coll_free = true;
       for (ObstContainer::const_iterator it_obst = obstacles_->begin(); it_obst != obstacles_->end(); ++it_obst)
@@ -416,17 +416,17 @@ void HomotopyClassPlanner::createProbRoadmapGraph(const PoseSE2& start, const Po
       }
 
     } while (!coll_free && ros::ok());
-    
+
     // Add new vertex
     HcGraphVertexType v = boost::add_vertex(graph_);
     graph_[v].pos = sample;
   }
-  
+
   // Now add goal vertex
   HcGraphVertexType goal_vtx = boost::add_vertex(graph_); // goal vertex
   graph_[goal_vtx].pos = goal.position();
-  
-  
+
+
   // Insert Edges
   HcGraphVertexIterator it_i, end_i, it_j, end_j;
   for (boost::tie(it_i,end_i) = boost::vertices(graph_); it_i!=boost::prior(end_i); ++it_i) // ignore goal in this loop
@@ -440,11 +440,11 @@ void HomotopyClassPlanner::createProbRoadmapGraph(const PoseSE2& start, const Po
       distij.normalize(); // normalize in place
 
       // Check if the direction is backwards:
-      if (distij.dot(diff)<=obstacle_heading_threshold) 
+      if (distij.dot(diff)<=obstacle_heading_threshold)
           continue; // diff is already normalized
-      
 
-      // Collision Check	
+
+      // Collision Check
       bool collision = false;
       for (ObstContainer::const_iterator it_obst = obstacles_->begin(); it_obst != obstacles_->end(); ++it_obst)
       {
@@ -456,12 +456,12 @@ void HomotopyClassPlanner::createProbRoadmapGraph(const PoseSE2& start, const Po
       }
       if (collision)
         continue;
-      
+
       // Create Edge
-      boost::add_edge(*it_i,*it_j,graph_);			
+      boost::add_edge(*it_i,*it_j,graph_);
     }
   }
-  
+
   /// Find all paths between start and goal!
   std::vector<HcGraphVertexType> visited;
   visited.push_back(start_vtx);
@@ -473,7 +473,7 @@ void HomotopyClassPlanner::DepthFirst(HcGraph& g, std::vector<HcGraphVertexType>
                                       double start_orientation, double goal_orientation, boost::optional<const Eigen::Vector2d&> start_velocity)
 {
   // see http://www.technical-recipes.com/2011/a-recursive-algorithm-to-find-all-paths-between-two-given-nodes/ for details on finding all simple paths
-  
+
   if ((int)tebs_.size() >= cfg_->hcp.max_number_classes)
     return; // We do not need to search for further possible alternative homotopy classes.
   

@@ -100,6 +100,17 @@ void TebLocalPlannerROS::initialize(std::string name, tf::TransformListener* tf,
     // create robot footprint/contour model for optimization
     RobotFootprintModelPtr robot_model = getRobotFootprintFromParamServer(nh);
 
+    CircularRobotFootprintPtr human_model = NULL;
+    double human_radius;
+    if (!nh.getParam("human_radius", human_radius))
+    {
+      ROS_ERROR_STREAM("Human model 'circular' cannot be loaded for trajectory optimization, since param '" << nh.getNamespace()
+                       << "/human_radius' does not exist. Using zero radius.");
+      human_model = boost::make_shared<CircularRobotFootprint>(0.0);
+    }
+    ROS_INFO_STREAM("Human model 'circular' (radius: " << human_radius <<"m) loaded for trajectory optimization.");
+    human_model = boost::make_shared<CircularRobotFootprint>(human_radius);
+
     // create the planner instance
     if (cfg_.hcp.enable_homotopy_class_planning)
     {
@@ -108,7 +119,12 @@ void TebLocalPlannerROS::initialize(std::string name, tf::TransformListener* tf,
     }
     else
     {
-      planner_ = PlannerInterfacePtr(new TebOptimalPlanner(cfg_, &obstacles_, robot_model, visualization_, &via_points_));
+      planner_ = PlannerInterfacePtr(new TebOptimalPlanner(cfg_, &obstacles_,
+                                                           robot_model,
+                                                           visualization_,
+                                                           &via_points_,
+                                                           human_model,
+                                                           &humans_via_points_map_));
       ROS_INFO("Parallel planning in distinctive topologies disabled.");
     }
 
@@ -341,7 +357,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   predict_srv.request.type = hanp_prediction::HumanPosePredictRequest::VELOCITY_OBSTACLE;
   predict_srv.request.publish_markers = publish_predicted_human_markers_;
 
-  std::map<int, std::vector<geometry_msgs::PoseStamped>> transformed_humans_plans_map;
+  std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>> transformed_humans_plans_map;
 
   if(predict_humans_client_ && predict_humans_client_.call(predict_srv))
   {
@@ -622,7 +638,7 @@ void TebLocalPlannerROS::updateViaPointsContainer(const std::vector<geometry_msg
 
 }
 
-void TebLocalPlannerROS::updateHumanViaPointsContainers(const std::map<int, std::vector<geometry_msgs::PoseStamped>>& transformed_humans_plans_map,
+void TebLocalPlannerROS::updateHumanViaPointsContainers(const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>>& transformed_humans_plans_map,
                                                         double min_separation) {
     for (auto& transformed_human_plan_kv : transformed_humans_plans_map) {
         auto& human_id = transformed_human_plan_kv.first;

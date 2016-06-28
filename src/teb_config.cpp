@@ -40,13 +40,13 @@
 
 namespace teb_local_planner
 {
-    
+
 void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle& nh)
 {
-    
+
   nh.param("odom_topic", odom_topic, odom_topic);
   nh.param("map_frame", map_frame, map_frame);
-  
+
   // Trajectory
   nh.param("teb_autosize", trajectory.teb_autosize, trajectory.teb_autosize);
   nh.param("dt_ref", trajectory.dt_ref, trajectory.dt_ref);
@@ -60,7 +60,7 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle& nh)
   nh.param("feasibility_check_no_poses", trajectory.feasibility_check_no_poses, trajectory.feasibility_check_no_poses);
   nh.param("publish_feedback", trajectory.publish_feedback, trajectory.publish_feedback);
   nh.param("shrink_horizon_backup", trajectory.shrink_horizon_backup, trajectory.shrink_horizon_backup);
-  
+
   // Robot
   nh.param("max_vel_x", robot.max_vel_x, robot.max_vel_x);
   nh.param("max_vel_x_backwards", robot.max_vel_x_backwards, robot.max_vel_x_backwards);
@@ -70,12 +70,16 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle& nh)
   nh.param("min_turning_radius", robot.min_turning_radius, robot.min_turning_radius);
   nh.param("wheelbase", robot.wheelbase, robot.wheelbase);
   nh.param("cmd_angle_instead_rotvel", robot.cmd_angle_instead_rotvel, robot.cmd_angle_instead_rotvel);
-  
+
+  // Human
+  nh.param("min_human_dist", human.min_human_dist, human.min_human_dist);
+  nh.param("human_radius", human.radius, human.radius);
+
   // GoalTolerance
   nh.param("xy_goal_tolerance", goal_tolerance.xy_goal_tolerance, goal_tolerance.xy_goal_tolerance);
   nh.param("yaw_goal_tolerance", goal_tolerance.yaw_goal_tolerance, goal_tolerance.yaw_goal_tolerance);
   nh.param("free_goal_vel", goal_tolerance.free_goal_vel, goal_tolerance.free_goal_vel);
-  
+
   // Obstacles
   nh.param("min_obstacle_dist", obstacles.min_obstacle_dist, obstacles.min_obstacle_dist);
   nh.param("include_costmap_obstacles", obstacles.include_costmap_obstacles, obstacles.include_costmap_obstacles);
@@ -83,7 +87,7 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle& nh)
   nh.param("obstacle_poses_affected", obstacles.obstacle_poses_affected, obstacles.obstacle_poses_affected);
   nh.param("costmap_converter_plugin", obstacles.costmap_converter_plugin, obstacles.costmap_converter_plugin);
   nh.param("costmap_converter_spin_thread", obstacles.costmap_converter_spin_thread, obstacles.costmap_converter_spin_thread);
-  
+
   // Optimization
   nh.param("no_inner_iterations", optim.no_inner_iterations, optim.no_inner_iterations);
   nh.param("no_outer_iterations", optim.no_outer_iterations, optim.no_outer_iterations);
@@ -99,22 +103,22 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle& nh)
   nh.param("weight_kinematics_turning_radius", optim.weight_kinematics_turning_radius, optim.weight_kinematics_turning_radius);
   nh.param("weight_optimaltime", optim.weight_optimaltime, optim.weight_optimaltime);
   nh.param("weight_obstacle", optim.weight_obstacle, optim.weight_obstacle);
-  nh.param("weight_dynamic_obstacle", optim.weight_dynamic_obstacle, optim.weight_dynamic_obstacle);    
+  nh.param("weight_dynamic_obstacle", optim.weight_dynamic_obstacle, optim.weight_dynamic_obstacle);
   nh.param("weight_viapoint", optim.weight_viapoint, optim.weight_viapoint);
-  
+
   // Homotopy Class Planner
-  nh.param("enable_homotopy_class_planning", hcp.enable_homotopy_class_planning, hcp.enable_homotopy_class_planning); 
-  nh.param("enable_multithreading", hcp.enable_multithreading, hcp.enable_multithreading); 
-  nh.param("simple_exploration", hcp.simple_exploration, hcp.simple_exploration); 
-  nh.param("max_number_classes", hcp.max_number_classes, hcp.max_number_classes); 
+  nh.param("enable_homotopy_class_planning", hcp.enable_homotopy_class_planning, hcp.enable_homotopy_class_planning);
+  nh.param("enable_multithreading", hcp.enable_multithreading, hcp.enable_multithreading);
+  nh.param("simple_exploration", hcp.simple_exploration, hcp.simple_exploration);
+  nh.param("max_number_classes", hcp.max_number_classes, hcp.max_number_classes);
   nh.param("selection_obst_cost_scale", hcp.selection_obst_cost_scale, hcp.selection_obst_cost_scale);
   nh.param("selection_viapoint_cost_scale", hcp.selection_viapoint_cost_scale, hcp.selection_viapoint_cost_scale);
-  nh.param("selection_cost_hysteresis", hcp.selection_cost_hysteresis, hcp.selection_cost_hysteresis); 
-  nh.param("selection_alternative_time_cost", hcp.selection_alternative_time_cost, hcp.selection_alternative_time_cost); 
-  nh.param("roadmap_graph_samples", hcp.roadmap_graph_no_samples, hcp.roadmap_graph_no_samples); 
-  nh.param("roadmap_graph_area_width", hcp.roadmap_graph_area_width, hcp.roadmap_graph_area_width); 
-  nh.param("h_signature_prescaler", hcp.h_signature_prescaler, hcp.h_signature_prescaler); 
-  nh.param("h_signature_threshold", hcp.h_signature_threshold, hcp.h_signature_threshold); 
+  nh.param("selection_cost_hysteresis", hcp.selection_cost_hysteresis, hcp.selection_cost_hysteresis);
+  nh.param("selection_alternative_time_cost", hcp.selection_alternative_time_cost, hcp.selection_alternative_time_cost);
+  nh.param("roadmap_graph_samples", hcp.roadmap_graph_no_samples, hcp.roadmap_graph_no_samples);
+  nh.param("roadmap_graph_area_width", hcp.roadmap_graph_area_width, hcp.roadmap_graph_area_width);
+  nh.param("h_signature_prescaler", hcp.h_signature_prescaler, hcp.h_signature_prescaler);
+  nh.param("h_signature_threshold", hcp.h_signature_threshold, hcp.h_signature_threshold);
   nh.param("obstacle_keypoint_offset", hcp.obstacle_keypoint_offset, hcp.obstacle_keypoint_offset); 
   nh.param("obstacle_heading_threshold", hcp.obstacle_heading_threshold, hcp.obstacle_heading_threshold); 
   nh.param("viapoints_all_candidates", hcp.viapoints_all_candidates, hcp.viapoints_all_candidates);

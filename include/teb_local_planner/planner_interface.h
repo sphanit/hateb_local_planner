@@ -96,7 +96,7 @@ public:
    * @return \c true if planning was successful, \c false otherwise
    */
   virtual bool plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan,
-                    const std::map<int, std::vector<geometry_msgs::PoseStamped>>& initial_humans_plans_map,
+                    const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>>& initial_humans_plans_map,
                     const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false) = 0;
 
   /**
