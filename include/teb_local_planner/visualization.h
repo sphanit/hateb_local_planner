@@ -242,6 +242,7 @@ protected:
   ros::Publisher humans_global_plans_pub_; //!< Publisher for the local plan
   ros::Publisher humans_local_plans_pub_; //!< Publisher for the local plan
   ros::Publisher teb_poses_pub_; //!< Publisher for the trajectory pose sequence
+  ros::Publisher humans_tebs_poses_pub_; //!< Publisher for the trajectory pose sequence
   ros::Publisher teb_marker_pub_; //!< Publisher for visualization markers
   ros::Publisher feedback_pub_; //!< Publisher for the feedback message for analysis and debug purposes
 

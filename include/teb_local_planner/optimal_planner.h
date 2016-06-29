@@ -583,6 +583,7 @@ protected:
    * @see optimizeGraph
    */
   void AddEdgesVelocity();
+  void AddEdgesVelocityForHumans();
 
   /**
    * @brief Add all edges (local cost functions) for limiting the translational and angular acceleration.
@@ -593,6 +594,7 @@ protected:
    * @see optimizeGraph
    */
   void AddEdgesAcceleration();
+  void AddEdgesAccelerationForHumans();
 
   /**
    * @brief Add all edges (local cost functions) for minimizing the transition time (resp. minimize time differences)

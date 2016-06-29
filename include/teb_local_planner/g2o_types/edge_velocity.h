@@ -32,7 +32,7 @@
  *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * Notes:
  * The following class is derived from a class defined by the
  * g2o-framework. g2o is licensed under the terms of the BSD License.
@@ -56,11 +56,11 @@
 namespace teb_local_planner
 {
 
-  
+
 /**
  * @class EdgeVelocity
  * @brief Edge defining the cost function for limiting the translational and rotational velocity.
- * 
+ *
  * The edge depends on three vertices \f$ \mathbf{s}_i, \mathbf{s}_{ip1}, \Delta T_i \f$ and minimizes: \n
  * \f$ \min \textrm{penaltyInterval}( [v,omega]^T ) \cdot weight \f$. \n
  * \e v is calculated using the difference quotient and the position parts of both poses. \n
@@ -71,26 +71,26 @@ namespace teb_local_planner
  * the second one the rotational velocity.
  * @see TebOptimalPlanner::AddEdgesVelocity
  * @remarks Do not forget to call setTebConfig()
- */  
+ */
 class EdgeVelocity : public g2o::BaseMultiEdge<2, double>
 {
 public:
-  
+
   /**
    * @brief Construct edge.
-   */	      
+   */
   EdgeVelocity()
   {
     this->resize(3); // Since we derive from a g2o::BaseMultiEdge, set the desired number of vertices
     for(unsigned int i=0;i<3;i++) _vertices[i] = NULL;
   }
-  
+
   /**
    * @brief Destruct edge.
-   * 
+   *
    * We need to erase vertices manually, since we want to keep them even if TebOptimalPlanner::clearGraph() is called.
    * This is necessary since the vertices are managed by the Timed_Elastic_Band class.
-   */  
+   */
   virtual ~EdgeVelocity()
   {
     for(unsigned int i=0;i<3;i++)
@@ -102,7 +102,7 @@ public:
 
   /**
    * @brief Actual cost function
-   */  
+   */
   void computeError()
   {
     ROS_ASSERT_MSG(cfg_, "You must call setTebConfig on EdgeVelocity()");
@@ -113,9 +113,9 @@ public:
     double vel = deltaS.norm() / deltaT->estimate();
 //     vel *= g2o::sign(deltaS[0]*cos(conf1->theta()) + deltaS[1]*sin(conf1->theta())); // consider direction
     vel *= fast_sigmoid( 100 * (deltaS.x()*cos(conf1->theta()) + deltaS.y()*sin(conf1->theta())) ); // consider direction
-    
+
     double omega = g2o::normalize_theta(conf2->theta() - conf1->theta()) / deltaT->estimate();
-  
+
     _error[0] = penaltyBoundToInterval(vel, -cfg_->robot.max_vel_x_backwards, cfg_->robot.max_vel_x,cfg_->optim.penalty_epsilon);
     _error[1] = penaltyBoundToInterval(omega, cfg_->robot.max_vel_theta,cfg_->optim.penalty_epsilon);
 
@@ -135,30 +135,30 @@ public:
     const VertexPose* conf1 = static_cast<const VertexPose*>(_vertices[0]);
     const VertexPose* conf2 = static_cast<const VertexPose*>(_vertices[1]);
     const VertexTimeDiff* deltaT = static_cast<const VertexTimeDiff*>(_vertices[2]);
-    
+
     Eigen::Vector2d deltaS = conf2->position() - conf1->position();
     double dist = deltaS.norm();
     double aux1 = dist*deltaT->estimate();
     double aux2 = 1/deltaT->estimate();
-    
+
     double vel = dist * aux2;
     double omega = g2o::normalize_theta(conf2->theta() - conf1->theta()) * aux2;
-    
+
     double dev_border_vel = penaltyBoundToIntervalDerivative(vel, -cfg_->robot.max_vel_x_backwards, cfg_->robot.max_vel_x,cfg_->optim.penalty_epsilon);
     double dev_border_omega = penaltyBoundToIntervalDerivative(omega, cfg_->robot.max_vel_theta,cfg_->optim.penalty_epsilon);
-    
+
     _jacobianOplus[0].resize(2,3); // conf1
     _jacobianOplus[1].resize(2,3); // conf2
     _jacobianOplus[2].resize(2,1); // deltaT
-    
+
 //  if (aux1==0) aux1=1e-6;
 //  if (aux2==0) aux2=1e-6;
-    
+
     if (dev_border_vel!=0)
     {
       double aux3 = dev_border_vel / aux1;
       _jacobianOplus[0](0,0) = -deltaS[0] * aux3; // vel x1
-      _jacobianOplus[0](0,1) = -deltaS[1] * aux3; // vel y1	
+      _jacobianOplus[0](0,1) = -deltaS[1] * aux3; // vel y1
       _jacobianOplus[1](0,0) = deltaS[0] * aux3; // vel x2
       _jacobianOplus[1](0,1) = deltaS[1] * aux3; // vel y2
       _jacobianOplus[2](0,0) = -vel * aux2 * dev_border_vel; // vel deltaT
@@ -166,12 +166,12 @@ public:
     else
     {
       _jacobianOplus[0](0,0) = 0; // vel x1
-      _jacobianOplus[0](0,1) = 0; // vel y1	
+      _jacobianOplus[0](0,1) = 0; // vel y1
       _jacobianOplus[1](0,0) = 0; // vel x2
-      _jacobianOplus[1](0,1) = 0; // vel y2	
+      _jacobianOplus[1](0,1) = 0; // vel y2
       _jacobianOplus[2](0,0) = 0; // vel deltaT
     }
-    
+
     if (dev_border_omega!=0)
     {
       double aux4 = aux2 * dev_border_omega;
@@ -183,7 +183,7 @@ public:
     {
       _jacobianOplus[2](1,0) = 0; // omega deltaT
       _jacobianOplus[0](1,2) = 0; // omega angle1
-      _jacobianOplus[1](1,2) = 0; // omega angle2			
+      _jacobianOplus[1](1,2) = 0; // omega angle2
     }
 
     _jacobianOplus[0](1,0) = 0; // omega x1
@@ -195,13 +195,13 @@ public:
   }
 #endif
 #endif
- 
+
   /**
    * @brief Compute and return error / cost value.
-   * 
+   *
    * This method is called by TebOptimalPlanner::computeCurrentCost to obtain the current cost.
    * @return 2D Cost / error vector [translational vel cost, angular vel cost]^T
-   */ 
+   */
   ErrorVector& getError()
   {
     computeError();
@@ -210,7 +210,7 @@ public:
 
   /**
    * @brief Read values from input stream
-   */  
+   */
   virtual bool read(std::istream& is)
   {
     is >> _measurement;
@@ -220,7 +220,7 @@ public:
 
   /**
    * @brief Write values to an output stream
-   */  
+   */
   virtual bool write(std::ostream& os) const
   {
     //os << measurement() << " ";
@@ -231,20 +231,84 @@ public:
   /**
    * @brief Assign the TebConfig class for parameters.
    * @param cfg TebConfig class
-   */    
+   */
   void setTebConfig(const TebConfig& cfg)
   {
     cfg_ = &cfg;
   }
 
 protected:
-  
+
   const TebConfig* cfg_; //!< Store TebConfig class for parameters
-  
-  
+
+
 public:
-  
+
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+};
+
+class EdgeVelocityHuman : public g2o::BaseMultiEdge<2, double>
+{
+public:
+    EdgeVelocityHuman() {
+        this->resize(3);
+        for(unsigned int i=0;i<3;i++)
+            _vertices[i] = NULL;
+    }
+
+    virtual ~EdgeVelocityHuman() {
+        for(unsigned int i=0;i<3;i++) {
+            if(_vertices[i])
+                _vertices[i]->edges().erase(this);
+        }
+    }
+
+    void computeError()
+    {
+        ROS_ASSERT_MSG(cfg_, "You must call setTebConfig on EdgeVelocityHuman()");
+        const VertexPose* conf1 = static_cast<const VertexPose*>(_vertices[0]);
+        const VertexPose* conf2 = static_cast<const VertexPose*>(_vertices[1]);
+        const VertexTimeDiff* deltaT = static_cast<const VertexTimeDiff*>(_vertices[2]);
+        Eigen::Vector2d deltaS = conf2->estimate().position() - conf1->estimate().position();
+        double vel = deltaS.norm() / deltaT->estimate();
+        // vel *= g2o::sign(deltaS[0]*cos(conf1->theta()) + deltaS[1]*sin(conf1->theta())); // consider direction
+        vel *= fast_sigmoid( 100 * (deltaS.x()*cos(conf1->theta()) + deltaS.y()*sin(conf1->theta())) ); // consider direction
+
+        double omega = g2o::normalize_theta(conf2->theta() - conf1->theta()) / deltaT->estimate();
+
+        _error[0] = penaltyBoundToInterval(vel, -cfg_->human.max_vel_x_backwards, cfg_->human.max_vel_x,cfg_->optim.penalty_epsilon);
+        _error[1] = penaltyBoundToInterval(omega, cfg_->human.max_vel_theta,cfg_->optim.penalty_epsilon);
+
+        ROS_ASSERT_MSG(std::isfinite(_error[0]), "EdgeVelocityHuman::computeError() _error[0]=%f _error[1]=%f\n",_error[0],_error[1]);
+    }
+
+    ErrorVector& getError() {
+        computeError();
+        return _error;
+    }
+
+    virtual bool read(std::istream& is) {
+        is >> _measurement;
+        is >> information()(0,0);
+        return true;
+    }
+
+    virtual bool write(std::ostream& os) const {
+        //os << measurement() << " ";
+        os << information()(0,0) << " Error Vel: " << _error[0] << ", Error Omega: " << _error[1];
+        return os.good();
+    }
+
+    void setTebConfig(const TebConfig& cfg) {
+        cfg_ = &cfg;
+    }
+
+protected:
+    const TebConfig* cfg_;
+
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 };
 

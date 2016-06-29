@@ -98,6 +98,11 @@ public:
   struct Human {
       double radius;
       double min_human_dist;
+      double max_vel_x;
+      double max_vel_x_backwards;
+      double max_vel_theta;
+      double acc_lim_x;
+      double acc_lim_theta;
   } human;
 
   //! Goal tolerance related parameters
@@ -133,9 +138,13 @@ public:
     double penalty_epsilon; //!< Add a small safety margin to penalty functions for hard-constraint approximations
 
     double weight_max_vel_x; //!< Optimization weight for satisfying the maximum allowed translational velocity
+    double weight_max_human_vel_x; //!< Optimization weight for satisfying the maximum allowed translational velocity for humans
     double weight_max_vel_theta; //!< Optimization weight for satisfying the maximum allowed angular velocity
+    double weight_max_human_vel_theta; //!< Optimization weight for satisfying the maximum allowed angular velocity for humans
     double weight_acc_lim_x; //!< Optimization weight for satisfying the maximum allowed translational acceleration
+    double weight_human_acc_lim_x; //!< Optimization weight for satisfying the maximum allowed translational acceleration for humans
     double weight_acc_lim_theta; //!< Optimization weight for satisfying the maximum allowed angular acceleration
+    double weight_human_acc_lim_theta; //!< Optimization weight for satisfying the maximum allowed angular acceleration for humans
     double weight_kinematics_nh; //!< Optimization weight for satisfying the non-holonomic kinematics
     double weight_kinematics_forward_drive; //!< Optimization weight for forcing the robot to choose only forward directions (positive transl. velocities, only diffdrive robot)
     double weight_kinematics_turning_radius; //!< Optimization weight for enforcing a minimum turning radius (carlike robots)
@@ -143,6 +152,8 @@ public:
     double weight_obstacle; //!< Optimization weight for satisfying a minimum separation from obstacles
     double weight_dynamic_obstacle; //!< Optimization weight for satisfying a minimum separation from dynamic obstacles
     double weight_viapoint; //!< Optimization weight for minimizing the distance to via-points
+    double weight_human_viapoint; //!< Optimization weight for minimizing the distance from human to its via-points
+    double weight_human_robot; //!< Optimization weight for satisfying a minimum seperation between human and robot
   } optim; //!< Optimization related parameters
 
 
@@ -219,6 +230,11 @@ public:
     // Human
     human.radius = 0.2;
     human.min_human_dist = 0.2;
+    human.max_vel_x = 0.4;
+    human.max_vel_x_backwards = 0.2;
+    human.max_vel_theta = 0.3;
+    human.acc_lim_x = 0.5;
+    human.acc_lim_theta = 0.5;
 
     // GoalTolerance
 
@@ -244,9 +260,13 @@ public:
     optim.optimization_verbose = false;
     optim.penalty_epsilon = 0.1;
     optim.weight_max_vel_x = 2; //1
+    optim.weight_max_human_vel_x = 1.5;
     optim.weight_max_vel_theta = 1;
+    optim.weight_max_human_vel_theta = 1;
     optim.weight_acc_lim_x = 1;
+    optim.weight_human_acc_lim_x = 1;
     optim.weight_acc_lim_theta = 1;
+    optim.weight_human_acc_lim_theta = 1;
     optim.weight_kinematics_nh = 1000;
     optim.weight_kinematics_forward_drive = 1;
     optim.weight_kinematics_turning_radius = 1;
@@ -254,6 +274,8 @@ public:
     optim.weight_obstacle = 10;
     optim.weight_dynamic_obstacle = 10;
     optim.weight_viapoint = 1;
+    optim.weight_human_viapoint = 1;
+    optim.weight_human_robot = 40;
 
     // Homotopy Class Planner
 
