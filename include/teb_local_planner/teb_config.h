@@ -228,7 +228,7 @@ public:
     robot.cmd_angle_instead_rotvel = false;
 
     // Human
-    human.radius = 0.2;
+    human.radius = 0.4;
     human.min_human_dist = 0.2;
     human.max_vel_x = 0.4;
     human.max_vel_x_backwards = 0.2;

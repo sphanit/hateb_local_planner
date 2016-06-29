@@ -125,6 +125,7 @@ void TebLocalPlannerROS::initialize(std::string name, tf::TransformListener* tf,
                                                            &via_points_,
                                                            human_model,
                                                            &humans_via_points_map_));
+      planner_->local_weight_optimaltime_ = cfg_.optim.weight_optimaltime;
       ROS_INFO("Parallel planning in distinctive topologies disabled.");
     }
 
@@ -272,7 +273,8 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   if (horizon_reduced_)
   {
     // reduce to 50 percent:
-    int horizon_reduction = goal_idx/2;
+    //int horizon_reduction = goal_idx/2;
+    int horizon_reduction = (int)(goal_idx * 0.75);
     // we have a small overhead here, since we already transformed 50% more of the trajectory.
     // But that's ok for now, since we do not need to make transformGlobalPlan more complex
     // and a reduced horizon should occur just rarely.
@@ -400,9 +402,10 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
 
   // Undo temporary horizon reduction
   auto hr2_start_time = ros::Time::now();
-  if (horizon_reduced_ && (ros::Time::now()-horizon_reduced_stamp_).toSec() >= 10 && !planner_->isHorizonReductionAppropriate(transformed_plan)) // 10s are hardcoded for now...
+  if (horizon_reduced_ && (ros::Time::now()-horizon_reduced_stamp_).toSec() >= 5 && !planner_->isHorizonReductionAppropriate(transformed_plan)) // 10s are hardcoded for now...
   {
     horizon_reduced_ = false;
+    planner_->local_weight_optimaltime_ = cfg_.optim.weight_optimaltime;
     ROS_INFO("Switching back to full horizon length.");
   }
   auto hr2_time = ros::Time::now() - hr2_start_time;
@@ -418,7 +421,9 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
     if (!horizon_reduced_ && cfg_.trajectory.shrink_horizon_backup && planner_->isHorizonReductionAppropriate(transformed_plan))
     {
       horizon_reduced_ = true;
-      ROS_WARN("TebLocalPlannerROS: trajectory is not feasible, but the planner suggests a shorter horizon temporary. Complying with its wish for at least 10s...");
+      planner_->local_weight_optimaltime_ = 0.4;
+      // ROS_WARN("TebLocalPlannerROS: trajectory is not feasible, but the planner suggests a shorter horizon temporary. Complying with its wish for at least 10s...");
+      ROS_WARN("TebLocalPlannerROS: trajectory is not feasible, but the planner suggests a slower trajectory. Complying with its wish for at least 5s...");
       horizon_reduced_stamp_ = ros::Time::now();
       return true; // commanded velocity is zero for this step
     }
@@ -468,7 +473,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   auto viz_time = ros::Time::now() - viz_start_time;
 
   auto total_time = ros::Time::now() - start_time;
-  ROS_INFO_STREAM_COND(total_time.toSec() > 0.02,"\tcompute velocity times:\n" <<
+  ROS_INFO_STREAM_COND(total_time.toSec() > 0.1,"\tcompute velocity times:\n" <<
     "\t\ttotal time                   " << std::to_string(total_time.toSec()) << "\n" <<
     "\t\tpose get time                " << std::to_string(pose_get_time.toSec()) << "\n" <<
     "\t\tvel get time                 " << std::to_string(vel_get_time.toSec()) << "\n" <<

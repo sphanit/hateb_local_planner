@@ -35,7 +35,7 @@ public:
 
         static_cast<PointObstacle*>(obs_)->setCentroid(human_bandpt->x(), human_bandpt->y());
 
-        double dist = robot_model_->calculateDistance(human_bandpt->pose(), obs_) - radius_;
+       double dist = robot_model_->calculateDistance(robot_bandpt->pose(), obs_) - radius_;
         _error[0] = penaltyBoundFromBelow(dist, cfg_->human.min_human_dist,
                                           cfg_->optim.penalty_epsilon);
 
@@ -88,7 +88,6 @@ protected:
     const CircularRobotFootprint* human_model_;
     Obstacle* obs_ = new PointObstacle();
     double radius_;
-
 
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW

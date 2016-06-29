@@ -574,7 +574,7 @@ protected:
    * @see buildGraph
    * @see optimizeGraph
    */
-  void AddTEBVertices();
+  void AddTEBVertices(std::stringstream& ss);
 
   /**
    * @brief Add all edges (local cost functions) for limiting the translational and angular velocity.
@@ -639,6 +639,7 @@ protected:
    * @see optimizeGraph
    */
   void AddEdgesKinematicsDiffDrive();
+  void AddEdgesKinematicsDiffDriveForHumans();
 
   /**
    * @brief Add all edges (local cost functions) for satisfying kinematic constraints of a carlike robot
@@ -648,7 +649,7 @@ protected:
    */
   void AddEdgesKinematicsCarlike();
 
-  void AddEdgesHumanRobot();
+  void AddEdgesHumanRobot(std::stringstream& ss);
 
   //@}
 

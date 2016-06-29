@@ -131,7 +131,9 @@ void TebOptimalPlanner::registerG2OTypes()
 
   factory->registerType("EDGE_TIME_OPTIMAL", new g2o::HyperGraphElementCreator<EdgeTimeOptimal>);
   factory->registerType("EDGE_VELOCITY", new g2o::HyperGraphElementCreator<EdgeVelocity>);
+  factory->registerType("EDGE_VELOCITY_HUMAN", new g2o::HyperGraphElementCreator<EdgeVelocityHuman>);
   factory->registerType("EDGE_ACCELERATION", new g2o::HyperGraphElementCreator<EdgeAcceleration>);
+  factory->registerType("EDGE_ACCELERATION_HUMAN", new g2o::HyperGraphElementCreator<EdgeAccelerationHuman>);
   factory->registerType("EDGE_ACCELERATION_START", new g2o::HyperGraphElementCreator<EdgeAccelerationStart>);
   factory->registerType("EDGE_ACCELERATION_GOAL", new g2o::HyperGraphElementCreator<EdgeAccelerationGoal>);
   factory->registerType("EDGE_KINEMATICS_DIFF_DRIVE", new g2o::HyperGraphElementCreator<EdgeKinematicsDiffDrive>);
@@ -139,6 +141,7 @@ void TebOptimalPlanner::registerG2OTypes()
   factory->registerType("EDGE_OBSTACLE", new g2o::HyperGraphElementCreator<EdgeObstacle>);
   factory->registerType("EDGE_DYNAMIC_OBSTACLE", new g2o::HyperGraphElementCreator<EdgeDynamicObstacle>);
   factory->registerType("EDGE_VIA_POINT", new g2o::HyperGraphElementCreator<EdgeViaPoint>);
+  factory->registerType("EDGE_HUMAN_ROBOT", new g2o::HyperGraphElementCreator<EdgeHumanRobot>);
   return;
 }
 
@@ -268,6 +271,7 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
       auto& human_id = initial_human_plan_kv.first;
       auto& initial_human_plan = initial_human_plan_kv.second;
 
+      // erase human-teb if human plan is empty
       if (initial_human_plan.empty()) {
           auto itr = humans_tebs_map_.find(human_id);
           if (itr != humans_tebs_map_.end()) {
@@ -277,6 +281,7 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
           continue;
       }
 
+      // create new human-teb for new human
       if (humans_tebs_map_.find(human_id) == humans_tebs_map_.end()) {
           humans_tebs_map_[human_id] = TimedElasticBand();
           humans_tebs_map_[human_id].initTEBtoGoal(initial_human_plan,
@@ -284,22 +289,23 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
                                                    true,
                                                    cfg_->trajectory.min_samples);
       }
+      // modify human-teb for existing human
       else {
-          PoseSE2 start_(initial_human_plan.front().pose);
-          PoseSE2 goal_(initial_human_plan.back().pose);
+          // PoseSE2 start_(initial_human_plan.front().pose);
+          // PoseSE2 goal_(initial_human_plan.back().pose);
           auto& human_teb = humans_tebs_map_[human_id];
-          if (human_teb.sizePoses()>0 && (goal_.position() - human_teb.BackPose().position())
-                                         .norm()
-                                         < cfg_->trajectory.force_reinit_new_goal_dist)
-              human_teb.updateAndPruneTEB(start_, goal_,
-                                          cfg_->trajectory.min_samples);
-          else {
-              ROS_DEBUG("New goal: distance to existing goal is higher than the specified threshold. Reinitializing human trajectories.");
+          // if (human_teb.sizePoses()>0 && (goal_.position() - human_teb.BackPose().position())
+          //                                .norm()
+          //                                < cfg_->trajectory.force_reinit_new_goal_dist)
+          //     human_teb.updateAndPruneTEB(start_, goal_,
+          //                                 cfg_->trajectory.min_samples);
+          // else {
+          //     ROS_DEBUG("New goal: distance to existing goal is higher than the specified threshold. Reinitializing human trajectories.");
               human_teb.clearTimedElasticBand();
               human_teb.initTEBtoGoal(initial_human_plan,
                                       cfg_->trajectory.dt_ref, true,
                                       cfg_->trajectory.min_samples);
-          }
+          // }
       }
       // no start velocity for humans, for now
   }
@@ -308,11 +314,11 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
   // now optimize
   auto opt_start_time = ros::Time::now();
   bool teb_opt_result = optimizeTEB(cfg_->optim.no_inner_iterations,
-                                    cfg_->optim.no_outer_iterations);
+                                    cfg_->optim.no_outer_iterations, true);
   auto opt_time = ros::Time::now() - opt_start_time;
 
   auto total_time = ros::Time::now() - prep_start_time;
-  ROS_INFO_STREAM_COND(total_time.toSec() > 0.02, "\nteb optimal plan times:\n" <<
+  ROS_INFO_STREAM_COND(total_time.toSec() > 0.1, "\nteb optimal plan times:\n" <<
     "\ttotal plan time                " << std::to_string(total_time.toSec()) << "\n" <<
     "\toptimizatoin preparation time  " << std::to_string(prep_time.toSec()) << "\n" <<
     "\thuman preparation time         " << std::to_string(prep_time.toSec()) << "\n" <<
@@ -383,14 +389,15 @@ bool TebOptimalPlanner::buildGraph()
     return false;
   }
 
+  std::stringstream ss;
   // add TEB vertices
-  AddTEBVertices();
+  AddTEBVertices(ss);
 
   // add Edges (local cost functions)
   AddEdgesObstacles();
   AddEdgesObstaclesForHumans();
   AddEdgesDynamicObstacles();
-  AddEdgesDynamicObstaclesForHumans();
+  //AddEdgesDynamicObstaclesForHumans();
 
   AddEdgesViaPoints();
   AddEdgesViaPointsForHumans();
@@ -399,16 +406,20 @@ bool TebOptimalPlanner::buildGraph()
   AddEdgesVelocityForHumans();
 
   AddEdgesAcceleration();
-  AddEdgesVelocityForHumans();
+  AddEdgesAccelerationForHumans();
 
   AddEdgesTimeOptimal();
 
-  AddEdgesHumanRobot();
 
   if (cfg_->robot.min_turning_radius == 0 || cfg_->optim.weight_kinematics_turning_radius == 0)
     AddEdgesKinematicsDiffDrive(); // we have a differential drive robot
   else
     AddEdgesKinematicsCarlike(); // we have a carlike robot since the turning radius is bounded from below.
+
+  AddEdgesKinematicsDiffDriveForHumans();
+
+  AddEdgesHumanRobot(ss);
+  //ROS_INFO_STREAM(ss.str());
 
   return true;
 }
@@ -455,30 +466,46 @@ void TebOptimalPlanner::clearGraph()
 
 
 
-void TebOptimalPlanner::AddTEBVertices()
+void TebOptimalPlanner::AddTEBVertices(std::stringstream& ss)
 {
+  ss << "\nvertices:";
+
   // add vertices to graph
   ROS_DEBUG_COND(cfg_->optim.optimization_verbose, "Adding TEB vertices ...");
   unsigned int id_counter = 0; // used for vertices ids
+  unsigned int id_pose = 0, id_time = 0;
   for (unsigned int i=0; i<teb_.sizePoses(); ++i)
   {
     teb_.PoseVertex(i)->setId(id_counter++);
+    id_pose+=1;
     optimizer_->addVertex(teb_.PoseVertex(i));
     if (teb_.sizeTimeDiffs()!=0 && i<teb_.sizeTimeDiffs())
     {
       teb_.TimeDiffVertex(i)->setId(id_counter++);
+      id_time+=1;
       optimizer_->addVertex(teb_.TimeDiffVertex(i));
     }
   }
+  ss << "\n\trobot pose:" << id_pose << "/" << teb_.sizePoses() << ", time:" << id_time << "/" << teb_.sizeTimeDiffs();
 
   unsigned int robot_teb_size = teb_.sizePoses();
 
   for (auto& human_teb_kv : humans_tebs_map_) {
       auto& human_teb = human_teb_kv.second;
-      for (unsigned int i=0; i<human_teb.sizePoses() && i <= robot_teb_size; ++i) {
+      id_pose = 0;
+      id_time = 0;
+      for (unsigned int i=0; i<human_teb.sizePoses(); ++i) {
           human_teb.PoseVertex(i)->setId(id_counter++);
+          id_pose += 1;
           optimizer_->addVertex(human_teb.PoseVertex(i));
+          if (teb_.sizeTimeDiffs()!=0 && i<human_teb.sizeTimeDiffs())
+          {
+            human_teb.TimeDiffVertex(i)->setId(id_counter++);
+            id_time += 1;
+            optimizer_->addVertex(human_teb.TimeDiffVertex(i));
+          }
       }
+      ss << "\n\thuman-" << human_teb_kv.first << " pose:" << id_pose << "/" << human_teb.sizePoses() << ", time:" << id_time << "/" << human_teb.sizeTimeDiffs();
   }
 }
 
@@ -634,7 +661,6 @@ void TebOptimalPlanner::AddEdgesDynamicObstaclesForHumans() {
             {
                 EdgeDynamicObstacle* dynobst_edge = new EdgeDynamicObstacle(i);
                 dynobst_edge->setVertex(0,human_teb.PoseVertex(i));
-                //dynobst_edge->setVertex(1,teb.PointVertex(i+1));
                 dynobst_edge->setVertex(1,human_teb.TimeDiffVertex(i));
                 dynobst_edge->setInformation(information);
                 dynobst_edge->setMeasurement(obst->get());
@@ -851,11 +877,11 @@ void TebOptimalPlanner::AddEdgesAccelerationForHumans () {
 
 void TebOptimalPlanner::AddEdgesTimeOptimal()
 {
-  if (cfg_->optim.weight_optimaltime==0)
+  if (local_weight_optimaltime_==0)
     return; // if weight equals zero skip adding edges!
 
   Eigen::Matrix<double,1,1> information;
-  information.fill(cfg_->optim.weight_optimaltime);
+  information.fill(local_weight_optimaltime_);
 
   for (std::size_t i=0; i < teb_.sizeTimeDiffs(); ++i)
   {
@@ -889,6 +915,30 @@ void TebOptimalPlanner::AddEdgesKinematicsDiffDrive()
   }
 }
 
+void TebOptimalPlanner::AddEdgesKinematicsDiffDriveForHumans()
+{
+  if (cfg_->optim.weight_kinematics_nh==0 && cfg_->optim.weight_kinematics_forward_drive==0)
+    return; // if weight equals zero skip adding edges!
+
+  // create edge for satisfiying kinematic constraints
+  Eigen::Matrix<double,2,2> information_kinematics;
+  information_kinematics.fill(0.0);
+  information_kinematics(0, 0) = cfg_->optim.weight_kinematics_nh;
+  information_kinematics(1, 1) = cfg_->optim.weight_kinematics_forward_drive;
+
+  for (auto& human_teb_kv : humans_tebs_map_) {
+    auto& human_teb = human_teb_kv.second;
+    for (unsigned int i=0; i < human_teb.sizePoses()-1; i++) {
+      EdgeKinematicsDiffDrive* kinematics_edge = new EdgeKinematicsDiffDrive;
+      kinematics_edge->setVertex(0,human_teb.PoseVertex(i));
+      kinematics_edge->setVertex(1,human_teb.PoseVertex(i+1));
+      kinematics_edge->setInformation(information_kinematics);
+      kinematics_edge->setTebConfig(*cfg_);
+      optimizer_->addEdge(kinematics_edge);
+    }
+  }
+}
+
 void TebOptimalPlanner::AddEdgesKinematicsCarlike()
 {
   if (cfg_->optim.weight_kinematics_nh==0 && cfg_->optim.weight_kinematics_turning_radius)
@@ -911,13 +961,17 @@ void TebOptimalPlanner::AddEdgesKinematicsCarlike()
   }
 }
 
-void TebOptimalPlanner::AddEdgesHumanRobot()
+void TebOptimalPlanner::AddEdgesHumanRobot(std::stringstream& ss)
 {
     auto robot_teb_size = teb_.sizePoses();
+
+    ss << "\nhuman-robot edges:";
+    unsigned int id_edge = 0;
 
     for (auto& human_teb_kv : humans_tebs_map_) {
         auto& human_teb = human_teb_kv.second;
 
+        id_edge = 0;
         for (unsigned int i=0; (i < human_teb.sizePoses()) && (i < robot_teb_size); i++) {
             Eigen::Matrix<double,1,1> information_human_robot;
             information_human_robot.fill(cfg_->optim.weight_human_robot);
@@ -928,7 +982,9 @@ void TebOptimalPlanner::AddEdgesHumanRobot()
             human_robot_edge->setInformation(information_human_robot);
             human_robot_edge->setParameters(*cfg_, robot_model_.get(), human_model_.get());
             optimizer_->addEdge(human_robot_edge);
+            id_edge += 1;
         }
+        ss << "\n\thuman-" << human_teb_kv.first << ": " << id_edge;
     }
 }
 
@@ -1017,6 +1073,12 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     if (edge_viapoint!=NULL)
     {
       cost_ += edge_viapoint->getError().squaredNorm() * viapoint_cost_scale;
+      continue;
+    }
+
+    EdgeHumanRobot* edge_human_robot = dynamic_cast<EdgeHumanRobot*>(*it);
+    if (edge_human_robot != NULL) {
+      cost_ += edge_human_robot->getError().squaredNorm();;
       continue;
     }
   }

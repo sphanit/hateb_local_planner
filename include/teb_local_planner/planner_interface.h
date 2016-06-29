@@ -190,6 +190,8 @@ public:
   {
   }
 
+  double local_weight_optimaltime_;
+
 };
 
 //! Abbrev. for shared instances of PlannerInterface or it's subclasses
