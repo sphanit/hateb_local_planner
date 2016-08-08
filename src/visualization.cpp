@@ -115,18 +115,15 @@ void TebVisualization::publishHumansPlans(const std::map<uint64_t, std::vector<g
             path.poses[i] = human_plan[i];
         }
 
-        path_array_rviz_plugin::Path gui_path;
-        gui_path.path_id = human_id;
-        gui_path.path = path;
-
-        gui_path_array.paths.push_back(gui_path);
+        gui_path_array.ids.push_back(human_id);
+        gui_path_array.paths.push_back(path);
     }
 
     if(gui_path_array.paths.empty())
         return;
 
-    gui_path_array.header.frame_id = gui_path_array.paths[0].path.poses[0].header.frame_id;
-    gui_path_array.header.stamp = gui_path_array.paths[0].path.poses[0].header.stamp;
+    gui_path_array.header.frame_id = gui_path_array.paths[0].header.frame_id;
+    gui_path_array.header.stamp = gui_path_array.paths[0].header.stamp;
 
     humans_global_plans_pub_.publish(gui_path_array);
 }
@@ -193,18 +190,15 @@ void TebVisualization::publishHumanPlanAndPoses(const std::map<uint64_t, TimedEl
             gui_teb_poses.poses.push_back(pose.pose);
         }
 
-        path_array_rviz_plugin::Path gui_teb_path;
-        gui_teb_path.path_id = human_id;
-        gui_teb_path.path = teb_path;
-
-        gui_teb_path_array.paths.push_back(gui_teb_path);
+        gui_teb_path_array.ids.push_back(human_id);
+        gui_teb_path_array.paths.push_back(teb_path);
     }
 
     if(gui_teb_path_array.paths.empty())
         return;
 
-    gui_teb_path_array.header.frame_id = gui_teb_path_array.paths[0].path.poses[0].header.frame_id;
-    gui_teb_path_array.header.stamp = gui_teb_path_array.paths[0].path.poses[0].header.stamp;
+    gui_teb_path_array.header.frame_id = gui_teb_path_array.paths[0].header.frame_id;
+    gui_teb_path_array.header.stamp = gui_teb_path_array.paths[0].header.stamp;
 
     gui_teb_poses.header.frame_id = gui_teb_path_array.header.frame_id;
     gui_teb_poses.header.stamp = gui_teb_path_array.header.stamp ;
