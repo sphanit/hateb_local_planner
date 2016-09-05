@@ -63,8 +63,8 @@ void TebVisualization::initialize(ros::NodeHandle& nh, const TebConfig& cfg)
   // register topics
   global_plan_pub_ = nh.advertise<nav_msgs::Path>("global_plan", 1);
   local_plan_pub_ = nh.advertise<nav_msgs::Path>("local_plan",1);
-  humans_global_plans_pub_ = nh.advertise<path_array_rviz_plugin::PathArray>("humans_global_plans",1);
-  humans_local_plans_pub_ = nh.advertise<path_array_rviz_plugin::PathArray>("humans_local_plans",1);
+  humans_global_plans_pub_ = nh.advertise<hanp_msgs::PathArray>("humans_global_plans",1);
+  humans_local_plans_pub_ = nh.advertise<hanp_msgs::PathArray>("humans_local_plans",1);
   teb_poses_pub_ = nh.advertise<geometry_msgs::PoseArray>("teb_poses", 100);
   humans_tebs_poses_pub_ = nh.advertise<geometry_msgs::PoseArray>("humans_tebs_poses", 1);
   teb_marker_pub_ = nh.advertise<visualization_msgs::Marker>("teb_markers", 1000);
@@ -96,7 +96,7 @@ void TebVisualization::publishHumansPlans(const std::map<uint64_t, std::vector<g
     if(humans_plans_map.empty())
         return;
 
-    path_array_rviz_plugin::PathArray gui_path_array;
+    hanp_msgs::PathArray gui_path_array;
 
     for (auto& human_plan_kv : humans_plans_map)
     {
@@ -164,7 +164,7 @@ void TebVisualization::publishHumanPlanAndPoses(const std::map<uint64_t, TimedEl
     if (printErrorWhenNotInitialized() || humans_tebs_map.empty())
         return;
 
-    path_array_rviz_plugin::PathArray gui_teb_path_array;
+    hanp_msgs::PathArray gui_teb_path_array;
     geometry_msgs::PoseArray gui_teb_poses;
 
     for (auto& human_teb_kv : humans_tebs_map) {

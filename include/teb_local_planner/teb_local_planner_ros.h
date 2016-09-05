@@ -63,6 +63,7 @@
 
 // human data
 #include <hanp_prediction/HumanPosePredict.h>
+#include <std_srvs/SetBool.h>
 
 // transforms
 #include <angles/angles.h>
@@ -402,7 +403,7 @@ private:
   bool initialized_; //!< Keeps track about the correct initialization of this class
 
   // human perdiction service
-  ros::ServiceClient predict_humans_client_;
+  ros::ServiceClient predict_humans_client_, publish_predicted_markers_client_;
   bool publish_predicted_human_markers_ = true;
 
 public:

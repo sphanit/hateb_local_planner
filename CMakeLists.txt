@@ -19,6 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
   nav_msgs
   roscpp
   std_msgs
+  std_srvs
   path_array_rviz_plugin
   pluginlib
   tf
@@ -160,6 +161,7 @@ catkin_package(
 	pluginlib
 	roscpp
 	std_msgs
+	std_srvs
 	tf
 	tf_conversions
 	visualization_msgs

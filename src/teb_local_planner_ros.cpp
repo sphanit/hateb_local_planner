@@ -37,6 +37,7 @@
  *********************************************************************/
 
 #define PREDICT_SERVICE_NAME "/human_pose_prediction/predict_human_poses"
+#define PUBLISH_MARKERS_SRV_NAME "/human_pose_prediction/publish_prediction_markers"
 #define DEFAULT_HUMAN_SEGMENT hanp_msgs::TrackedSegmentType::TORSO
 
 #include <teb_local_planner/teb_local_planner_ros.h>
@@ -182,6 +183,7 @@ void TebLocalPlannerROS::initialize(std::string name, tf::TransformListener* tf,
 
     // setup human prediction client with persistent connection
     predict_humans_client_ = nh.serviceClient<hanp_prediction::HumanPosePredict>(PREDICT_SERVICE_NAME, true);
+    publish_predicted_markers_client_ = nh.serviceClient<std_srvs::SetBool>(PUBLISH_MARKERS_SRV_NAME, true);
 
     // set initialized flag
     initialized_ = true;
@@ -357,7 +359,13 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   }
   // predict_srv.request.predict_times = predict_times;
   predict_srv.request.type = hanp_prediction::HumanPosePredictRequest::VELOCITY_OBSTACLE;
-  predict_srv.request.publish_markers = publish_predicted_human_markers_;
+
+  std_srvs::SetBool publish_predicted_markers_srv;
+  publish_predicted_markers_srv.request.data = publish_predicted_human_markers_;
+  if(!publish_predicted_markers_client_ && publish_predicted_markers_client_.call(publish_predicted_markers_srv))
+  {
+    ROS_WARN("Failed to call %s service, is human prediction server running?", PUBLISH_MARKERS_SRV_NAME);
+  }
 
   std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>> transformed_humans_plans_map;
 

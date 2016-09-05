@@ -65,7 +65,7 @@
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
 #include <visualization_msgs/Marker.h>
-#include <path_array_rviz_plugin/PathArray.h>
+#include <hanp_msgs/PathArray.h>
 
 namespace teb_local_planner
 {
