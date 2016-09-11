@@ -184,6 +184,8 @@ public:
   virtual bool plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan,
                     const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>>& initial_humans_plans_map,
                     const geometry_msgs::Twist* start_vel = NULL,
+                    const std::map<uint64_t, geometry_msgs::TwistStamped> *humans_start_vels_map = NULL,
+                    const std::map<uint64_t, geometry_msgs::TwistStamped> *humans_goals_vels_map = NULL,
                     bool free_goal_vel=false);
 
   /**
@@ -434,9 +436,12 @@ public:
         return true; // Found! Homotopy class already exists, therefore nothing added  
       return false;
   }
-    
+
+  virtual void getFullHUmanTrajectories(std::map<uint64_t, std::vector<TrajectoryPointMsg>>& human_trajectories);
+
+
 protected:
-  
+
   /** @name Explore new paths and keep only a single one for each homotopy class */
   //@{
   

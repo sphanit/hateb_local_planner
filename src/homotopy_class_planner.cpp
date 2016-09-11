@@ -103,7 +103,10 @@ void HomotopyClassPlanner::setVisualization(TebVisualizationPtr visualization)
 
 bool HomotopyClassPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan,
                                 const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>>& initial_humans_plans_map,
-                                const geometry_msgs::Twist* start_vel, bool free_goal_vel)
+                                const geometry_msgs::Twist* start_vel,
+                                const std::map<uint64_t, geometry_msgs::TwistStamped> *humans_start_vels_map,
+                                const std::map<uint64_t, geometry_msgs::TwistStamped> *humans_goals_vels_map,
+                                bool free_goal_vel)
 {
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
   auto start_time = ros::Time::now();
@@ -861,6 +864,11 @@ void HomotopyClassPlanner::computeCurrentCost(std::vector<double>& cost, double 
     it_teb->get()->computeCurrentCost(cost, obst_cost_scale, viapoint_cost_scale, alternative_time_cost);
   } 
 }
- 
- 
+
+void HomotopyClassPlanner::getFullHUmanTrajectories(std::map<uint64_t, std::vector<TrajectoryPointMsg>>& human_trajectories)
+{
+  return;
+}
+
+
 } // end namespace

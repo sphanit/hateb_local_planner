@@ -171,7 +171,10 @@ public:
    */
   virtual bool plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan,
                     const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>>& initial_humans_plans_map,
-                    const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false);
+                    const geometry_msgs::Twist* start_vel = NULL,
+                    const std::map<uint64_t, geometry_msgs::TwistStamped> *humans_start_vels_map = NULL,
+                    const std::map<uint64_t, geometry_msgs::TwistStamped> *humans_goals_vels_map = NULL,
+                    bool free_goal_vel=false);
 
   /**
    * @brief Plan a trajectory between a given start and goal pose (tf::Pose version)
@@ -490,6 +493,7 @@ public:
    * @param[out] trajectory the resulting trajectory
    */
   void getFullTrajectory(std::vector<TrajectoryPointMsg>& trajectory) const;
+  virtual void getFullHUmanTrajectories(std::map<uint64_t, std::vector<TrajectoryPointMsg>>& human_trajectories);
 
   /**
    * @brief Check whether the planned trajectory is feasible or not.
@@ -678,6 +682,7 @@ protected:
   boost::shared_ptr<g2o::SparseOptimizer> optimizer_; //!< g2o optimizer for trajectory optimization
   std::pair<bool, Eigen::Vector2d> vel_start_; //!< Store the initial velocity at the start pose
   std::pair<bool, Eigen::Vector2d> vel_goal_; //!< Store the final velocity at the goal pose
+  std::map<uint64_t, std::pair<bool, Eigen::Vector2d>> humans_vel_start_, humans_vel_goal_;
 
   bool initialized_; //!< Keeps track about the correct initialization of this class
   bool optimized_; //!< This variable is \c true as long as the last optimization has been completed successful

@@ -54,6 +54,7 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/TwistStamped.h>
 
+#include <teb_local_planner/TrajectoryMsg.h>
 
 namespace teb_local_planner
 {
@@ -97,7 +98,10 @@ public:
    */
   virtual bool plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan,
                     const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>>& initial_humans_plans_map,
-                    const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false) = 0;
+                    const geometry_msgs::Twist* start_vel = NULL,
+                    const std::map<uint64_t, geometry_msgs::TwistStamped> *humans_start_vels_map = NULL,
+                    const std::map<uint64_t, geometry_msgs::TwistStamped> *humans_goals_vels_map = NULL,
+                    bool free_goal_vel=false) = 0;
 
   /**
    * @brief Plan a trajectory between a given start and goal pose (tf::Pose version).
@@ -189,6 +193,9 @@ public:
   virtual void computeCurrentCost(std::vector<double>& cost, double obst_cost_scale=1.0, bool alternative_time_cost=false)
   {
   }
+
+  virtual void getFullHUmanTrajectories(std::map<uint64_t, std::vector<TrajectoryPointMsg>>& human_trajectories) = 0;
+
 
   double local_weight_optimaltime_;
 

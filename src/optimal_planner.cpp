@@ -109,7 +109,7 @@ void TebOptimalPlanner::visualize()
     return;
 
   visualization_->publishLocalPlanAndPoses(teb_);
-  visualization_->publishHumanPlanAndPoses(humans_tebs_map_);
+  visualization_->publishHumanPlanPoses(humans_tebs_map_);
 
   if (teb_.sizePoses() > 0)
     visualization_->publishRobotFootprintModel(teb_.Pose(0), *robot_model_);
@@ -228,7 +228,10 @@ void TebOptimalPlanner::setVelocityGoal(const Eigen::Ref<const Eigen::Vector2d>&
 
 bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan,
                              const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>>& initial_humans_plans_map,
-                             const geometry_msgs::Twist* start_vel, bool free_goal_vel)
+                             const geometry_msgs::Twist* start_vel,
+                             const std::map<uint64_t, geometry_msgs::TwistStamped> *humans_start_vels_map,
+                             const std::map<uint64_t, geometry_msgs::TwistStamped> *humans_goals_vels_map,
+                             bool free_goal_vel)
 {
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
   auto prep_start_time = ros::Time::now();
@@ -267,6 +270,7 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
           ++itr;
   }
 
+  humans_vel_start_.clear();
   for (auto& initial_human_plan_kv : initial_humans_plans_map) {
       auto& human_id = initial_human_plan_kv.first;
       auto& initial_human_plan = initial_human_plan_kv.second;
@@ -307,7 +311,40 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
                                       cfg_->trajectory.min_samples);
           // }
       }
-      // no start velocity for humans, for now
+      // give start velocity for humans
+      std::pair<bool, Eigen::Vector2d> human_start_vel;
+      human_start_vel.first = true;
+      if (humans_start_vels_map)
+      {
+        auto humans_start_vels_it = humans_start_vels_map->find(human_id);
+        if (humans_start_vels_it != humans_start_vels_map->end())
+        {
+          human_start_vel.second.coeffRef(0) = humans_start_vels_it->second.twist.linear.x;
+          human_start_vel.second.coeffRef(1) = humans_start_vels_it->second.twist.angular.z;
+        }
+      }
+      else
+      {
+        human_start_vel.second.setZero();
+      }
+      humans_vel_start_[human_id] = human_start_vel;
+
+      std::pair<bool, Eigen::Vector2d> human_goal_vel;
+      human_goal_vel.first = true;
+      if (humans_goals_vels_map)
+      {
+        auto humans_goal_vels_it = humans_goals_vels_map->find(human_id);
+        if (humans_goal_vels_it != humans_goals_vels_map->end())
+        {
+          human_goal_vel.second.coeffRef(0) = humans_goal_vels_it->second.twist.linear.x;
+          human_goal_vel.second.coeffRef(1) = humans_goal_vels_it->second.twist.angular.z;
+        }
+      }
+      else
+      {
+        human_goal_vel.second.setZero();
+      }
+      humans_vel_goal_[human_id] = human_goal_vel;
   }
   auto human_prep_time = ros::Time::now() - human_prep_time_start;
 
@@ -857,9 +894,23 @@ void TebOptimalPlanner::AddEdgesAccelerationForHumans () {
     information(1,1) = cfg_->optim.weight_human_acc_lim_theta;
 
     for (auto& human_teb_kv : humans_tebs_map_) {
+        auto &human_it = human_teb_kv.first;
         auto& human_teb = human_teb_kv.second;
 
         std::size_t NoBandpts(human_teb.sizePoses());
+
+        if (humans_vel_start_[human_it].first)
+        {
+          EdgeAccelerationHumanStart* human_acceleration_edge = new EdgeAccelerationHumanStart;
+          human_acceleration_edge->setVertex(0,human_teb.PoseVertex(0));
+          human_acceleration_edge->setVertex(1,human_teb.PoseVertex(1));
+          human_acceleration_edge->setVertex(2,human_teb.TimeDiffVertex(0));
+          human_acceleration_edge->setInitialVelocity(humans_vel_start_[human_it].second);
+          human_acceleration_edge->setInformation(information);
+          human_acceleration_edge->setTebConfig(*cfg_);
+          optimizer_->addEdge(human_acceleration_edge);
+        }
+
         for (std::size_t i=0; i < NoBandpts - 2; ++i)
         {
             EdgeAccelerationHuman* human_acceleration_edge = new EdgeAccelerationHuman;
@@ -871,6 +922,18 @@ void TebOptimalPlanner::AddEdgesAccelerationForHumans () {
             human_acceleration_edge->setInformation(information);
             human_acceleration_edge->setTebConfig(*cfg_);
             optimizer_->addEdge(human_acceleration_edge);
+        }
+
+        if(humans_vel_goal_[human_it].first)
+        {
+          EdgeAccelerationHumanGoal* human_acceleration_edge = new EdgeAccelerationHumanGoal;
+          human_acceleration_edge->setVertex(0,human_teb.PoseVertex(NoBandpts-2));
+          human_acceleration_edge->setVertex(1,human_teb.PoseVertex(NoBandpts-1));
+          human_acceleration_edge->setVertex(2,human_teb.TimeDiffVertex(human_teb.sizeTimeDiffs()-1));
+          human_acceleration_edge->setGoalVelocity(humans_vel_goal_[human_it].second);
+          human_acceleration_edge->setInformation(information);
+          human_acceleration_edge->setTebConfig(*cfg_);
+          optimizer_->addEdge(human_acceleration_edge);
         }
     }
 }
@@ -1199,6 +1262,66 @@ void TebOptimalPlanner::getFullTrajectory(std::vector<TrajectoryPointMsg>& traje
   goal.velocity.angular.z = vel_goal_.second.y();
   goal.time_from_start.fromSec(curr_time);
 }
+
+void TebOptimalPlanner::getFullHUmanTrajectories(std::map<uint64_t, std::vector<TrajectoryPointMsg>>& human_trajectories)
+{
+  for(auto &human_teb_kv : humans_tebs_map_)
+  {
+    auto& human_id = human_teb_kv.first;
+    auto& human_teb = human_teb_kv.second;
+
+    auto human_teb_size = human_teb.sizePoses();
+    if(human_teb_size == 0)
+    {
+      continue;
+    }
+
+    std::vector<TrajectoryPointMsg> trajectory(human_teb_size);
+
+    double curr_time = 0;
+
+    // start
+    TrajectoryPointMsg& start = trajectory.front();
+    human_teb.Pose(0).toPoseMsg(start.pose);
+    start.velocity.linear.y = start.velocity.linear.z = 0;
+    start.velocity.angular.x = start.velocity.angular.y = 0;
+    start.velocity.linear.x = humans_vel_start_[human_id].second.x();
+    start.velocity.angular.z = humans_vel_start_[human_id].second.y();
+    start.time_from_start.fromSec(curr_time);
+
+    curr_time += human_teb.TimeDiff(0);
+
+    // intermediate points
+    for (int i=1; i < human_teb_size-1; ++i)
+    {
+      TrajectoryPointMsg& point = trajectory[i];
+      human_teb.Pose(i).toPoseMsg(point.pose);
+      point.velocity.linear.y = point.velocity.linear.z = 0;
+      point.velocity.angular.x = point.velocity.angular.y = 0;
+      double vel1, vel2, omega1, omega2;
+      extractVelocity(human_teb.Pose(i-1), human_teb.Pose(i), human_teb.TimeDiff(i-1), vel1, omega1);
+      extractVelocity(human_teb.Pose(i), human_teb.Pose(i+1), human_teb.TimeDiff(i), vel2, omega2);
+      point.velocity.linear.x = 0.5*(vel1+vel2);
+      point.velocity.angular.z = 0.5*(omega1+omega2);
+      point.time_from_start.fromSec(curr_time);
+
+      curr_time += human_teb.TimeDiff(i);
+    }
+
+    // goal
+    TrajectoryPointMsg& goal = trajectory.back();
+    human_teb.BackPose().toPoseMsg(goal.pose);
+    goal.velocity.linear.y = goal.velocity.linear.z = 0;
+    goal.velocity.angular.x = goal.velocity.angular.y = 0;
+    goal.velocity.linear.x = humans_vel_goal_[human_id].second.x();
+    goal.velocity.angular.z = humans_vel_goal_[human_id].second.y();
+    goal.time_from_start.fromSec(curr_time);
+
+    human_trajectories[human_id] = trajectory;
+  }
+  return;
+}
+
 
 
 bool TebOptimalPlanner::isTrajectoryFeasible(base_local_planner::CostmapModel* costmap_model, const std::vector<geometry_msgs::Point>& footprint_spec,

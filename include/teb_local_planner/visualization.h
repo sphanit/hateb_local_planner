@@ -45,6 +45,7 @@
 #include <teb_local_planner/teb_config.h>
 #include <teb_local_planner/timed_elastic_band.h>
 #include <teb_local_planner/robot_footprint_model.h>
+#include <teb_local_planner/TrajectoryMsg.h>
 
 // ros stuff
 #include <ros/publisher.h>
@@ -66,6 +67,7 @@
 #include <nav_msgs/Path.h>
 #include <visualization_msgs/Marker.h>
 #include <hanp_msgs/PathArray.h>
+#include <hanp_msgs/TrajectoryArray.h>
 
 namespace teb_local_planner
 {
@@ -133,7 +135,10 @@ public:
    * @param teb const reference to a Timed_Elastic_Band
    */
   void publishLocalPlanAndPoses(const TimedElasticBand& teb) const;
-  void publishHumanPlanAndPoses(const std::map<uint64_t, TimedElasticBand>& humans_tebs_map) const;
+  void publishHumanPlanPoses(const std::map<uint64_t, TimedElasticBand>& humans_tebs_map) const;
+  void publishHumanTrajectories(const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>> &humans_plan_map_before,
+    const std::map<uint64_t, std::vector<TrajectoryPointMsg>> &human_trajectories,
+    const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>> &humans_plan_map_after) const;
 
   /**
    * @brief Publish the visualization of the robot model
