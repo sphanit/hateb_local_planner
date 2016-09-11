@@ -154,6 +154,7 @@ public:
     double weight_viapoint; //!< Optimization weight for minimizing the distance to via-points
     double weight_human_viapoint; //!< Optimization weight for minimizing the distance from human to its via-points
     double weight_human_robot; //!< Optimization weight for satisfying a minimum seperation between human and robot
+    bool use_external_prediction;
   } optim; //!< Optimization related parameters
 
 
@@ -276,6 +277,7 @@ public:
     optim.weight_viapoint = 1;
     optim.weight_human_viapoint = 1;
     optim.weight_human_robot = 40;
+    optim.use_external_prediction = false;
 
     // Homotopy Class Planner
 

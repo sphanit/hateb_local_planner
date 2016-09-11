@@ -116,6 +116,7 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle& nh)
   nh.param("weight_viapoint", optim.weight_viapoint, optim.weight_viapoint);
   nh.param("weight_human_viapoint", optim.weight_human_viapoint, optim.weight_human_viapoint);
   nh.param("weight_human_robot", optim.weight_human_robot, optim.weight_human_robot);
+  nh.param("use_external_prediction", optim.use_external_prediction, optim.use_external_prediction);
 
   // Homotopy Class Planner
   nh.param("enable_homotopy_class_planning", hcp.enable_homotopy_class_planning, hcp.enable_homotopy_class_planning);
@@ -208,6 +209,7 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig& cfg)
   optim.weight_viapoint = cfg.weight_viapoint;
   optim.weight_human_viapoint = cfg.weight_human_viapoint;
   optim.weight_human_robot = cfg.weight_human_robot;
+  optim.use_external_prediction = cfg.use_external_prediction;
 
   // Homotopy Class Planner
   hcp.enable_multithreading = cfg.enable_multithreading;

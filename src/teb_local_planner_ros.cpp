@@ -351,14 +351,21 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   // update humans
   auto human_start_time = ros::Time::now();
   hanp_prediction::HumanPosePredict predict_srv;
-  double traj_size = 10, predict_time = 5.0; //TODO: make these values configurable
-  std::vector<double> predict_times;
-  for(double i = 1.0; i <= traj_size; ++i)
+  if (cfg_.optim.use_external_prediction)
   {
-      predict_srv.request.predict_times.push_back(predict_time * (i / traj_size));
+    predict_srv.request.type = hanp_prediction::HumanPosePredictRequest::EXTERNAL;
   }
-  // predict_srv.request.predict_times = predict_times;
-  predict_srv.request.type = hanp_prediction::HumanPosePredictRequest::VELOCITY_OBSTACLE;
+  else
+  {
+    double traj_size = 10, predict_time = 5.0; //TODO: make these values configurable
+    std::vector<double> predict_times;
+    for(double i = 1.0; i <= traj_size; ++i)
+    {
+        predict_srv.request.predict_times.push_back(predict_time * (i / traj_size));
+    }
+    // predict_srv.request.predict_times = predict_times;
+    predict_srv.request.type = hanp_prediction::HumanPosePredictRequest::VELOCITY_OBSTACLE;
+  }
 
   std_srvs::SetBool publish_predicted_markers_srv;
   publish_predicted_markers_srv.request.data = publish_predicted_human_markers_;
