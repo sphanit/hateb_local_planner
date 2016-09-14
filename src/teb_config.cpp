@@ -79,6 +79,7 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle& nh)
   nh.param("max_human_vel_theta", human.max_vel_theta, human.max_vel_theta);
   nh.param("human_acc_lim_x", human.acc_lim_x, human.acc_lim_x);
   nh.param("human_acc_lim_theta", human.acc_lim_theta, human.acc_lim_theta);
+  nh.param("use_external_prediction", human.use_external_prediction, human.use_external_prediction);
 
   // GoalTolerance
   nh.param("xy_goal_tolerance", goal_tolerance.xy_goal_tolerance, goal_tolerance.xy_goal_tolerance);
@@ -116,7 +117,6 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle& nh)
   nh.param("weight_viapoint", optim.weight_viapoint, optim.weight_viapoint);
   nh.param("weight_human_viapoint", optim.weight_human_viapoint, optim.weight_human_viapoint);
   nh.param("weight_human_robot", optim.weight_human_robot, optim.weight_human_robot);
-  nh.param("use_external_prediction", optim.use_external_prediction, optim.use_external_prediction);
 
   // Homotopy Class Planner
   nh.param("enable_homotopy_class_planning", hcp.enable_homotopy_class_planning, hcp.enable_homotopy_class_planning);
@@ -135,6 +135,9 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle& nh)
   nh.param("obstacle_heading_threshold", hcp.obstacle_heading_threshold, hcp.obstacle_heading_threshold);
   nh.param("viapoints_all_candidates", hcp.viapoints_all_candidates, hcp.viapoints_all_candidates);
   nh.param("visualize_hc_graph", hcp.visualize_hc_graph, hcp.visualize_hc_graph);
+
+  // Visualization
+  nh.param("pose_array_z_scale", visualization.pose_array_z_scale, visualization.pose_array_z_scale);
 
   checkParameters();
   checkDeprecated(nh);
@@ -173,6 +176,7 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig& cfg)
   human.max_vel_theta = cfg.max_vel_theta;
   human.acc_lim_x = cfg.acc_lim_x;
   human.acc_lim_theta = cfg.acc_lim_theta;
+  human.use_external_prediction = cfg.use_external_prediction;
 
   // GoalTolerance
   goal_tolerance.xy_goal_tolerance = cfg.xy_goal_tolerance;
@@ -209,7 +213,6 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig& cfg)
   optim.weight_viapoint = cfg.weight_viapoint;
   optim.weight_human_viapoint = cfg.weight_human_viapoint;
   optim.weight_human_robot = cfg.weight_human_robot;
-  optim.use_external_prediction = cfg.use_external_prediction;
 
   // Homotopy Class Planner
   hcp.enable_multithreading = cfg.enable_multithreading;
@@ -228,6 +231,9 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig& cfg)
   hcp.h_signature_threshold = cfg.h_signature_threshold;
   hcp.viapoints_all_candidates = cfg.viapoints_all_candidates;
   hcp.visualize_hc_graph = cfg.visualize_hc_graph;
+
+  // Visualization
+  visualization.pose_array_z_scale = cfg.pose_array_z_scale;
 
   checkParameters();
 }

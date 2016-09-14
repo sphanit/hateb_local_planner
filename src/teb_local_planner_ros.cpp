@@ -351,7 +351,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   // update humans
   auto human_start_time = ros::Time::now();
   hanp_prediction::HumanPosePredict predict_srv;
-  if (cfg_.optim.use_external_prediction)
+  if (cfg_.human.use_external_prediction)
   {
     predict_srv.request.type = hanp_prediction::HumanPosePredictRequest::EXTERNAL;
   }

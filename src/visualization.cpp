@@ -170,7 +170,7 @@ void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand &teb) con
     pose.pose.position.z = 0;
     pose.pose.orientation = tf::createQuaternionMsgFromYaw(teb.Pose(i).theta());
     teb_path.poses.push_back(pose);
-    pose.pose.position.z = pose_time;
+    pose.pose.position.z = pose_time * cfg_->visualization.pose_array_z_scale;
     teb_poses.poses.push_back(pose.pose);
     if (i < (teb.sizePoses() - 1))
     {
@@ -205,7 +205,7 @@ void TebVisualization::publishHumanPlanPoses(const std::map<uint64_t, TimedElast
       geometry_msgs::Pose pose;
       pose.position.x = human_teb.Pose(i).x();
       pose.position.y = human_teb.Pose(i).y();
-      pose.position.z = pose_time;
+      pose.position.z = pose_time * cfg_->visualization.pose_array_z_scale;
       pose.orientation = tf::createQuaternionMsgFromYaw(human_teb.Pose(i).theta());
       gui_teb_poses.poses.push_back(pose);
       if (i < (human_teb.sizePoses() - 1)) {

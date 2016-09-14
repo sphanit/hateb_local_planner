@@ -103,6 +103,7 @@ public:
       double max_vel_theta;
       double acc_lim_x;
       double acc_lim_theta;
+      bool use_external_prediction;
   } human;
 
   //! Goal tolerance related parameters
@@ -154,7 +155,6 @@ public:
     double weight_viapoint; //!< Optimization weight for minimizing the distance to via-points
     double weight_human_viapoint; //!< Optimization weight for minimizing the distance from human to its via-points
     double weight_human_robot; //!< Optimization weight for satisfying a minimum seperation between human and robot
-    bool use_external_prediction;
   } optim; //!< Optimization related parameters
 
 
@@ -181,6 +181,11 @@ public:
 
     bool visualize_hc_graph; //!< Visualize the graph that is created for exploring new homotopy classes.
   } hcp;
+
+  struct Visualization
+  {
+    double pose_array_z_scale;
+  } visualization;
 
 
  /**
@@ -236,6 +241,7 @@ public:
     human.max_vel_theta = 0.3;
     human.acc_lim_x = 0.5;
     human.acc_lim_theta = 0.5;
+    human.use_external_prediction = false;
 
     // GoalTolerance
 
@@ -277,7 +283,6 @@ public:
     optim.weight_viapoint = 1;
     optim.weight_human_viapoint = 1;
     optim.weight_human_robot = 40;
-    optim.use_external_prediction = false;
 
     // Homotopy Class Planner
 
@@ -301,6 +306,8 @@ public:
 
     hcp.visualize_hc_graph = false;
 
+    // Visualization
+    visualization.pose_array_z_scale = 1.0;
 
   }
 
