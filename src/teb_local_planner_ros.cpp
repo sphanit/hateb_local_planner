@@ -374,33 +374,34 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
     ROS_WARN("Failed to call %s service, is human prediction server running?", PUBLISH_MARKERS_SRV_NAME);
   }
 
-  std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>> transformed_humans_plans_map_before, transformed_humans_plans_map, transformed_humans_plans_map_after, transformed_humans_plans_map_full;
-  std::map<uint64_t, geometry_msgs::TwistStamped> transformed_humans_start_vels_map, transformed_humans_goal_vels_map;
-
+  HumanPlanVelMap transformed_human_plan_vel_map;
+  std::vector<HumanPlanCombined> transformed_human_plans;
   if(predict_humans_client_ && predict_humans_client_.call(predict_srv))
   {
     tf::StampedTransform tf_plan_to_global;
-    for(auto human_plan_prediction : predict_srv.response.predicted_humans)
+    for(auto predicted_humans_poses : predict_srv.response.predicted_humans_poses)
     {
       // transform human plans
-      std::vector<geometry_msgs::PoseStamped> transformed_human_plan_before, transformed_human_plan, transformed_human_plan_after, transformed_human_plan_full;
-      auto &transformed_twist = human_plan_prediction.twist;
-      if (!transformHumanPlan(*tf_, human_plan_prediction.poses, robot_pose, *costmap_, global_frame_,
-                           transformed_human_plan_before, transformed_human_plan, transformed_human_plan_after, transformed_human_plan_full,
-                           transformed_twist, &tf_plan_to_global))
+      HumanPlanCombined human_plan_combined;
+      auto &transformed_vel = predicted_humans_poses.start_velocity;
+      if (!transformHumanPlan(*tf_, robot_pose, *costmap_, global_frame_, predicted_humans_poses.poses,
+                              human_plan_combined, transformed_vel, &tf_plan_to_global))
       {
-        ROS_WARN("Could not transform the human %ld plan to the frame of the controller", human_plan_prediction.track_id);
+        ROS_WARN("Could not transform the human %ld plan to the frame of the controller", predicted_humans_poses.id);
         continue;
       }
 
-      transformed_humans_plans_map_before[human_plan_prediction.track_id] = transformed_human_plan_before;
-      transformed_humans_plans_map[human_plan_prediction.track_id] = transformed_human_plan;
-      transformed_humans_plans_map_after[human_plan_prediction.track_id] = transformed_human_plan_after;
-      transformed_humans_plans_map_full[human_plan_prediction.track_id] = transformed_human_plan_full;
-      transformed_humans_start_vels_map[human_plan_prediction.track_id] = transformed_twist;
-      if (transformed_human_plan_after.size() > 0) {
-        transformed_humans_goal_vels_map[human_plan_prediction.track_id] = transformed_twist;
+      human_plan_combined.id = predicted_humans_poses.id;
+      transformed_human_plans.push_back(human_plan_combined);
+
+      PlanStartVelGoalVel plan_start_vel_goal_vel;
+      plan_start_vel_goal_vel.plan = human_plan_combined.plan_to_optimize;
+      plan_start_vel_goal_vel.start_vel = transformed_vel.twist;
+      if(human_plan_combined.plan_after.size() > 0)
+      {
+        plan_start_vel_goal_vel.goal_vel = transformed_vel.twist;
       }
+      transformed_human_plan_vel_map[human_plan_combined.id] = plan_start_vel_goal_vel;
     }
   }
   else
@@ -410,14 +411,13 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
     // re-initialize the service
     //predict_humans_client_ = nh.serviceClient<hanp_prediction::HumanPosePredict>(PREDICT_SERVICE_NAME, true);
   }
-  updateHumanViaPointsContainers(transformed_humans_plans_map, cfg_.trajectory.global_plan_viapoint_sep);
+  updateHumanViaPointsContainers(transformed_human_plan_vel_map, cfg_.trajectory.global_plan_viapoint_sep);
   auto human_time = ros::Time::now() - human_start_time;
 
   // Now perform the actual planning
   auto plan_start_time = ros::Time::now();
   // bool success = planner_->plan(robot_pose_, robot_goal_, robot_vel_, cfg_.goal_tolerance.free_goal_vel); // straight line init
-  bool success = planner_->plan(transformed_plan, transformed_humans_plans_map, &robot_vel_twist,
-      &transformed_humans_start_vels_map, &transformed_humans_goal_vels_map, cfg_.goal_tolerance.free_goal_vel);
+  bool success = planner_->plan(transformed_plan, &robot_vel_twist, cfg_.goal_tolerance.free_goal_vel, &transformed_human_plan_vel_map);
   if (!success)
   {
     planner_->clearPlanner(); // force reinitialization for next time
@@ -495,10 +495,18 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   visualization_->publishObstacles(obstacles_);
   visualization_->publishViaPoints(via_points_);
   visualization_->publishGlobalPlan(global_plan_);
-  visualization_->publishHumansPlans(transformed_humans_plans_map_full);
-  std::map<uint64_t, std::vector<TrajectoryPointMsg>> human_trajectories_map;
-  planner_->getFullHUmanTrajectories(human_trajectories_map);
-  visualization_->publishHumanTrajectories(transformed_humans_plans_map_before, human_trajectories_map, transformed_humans_plans_map_after);
+  visualization_->publishHumansPlans(transformed_human_plans);
+  std::vector<HumanPlanTrajCombined> human_plans_traj_array;
+  for (auto &human_plan_combined : transformed_human_plans)
+  {
+    HumanPlanTrajCombined human_plan_traj_combined;
+    human_plan_traj_combined.id = human_plan_combined.id;
+    human_plan_traj_combined.plan_before = human_plan_combined.plan_before;
+    planner_->getFullHumanTrajectory(human_plan_traj_combined.id, human_plan_traj_combined.optimized_trajectory);
+    human_plan_traj_combined.plan_after = human_plan_combined.plan_after;
+    human_plans_traj_array.push_back(human_plan_traj_combined);
+  }
+  visualization_->publishHumanTrajectories(human_plans_traj_array);
   auto viz_time = ros::Time::now() - viz_start_time;
 
   auto total_time = ros::Time::now() - start_time;
@@ -672,34 +680,34 @@ void TebLocalPlannerROS::updateViaPointsContainer(const std::vector<geometry_msg
 
 }
 
-void TebLocalPlannerROS::updateHumanViaPointsContainers(const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>>& transformed_humans_plans_map,
+void TebLocalPlannerROS::updateHumanViaPointsContainers(const HumanPlanVelMap &transformed_human_plan_vel_map,
                                                         double min_separation) {
-    for (auto& transformed_human_plan_kv : transformed_humans_plans_map) {
-        auto& human_id = transformed_human_plan_kv.first;
-        auto& transformed_human_plan = transformed_human_plan_kv.second;
+    if (min_separation<0)
+        return;
 
+    // reset via-points for known humans, create via-points for new humans
+    for (auto& transformed_human_plan_vel_kv : transformed_human_plan_vel_map) {
+        auto& human_id = transformed_human_plan_vel_kv.first;
         if (humans_via_points_map_.find(human_id) != humans_via_points_map_.end())
             humans_via_points_map_[human_id].clear();
         else
             humans_via_points_map_[human_id] = ViaPointContainer();
     }
 
+    // remove human via-points for vanished humans
     auto itr = humans_via_points_map_.begin();
     while (itr != humans_via_points_map_.end()) {
-        if (transformed_humans_plans_map.find(itr->first) != transformed_humans_plans_map.end())
-            itr = humans_via_points_map_.erase(itr); //TODO: need to check for memory leak for vector
+        if (transformed_human_plan_vel_map.find(itr->first) != transformed_human_plan_vel_map.end())
+            itr = humans_via_points_map_.erase(itr);
         else
             ++itr;
     }
 
-    if (min_separation<0)
-        return;
-
     std::size_t prev_idx;
-    for (auto& transformed_human_plan_kv : transformed_humans_plans_map) {
+    for (auto& transformed_human_plan_vel_kv : transformed_human_plan_vel_map) {
         prev_idx = 0;
-        auto& human_id = transformed_human_plan_kv.first;
-        auto& transformed_human_plan = transformed_human_plan_kv.second;
+        auto& human_id = transformed_human_plan_vel_kv.first;
+        auto& transformed_human_plan = transformed_human_plan_vel_kv.second.plan;
         for (std::size_t i=1; i < transformed_human_plan.size(); ++i) {
             if (distance_points2d(transformed_human_plan[prev_idx].pose.position,
                                   transformed_human_plan[i].pose.position)
@@ -887,12 +895,14 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf::TransformListener& tf, co
 
 
 
-bool TebLocalPlannerROS::transformHumanPlan(const tf::TransformListener& tf, const std::vector<geometry_msgs::PoseWithCovarianceStamped>& human_plan,
-  const tf::Stamped<tf::Pose>& robot_pose,  const costmap_2d::Costmap2D& costmap, const std::string& global_frame,
-  std::vector<geometry_msgs::PoseStamped>& transformed_human_plan_before, std::vector<geometry_msgs::PoseStamped>& transformed_human_plan,
-  std::vector<geometry_msgs::PoseStamped>& transformed_human_plan_after,
-  std::vector<geometry_msgs::PoseStamped>& transformed_human_plan_full,
-  geometry_msgs::TwistStamped &transformed_human_twist, tf::StampedTransform* tf_human_plan_to_global) const
+bool TebLocalPlannerROS::transformHumanPlan(const tf::TransformListener &tf,
+                                            const tf::Stamped<tf::Pose> &robot_pose,
+                                            const costmap_2d::Costmap2D &costmap,
+                                            const std::string &global_frame,
+                                            const std::vector<geometry_msgs::PoseWithCovarianceStamped> &human_plan,
+                                            HumanPlanCombined &transformed_human_plan_combined,
+                                            geometry_msgs::TwistStamped &transformed_human_twist,
+                                            tf::StampedTransform* tf_human_plan_to_global) const
 {
   try
   {
@@ -902,27 +912,17 @@ bool TebLocalPlannerROS::transformHumanPlan(const tf::TransformListener& tf, con
       return false;
     }
 
-    const auto human_plan_pose = human_plan[0];
-
-    transformed_human_plan_before.clear();
-    transformed_human_plan.clear();
-    transformed_human_plan_after.clear();
-    transformed_human_plan_full.clear();
-
     // get human_plan_to_global_transform from plan frame to global_frame
     tf::StampedTransform human_plan_to_global_transform;
-    tf.waitForTransform(global_frame, human_plan_pose.header.frame_id,
+    tf.waitForTransform(global_frame, human_plan.front().header.frame_id,
                         ros::Time(0), ros::Duration(0.5));
-    tf.lookupTransform(global_frame, human_plan_pose.header.frame_id,
+    tf.lookupTransform(global_frame, human_plan.front().header.frame_id,
                        ros::Time(0), human_plan_to_global_transform);
 
-    // //let's get the pose of the robot in the frame of the plan
-    // tf::Stamped<tf::Pose> robot_pose;
-    // robot_pose.setData(human_plan_to_global_transform.inverse() * global_pose);
-
     // transform the full plan to local planning frame
+    std::vector<geometry_msgs::PoseStamped> transformed_human_plan;
     tf::Stamped<tf::Pose> tf_pose_stamped;
-    geometry_msgs::PoseStamped newer_pose;
+    geometry_msgs::PoseStamped transformed_pose;
     tf::Pose tf_pose;
     for(auto &human_pose : human_plan)
     {
@@ -930,9 +930,9 @@ bool TebLocalPlannerROS::transformHumanPlan(const tf::TransformListener& tf, con
         tf_pose_stamped.setData(human_plan_to_global_transform * tf_pose);
         tf_pose_stamped.stamp_ = human_plan_to_global_transform.stamp_;
         tf_pose_stamped.frame_id_ = global_frame;
-        tf::poseStampedTFToMsg(tf_pose_stamped, newer_pose);
+        tf::poseStampedTFToMsg(tf_pose_stamped, transformed_pose);
 
-        transformed_human_plan_full.push_back(newer_pose);
+        transformed_human_plan.push_back(transformed_pose);
     }
 
     // transform human twist to local planning frame
@@ -943,18 +943,17 @@ bool TebLocalPlannerROS::transformHumanPlan(const tf::TransformListener& tf, con
     transformed_human_twist.twist.linear.y -= human_to_global_twist.linear.y;
     transformed_human_twist.twist.angular.z -= human_to_global_twist.angular.z;
 
-    //we'll discard points on the plan that are outside the local costmap
     double dist_threshold = std::max(costmap.getSizeInCellsX() * costmap.getResolution() / 2.0,
                                      costmap.getSizeInCellsY() * costmap.getResolution() / 2.0) * 0.85;
     double sq_dist_threshold = dist_threshold * dist_threshold;
     double x_diff, y_diff, sq_dist;
 
     // get first point of human plan within threshold distance from robot
-    int start_index = transformed_human_plan_full.size(), end_index = 0;
-    for(int i = 0; i < transformed_human_plan_full.size(); i++)
+    int start_index = transformed_human_plan.size(), end_index = 0;
+    for(int i = 0; i < transformed_human_plan.size(); i++)
     {
-        x_diff = robot_pose.getOrigin().x() - transformed_human_plan_full[i].pose.position.x;
-        y_diff = robot_pose.getOrigin().y() - transformed_human_plan_full[i].pose.position.y;
+        x_diff = robot_pose.getOrigin().x() - transformed_human_plan[i].pose.position.x;
+        y_diff = robot_pose.getOrigin().y() - transformed_human_plan[i].pose.position.y;
         sq_dist = x_diff * x_diff + y_diff * y_diff;
         if (sq_dist < sq_dist_threshold)
         {
@@ -964,10 +963,10 @@ bool TebLocalPlannerROS::transformHumanPlan(const tf::TransformListener& tf, con
     }
 
     // now get last point of human plan withing threshold distance from robot
-    for(int i = (transformed_human_plan_full.size() - 1); i >= 0; i--)
+    for(int i = (transformed_human_plan.size() - 1); i >= 0; i--)
     {
-        x_diff = robot_pose.getOrigin().x() - transformed_human_plan_full[i].pose.position.x;
-        y_diff = robot_pose.getOrigin().y() - transformed_human_plan_full[i].pose.position.y;
+        x_diff = robot_pose.getOrigin().x() - transformed_human_plan[i].pose.position.x;
+        y_diff = robot_pose.getOrigin().y() - transformed_human_plan[i].pose.position.y;
         sq_dist = x_diff * x_diff + y_diff * y_diff;
         if (sq_dist < sq_dist_threshold)
         {
@@ -976,50 +975,29 @@ bool TebLocalPlannerROS::transformHumanPlan(const tf::TransformListener& tf, con
         }
     }
 
-    ROS_INFO("start: %d, end: %d, full: %ld", start_index, end_index, transformed_human_plan_full.size());
-    for(int i = 0; i < transformed_human_plan_full.size(); i++)
+    // ROS_INFO("start: %d, end: %d, full: %ld", start_index, end_index, transformed_human_plan.size());
+    transformed_human_plan_combined.plan_before.clear();
+    transformed_human_plan_combined.plan_to_optimize.clear();
+    transformed_human_plan_combined.plan_after.clear();
+    for(int i = 0; i < transformed_human_plan.size(); i++)
     {
       if(i < start_index)
       {
-        transformed_human_plan_before.push_back(transformed_human_plan_full[i]);
+        transformed_human_plan_combined.plan_before.push_back(transformed_human_plan[i]);
       }
       else if (i >= start_index && i <= end_index)
       {
-        transformed_human_plan.push_back(transformed_human_plan_full[i]);
+        transformed_human_plan_combined.plan_to_optimize.push_back(transformed_human_plan[i]);
       }
       else if (i > end_index)
       {
-        transformed_human_plan_after.push_back(transformed_human_plan_full[i]);
+        transformed_human_plan_combined.plan_after.push_back(transformed_human_plan[i]);
       }
       else
       {
-        ROS_ERROR("Transform plan indexing error");
+        ROS_ERROR("Transform human plan indexing error");
       }
     }
-    // ROS_INFO("before: %ld, in: %ld, after: %ld, full: %ld\n",
-    //   transformed_human_plan_before.size(), transformed_human_plan.size(),
-    //   transformed_human_plan_after.size(), transformed_human_plan_full.size());
-
-    // //we need to loop to a point on the plan that is within a certain distance of the robot
-    // tf::Stamped<tf::Pose> tf_pose_stamped;
-    // geometry_msgs::PoseStamped newer_pose;
-    // tf::Pose tf_pose;
-    // for(auto human_pose : human_plan)
-    // {
-    //   double x_diff = robot_pose.getOrigin().x() - human_pose.pose.pose.position.x;
-    //   double y_diff = robot_pose.getOrigin().y() - human_pose.pose.pose.position.y;
-    //   double sq_dist = x_diff * x_diff + y_diff * y_diff;
-    //   if (sq_dist < sq_dist_threshold)
-    //   {
-    //     tf::poseMsgToTF(human_pose.pose.pose, tf_pose);
-    //     tf_pose_stamped.setData(human_plan_to_global_transform * tf_pose);
-    //     tf_pose_stamped.stamp_ = human_plan_to_global_transform.stamp_;
-    //     tf_pose_stamped.frame_id_ = global_frame;
-    //     tf::poseStampedTFToMsg(tf_pose_stamped, newer_pose);
-
-    //     transformed_human_plan.push_back(newer_pose);
-    //   }
-    // }
 
     if (tf_human_plan_to_global) *tf_human_plan_to_global = human_plan_to_global_transform;
   }
@@ -1037,7 +1015,7 @@ bool TebLocalPlannerROS::transformHumanPlan(const tf::TransformListener& tf, con
   {
     ROS_ERROR("Extrapolation Error: %s\n", ex.what());
     if (human_plan.size() > 0)
-      ROS_ERROR("Global Frame: %s Plan Frame size %d: %s\n", global_frame.c_str(), (unsigned int)human_plan.size(), human_plan[0].header.frame_id.c_str());
+      ROS_ERROR("Global Frame: %s Plan Frame size %d: %s\n", global_frame.c_str(), (unsigned int)human_plan.size(), human_plan.front().header.frame_id.c_str());
 
     return false;
   }

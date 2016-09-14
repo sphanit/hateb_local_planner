@@ -63,8 +63,8 @@ void TebVisualization::initialize(ros::NodeHandle &nh, const TebConfig &cfg)
   // register topics
   global_plan_pub_ = nh.advertise<nav_msgs::Path>("global_plan", 1);
   local_plan_pub_ = nh.advertise<nav_msgs::Path>("local_plan", 1);
-  humans_global_plans_pub_ = nh.advertise<hanp_msgs::PathArray>("humans_global_plans", 1);
-  humans_local_plans_pub_ = nh.advertise<hanp_msgs::TrajectoryArray>("humans_local_plans", 1);
+  humans_global_plans_pub_ = nh.advertise<hanp_msgs::HumanPathArray>("humans_global_plans", 1);
+  humans_local_plans_pub_ = nh.advertise<hanp_msgs::HumanTrajectoryArray>("humans_local_plans", 1);
   teb_poses_pub_ = nh.advertise<geometry_msgs::PoseArray>("teb_poses", 100);
   humans_tebs_poses_pub_ = nh.advertise<geometry_msgs::PoseArray>("humans_tebs_poses", 1);
   teb_marker_pub_ = nh.advertise<visualization_msgs::Marker>("teb_markers", 1000);
@@ -87,44 +87,60 @@ void TebVisualization::publishLocalPlan(const std::vector<geometry_msgs::PoseSta
   base_local_planner::publishPlan(local_plan, local_plan_pub_);
 }
 
-void TebVisualization::publishHumansPlans(const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>> &humans_plans_map) const
+void TebVisualization::publishHumansPlans(const std::vector<HumanPlanCombined> &humans_plans) const
 {
   if (printErrorWhenNotInitialized())
     return;
 
-  if (humans_plans_map.empty())
+  if (humans_plans.empty())
     return;
 
-  hanp_msgs::PathArray gui_path_array;
+  hanp_msgs::HumanPathArray human_path_array;
 
-  for (auto &human_plan_kv : humans_plans_map)
+  for (auto &human_plan_combined : humans_plans)
   {
-    auto &human_id = human_plan_kv.first;
-    auto &human_plan = human_plan_kv.second;
-
-    if (human_plan.empty())
-      continue;
-
-    nav_msgs::Path path;
-    path.poses.resize(human_plan.size());
-    path.header.frame_id = human_plan[0].header.frame_id;
-    path.header.stamp = human_plan[0].header.stamp;
-    for (unsigned int i = 0; i < human_plan.size(); i++)
+    auto total_size = human_plan_combined.plan_before.size()
+                    + human_plan_combined.plan_to_optimize.size()
+                    + human_plan_combined.plan_after.size();
+    if (total_size == 0)
     {
-      path.poses[i] = human_plan[i];
+      continue;
     }
 
-    gui_path_array.ids.push_back(human_id);
-    gui_path_array.paths.push_back(path);
+    nav_msgs::Path path;
+    path.poses.resize(total_size);
+    size_t index = 0;
+    for (size_t i = 0; i < human_plan_combined.plan_before.size(); ++i)
+    {
+      path.poses[i] = human_plan_combined.plan_before[i];
+    }
+    index += human_plan_combined.plan_before.size();
+    for (size_t i = 0; i < human_plan_combined.plan_to_optimize.size(); ++i)
+    {
+      path.poses[i + index] = human_plan_combined.plan_to_optimize[i];
+    }
+    index += human_plan_combined.plan_to_optimize.size();
+    for (size_t i = 0; i < human_plan_combined.plan_after.size(); ++i)
+    {
+      path.poses[i + index] = human_plan_combined.plan_after[i];
+    }
+
+    path.header.stamp = ros::Time::now();
+    path.header.frame_id = path.poses[0].header.frame_id;
+
+    hanp_msgs::HumanPath human_path;
+    human_path.header.stamp = path.header.stamp;
+    human_path.header.frame_id = path.header.frame_id;
+    human_path.id = human_plan_combined.id;
+    human_path.path = path;
+
+    human_path_array.paths.push_back(human_path);
   }
 
-  if (gui_path_array.paths.empty())
-    return;
+  human_path_array.header.stamp = human_path_array.paths[0].header.stamp;
+  human_path_array.header.frame_id = human_path_array.paths[0].header.frame_id;
 
-  gui_path_array.header.frame_id = gui_path_array.paths[0].header.frame_id;
-  gui_path_array.header.stamp = gui_path_array.paths[0].header.stamp;
-
-  humans_global_plans_pub_.publish(gui_path_array);
+  humans_global_plans_pub_.publish(human_path_array);
 }
 
 void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand &teb) const
@@ -143,6 +159,7 @@ void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand &teb) con
   teb_poses.header.stamp = teb_path.header.stamp;
 
   // fill path msgs with teb configurations
+  double pose_time = 0.0;
   for (unsigned int i = 0; i < teb.sizePoses(); i++)
   {
     geometry_msgs::PoseStamped pose;
@@ -153,7 +170,12 @@ void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand &teb) con
     pose.pose.position.z = 0;
     pose.pose.orientation = tf::createQuaternionMsgFromYaw(teb.Pose(i).theta());
     teb_path.poses.push_back(pose);
+    pose.pose.position.z = pose_time;
     teb_poses.poses.push_back(pose.pose);
+    if (i < (teb.sizePoses() - 1))
+    {
+      pose_time += teb.TimeDiff(i);
+    }
   }
   local_plan_pub_.publish(teb_path);
   teb_poses_pub_.publish(teb_poses);
@@ -177,14 +199,18 @@ void TebVisualization::publishHumanPlanPoses(const std::map<uint64_t, TimedElast
     if (human_teb.sizePoses() == 0)
       continue;
 
+    double pose_time = 0;
     for (unsigned int i = 0; i < human_teb.sizePoses(); i++)
     {
       geometry_msgs::Pose pose;
       pose.position.x = human_teb.Pose(i).x();
       pose.position.y = human_teb.Pose(i).y();
-      pose.position.z = 0.0;
+      pose.position.z = pose_time;
       pose.orientation = tf::createQuaternionMsgFromYaw(human_teb.Pose(i).theta());
       gui_teb_poses.poses.push_back(pose);
+      if (i < (human_teb.sizePoses() - 1)) {
+        pose_time += human_teb.TimeDiff(i);
+      }
     }
   }
 
@@ -194,111 +220,66 @@ void TebVisualization::publishHumanPlanPoses(const std::map<uint64_t, TimedElast
   humans_tebs_poses_pub_.publish(gui_teb_poses);
 }
 
-void TebVisualization::publishHumanTrajectories(const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>> &humans_plan_map_before,
-                                                const std::map<uint64_t, std::vector<TrajectoryPointMsg>> &human_trajectories_map,
-                                                const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>> &humans_plan_map_after) const
+void TebVisualization::publishHumanTrajectories(const std::vector<HumanPlanTrajCombined> &humans_plans_traj_combined) const
 {
-  hanp_msgs::TrajectoryArray hanp_trajectory_array;
+  hanp_msgs::HumanTrajectoryArray hanp_trajectory_array;
   hanp_trajectory_array.header.frame_id = cfg_->map_frame;
   hanp_trajectory_array.header.stamp = ros::Time::now();
 
-  // assuming all maps have same size with same keys
-  for (auto &humans_plan_map_before_kv : humans_plan_map_before)
+  for (auto &human_plan_traj_combined : humans_plans_traj_combined)
   {
-    auto &human_id = humans_plan_map_before_kv.first;
+    hanp_msgs::HumanTrajectory hanp_trajectory;
 
-    hanp_msgs::Trajectory hanp_trajectory;
-    hanp_trajectory.header.frame_id = hanp_trajectory_array.header.frame_id;
-    hanp_trajectory.header.stamp = hanp_trajectory_array.header.stamp;
-
-    auto &human_plan_before = humans_plan_map_before_kv.second;
-    for (auto &human_pose : human_plan_before)
+    for (auto human_pose : human_plan_traj_combined.plan_before)
     {
       hanp_msgs::TrajectoryPoint hanp_trajectory_point;
       hanp_trajectory_point.transform.translation.x = human_pose.pose.position.x;
       hanp_trajectory_point.transform.translation.y = human_pose.pose.position.y;
       hanp_trajectory_point.transform.translation.z = human_pose.pose.position.z;
       hanp_trajectory_point.transform.rotation = human_pose.pose.orientation;
-      hanp_trajectory_point.velocity.linear.x = -100.0; // TODO: fix this
       hanp_trajectory_point.time_from_start.fromSec(-1.0);
-      hanp_trajectory.points.push_back(hanp_trajectory_point);
+      hanp_trajectory.trajectory.points.push_back(hanp_trajectory_point);
     }
 
-    auto human_trajectories_map_it = human_trajectories_map.find(human_id);
-    if (human_trajectories_map_it != human_trajectories_map.end())
+    for (auto human_traj_point : human_plan_traj_combined.optimized_trajectory)
     {
-      auto &human_traj = human_trajectories_map_it->second;
-      for (auto &human_traj_point : human_traj)
-      {
-        hanp_msgs::TrajectoryPoint hanp_trajectory_point;
-        hanp_trajectory_point.transform.translation.x = human_traj_point.pose.position.x;
-        hanp_trajectory_point.transform.translation.y = human_traj_point.pose.position.y;
-        hanp_trajectory_point.transform.translation.z = human_traj_point.pose.position.z;
-        hanp_trajectory_point.transform.rotation = human_traj_point.pose.orientation;
-        hanp_trajectory_point.velocity = human_traj_point.velocity;
-        hanp_trajectory_point.time_from_start = human_traj_point.time_from_start;
-        hanp_trajectory.points.push_back(hanp_trajectory_point);
-      }
+      hanp_msgs::TrajectoryPoint hanp_trajectory_point;
+      hanp_trajectory_point.transform.translation.x = human_traj_point.pose.position.x;
+      hanp_trajectory_point.transform.translation.y = human_traj_point.pose.position.y;
+      hanp_trajectory_point.transform.translation.z = human_traj_point.pose.position.z;
+      hanp_trajectory_point.transform.rotation = human_traj_point.pose.orientation;
+      hanp_trajectory_point.velocity = human_traj_point.velocity;
+      hanp_trajectory_point.time_from_start = human_traj_point.time_from_start;
+      hanp_trajectory.trajectory.points.push_back(hanp_trajectory_point);
     }
 
-    auto humans_plan_map_after_it = humans_plan_map_after.find(human_id);
-    if (humans_plan_map_after_it != humans_plan_map_after.end())
+    for (auto human_pose : human_plan_traj_combined.plan_after)
     {
-      auto &human_plan_after = humans_plan_map_after_it->second;
-      for (auto &human_pose : human_plan_after)
-      {
-        hanp_msgs::TrajectoryPoint hanp_trajectory_point;
-        hanp_trajectory_point.transform.translation.x = human_pose.pose.position.x;
-        hanp_trajectory_point.transform.translation.y = human_pose.pose.position.y;
-        hanp_trajectory_point.transform.translation.z = human_pose.pose.position.z;
-        hanp_trajectory_point.transform.rotation = human_pose.pose.orientation;
-        hanp_trajectory_point.velocity.linear.x = -100.0; // TODO: fix this
-        hanp_trajectory_point.time_from_start.fromSec(-1.0);
-        hanp_trajectory.points.push_back(hanp_trajectory_point);
-      }
+      hanp_msgs::TrajectoryPoint hanp_trajectory_point;
+      hanp_trajectory_point.transform.translation.x = human_pose.pose.position.x;
+      hanp_trajectory_point.transform.translation.y = human_pose.pose.position.y;
+      hanp_trajectory_point.transform.translation.z = human_pose.pose.position.z;
+      hanp_trajectory_point.transform.rotation = human_pose.pose.orientation;
+      hanp_trajectory_point.time_from_start.fromSec(-1.0);
+      hanp_trajectory.trajectory.points.push_back(hanp_trajectory_point);
     }
 
-    if (!hanp_trajectory.points.empty())
+    if (!hanp_trajectory.trajectory.points.empty())
     {
-      hanp_trajectory_array.ids.push_back(human_id);
+      hanp_trajectory.header.frame_id = hanp_trajectory_array.header.frame_id;
+      hanp_trajectory.header.stamp = hanp_trajectory_array.header.stamp;
+      hanp_trajectory.id = human_plan_traj_combined.id;
+      hanp_trajectory.trajectory.header.frame_id = hanp_trajectory_array.header.frame_id;
+      hanp_trajectory.trajectory.header.stamp = hanp_trajectory_array.header.stamp;
       hanp_trajectory_array.trajectories.push_back(hanp_trajectory);
     }
   }
 
-  if (!hanp_trajectory_array.ids.empty())
+  if (!hanp_trajectory_array.trajectories.empty())
   {
     humans_local_plans_pub_.publish(hanp_trajectory_array);
   }
 
-  // if (human_id == 3)
-  // {
-  //   if (trajectory.poses.size() > 4)
-  //   {
-  //     int i = 0;
-  //     ROS_INFO("x=%.2f, y=%.2f, theta=%.2f, lin=%.2f, ang=%.2f", trajectory.poses[i].pose.position.x, trajectory.poses[i].pose.position.x, tf::getYaw(trajectory.poses[i].pose.orientation), trajectory.twists[i].twist.linear.x, trajectory.twists[i].twist.angular.z);
-  //     i = 1;
-  //     ROS_INFO("x=%.2f, y=%.2f, theta=%.2f, lin=%.2f, ang=%.2f", trajectory.poses[i].pose.position.x, trajectory.poses[i].pose.position.x, tf::getYaw(trajectory.poses[i].pose.orientation), trajectory.twists[i].twist.linear.x, trajectory.twists[i].twist.angular.z);
-  //     // ROS_INFO("PV0 x=%.2f, y=%.2f, theta=%.2f, lin=%.2f, ang=%.2f", trajectory.poses[2].pose.position.x);
-  //     ROS_INFO("...");
-  //     i = trajectory.poses.size() - 2;
-  //     ROS_INFO("x=%.2f, y=%.2f, theta=%.2f, lin=%.2f, ang=%.2f", trajectory.poses[i].pose.position.x, trajectory.poses[i].pose.position.x, tf::getYaw(trajectory.poses[i].pose.orientation), trajectory.twists[i].twist.linear.x, trajectory.twists[i].twist.angular.z);
-  //     i = trajectory.poses.size() - 2;
-  //     ROS_INFO("x=%.2f, y=%.2f, theta=%.2f, lin=%.2f, ang=%.2f", trajectory.poses[i].pose.position.x, trajectory.poses[i].pose.position.x, tf::getYaw(trajectory.poses[i].pose.orientation), trajectory.twists[i].twist.linear.x, trajectory.twists[i].twist.angular.z);
-  //     ROS_INFO("\n\n");
-  //   }
-  //   else
-  //   {
-  //     for (int i = 0; i < trajectory.poses.size(); i++)
-  //     {
-  //       ROS_INFO("PV0 x=%.2f, y=%.2f, theta=%.2f, lin=%.2f, ang=%.2f", trajectory.poses[i].pose.position.x, trajectory.poses[i].pose.position.x, tf::getYaw(trajectory.poses[i].pose.orientation), trajectory.twists[i].twist.linear.x, trajectory.twists[i].twist.angular.z);
-  //     }
-  //   }
-  // }
-
-  if (!hanp_trajectory_array.ids.empty())
-  {
-    humans_local_plans_pub_.publish(hanp_trajectory_array);
-  }
   return;
 }
 

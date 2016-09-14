@@ -221,7 +221,7 @@ protected:
   void updateViaPointsContainer(const std::vector<geometry_msgs::PoseStamped>& transformed_plan,
                                 double min_separation);
 
-  void updateHumanViaPointsContainers(const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>>& transformed_humans_plans_map,
+  void updateHumanViaPointsContainers(const HumanPlanVelMap &transformed_human_plan_vel_map,
                                       double min_separation);
 
 
@@ -294,14 +294,14 @@ protected:
     * @param[out] tf_human_plan_to_global Transformation between the human plan and the local planning frame
     * @return \c true if the global plan is transformed, \c false otherwise
     */
-  bool transformHumanPlan(const tf::TransformListener& tf, const std::vector<geometry_msgs::PoseWithCovarianceStamped>& human_plan,
-                           const tf::Stamped<tf::Pose>& global_pose,  const costmap_2d::Costmap2D& costmap,
-                           const std::string& global_frame, std::vector<geometry_msgs::PoseStamped>& transformed_human_plan_before,
-                           std::vector<geometry_msgs::PoseStamped>& transformed_human_plan,
-                           std::vector<geometry_msgs::PoseStamped>& transformed_human_plan_after,
-                           std::vector<geometry_msgs::PoseStamped>& transformed_human_plan_full,
-                           geometry_msgs::TwistStamped &transformed_human_twist,
-                           tf::StampedTransform* tf_human_plan_to_global = NULL) const;
+  bool transformHumanPlan(const tf::TransformListener &tf,
+                          const tf::Stamped<tf::Pose> &robot_pose,
+                          const costmap_2d::Costmap2D &costmap,
+                          const std::string &global_frame,
+                          const std::vector<geometry_msgs::PoseWithCovarianceStamped> &human_plan,
+                          HumanPlanCombined &transformed_human_plan_combined,
+                          geometry_msgs::TwistStamped &transformed_human_twist,
+                          tf::StampedTransform* tf_human_plan_to_global = NULL) const;
   /**
     * @brief Estimate the orientation of a pose from the global_plan that is treated as a local goal for the local planner.
     *

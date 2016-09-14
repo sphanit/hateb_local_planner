@@ -66,11 +66,25 @@
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
 #include <visualization_msgs/Marker.h>
-#include <hanp_msgs/PathArray.h>
-#include <hanp_msgs/TrajectoryArray.h>
+#include <hanp_msgs/HumanPathArray.h>
+#include <hanp_msgs/HumanTrajectoryArray.h>
 
 namespace teb_local_planner
 {
+
+typedef struct {
+  uint64_t id;
+  std::vector<geometry_msgs::PoseStamped> plan_before;
+  std::vector<TrajectoryPointMsg> optimized_trajectory;
+  std::vector<geometry_msgs::PoseStamped> plan_after;
+} HumanPlanTrajCombined;
+
+typedef struct {
+  uint64_t id;
+  std::vector<geometry_msgs::PoseStamped> plan_before;
+  std::vector<geometry_msgs::PoseStamped> plan_to_optimize;
+  std::vector<geometry_msgs::PoseStamped> plan_after;
+} HumanPlanCombined;
 
 class TebOptimalPlanner; //!< Forward Declaration
 
@@ -125,7 +139,7 @@ public:
    * @brief Publish a given global plan to the ros topic \e ../../global_plan
    * @param global_plan Pose array describing the global plan
    */
-  void publishHumansPlans(const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>>& humans_plans) const;
+  void publishHumansPlans(const std::vector<HumanPlanCombined> &humans_plans) const;
 
   /**
    * @brief Publish Timed_Elastic_Band related stuff (local plan, pose sequence).
@@ -136,9 +150,7 @@ public:
    */
   void publishLocalPlanAndPoses(const TimedElasticBand& teb) const;
   void publishHumanPlanPoses(const std::map<uint64_t, TimedElasticBand>& humans_tebs_map) const;
-  void publishHumanTrajectories(const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>> &humans_plan_map_before,
-    const std::map<uint64_t, std::vector<TrajectoryPointMsg>> &human_trajectories,
-    const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>> &humans_plan_map_after) const;
+  void publishHumanTrajectories(const std::vector<HumanPlanTrajCombined> &humans_plans_combined) const;
 
   /**
    * @brief Publish the visualization of the robot model

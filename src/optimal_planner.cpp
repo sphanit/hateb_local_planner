@@ -227,11 +227,9 @@ void TebOptimalPlanner::setVelocityGoal(const Eigen::Ref<const Eigen::Vector2d>&
 }
 
 bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan,
-                             const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>>& initial_humans_plans_map,
                              const geometry_msgs::Twist* start_vel,
-                             const std::map<uint64_t, geometry_msgs::TwistStamped> *humans_start_vels_map,
-                             const std::map<uint64_t, geometry_msgs::TwistStamped> *humans_goals_vels_map,
-                             bool free_goal_vel)
+                             bool free_goal_vel,
+                             const HumanPlanVelMap *initial_human_plan_vel_map)
 {
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
   auto prep_start_time = ros::Time::now();
@@ -264,16 +262,16 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
   auto human_prep_time_start = ros::Time::now();
   auto itr = humans_tebs_map_.begin();
   while (itr != humans_tebs_map_.end()) {
-      if (initial_humans_plans_map.find(itr->first) == initial_humans_plans_map.end())
+      if (initial_human_plan_vel_map->find(itr->first) == initial_human_plan_vel_map->end())
           itr = humans_tebs_map_.erase(itr);
       else
           ++itr;
   }
 
   humans_vel_start_.clear();
-  for (auto& initial_human_plan_kv : initial_humans_plans_map) {
-      auto& human_id = initial_human_plan_kv.first;
-      auto& initial_human_plan = initial_human_plan_kv.second;
+  for (auto &initial_human_plan_vel_kv : *initial_human_plan_vel_map) {
+      auto &human_id = initial_human_plan_vel_kv.first;
+      auto &initial_human_plan = initial_human_plan_vel_kv.second.plan;
 
       // erase human-teb if human plan is empty
       if (initial_human_plan.empty()) {
@@ -311,40 +309,18 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
                                       cfg_->trajectory.min_samples);
           // }
       }
-      // give start velocity for humans
+      // give start and goal velocity for humans
       std::pair<bool, Eigen::Vector2d> human_start_vel;
       human_start_vel.first = true;
-      if (humans_start_vels_map)
-      {
-        auto humans_start_vels_it = humans_start_vels_map->find(human_id);
-        if (humans_start_vels_it != humans_start_vels_map->end())
-        {
-          human_start_vel.second.coeffRef(0) = humans_start_vels_it->second.twist.linear.x;
-          human_start_vel.second.coeffRef(1) = humans_start_vels_it->second.twist.angular.z;
-        }
-      }
-      else
-      {
-        human_start_vel.second.setZero();
-      }
+      human_start_vel.second.coeffRef(0) = initial_human_plan_vel_kv.second.start_vel.linear.x;
+      human_start_vel.second.coeffRef(1) = initial_human_plan_vel_kv.second.start_vel.angular.z;
       humans_vel_start_[human_id] = human_start_vel;
 
       std::pair<bool, Eigen::Vector2d> human_goal_vel;
       human_goal_vel.first = true;
-      if (humans_goals_vels_map)
-      {
-        auto humans_goal_vels_it = humans_goals_vels_map->find(human_id);
-        if (humans_goal_vels_it != humans_goals_vels_map->end())
-        {
-          human_goal_vel.second.coeffRef(0) = humans_goal_vels_it->second.twist.linear.x;
-          human_goal_vel.second.coeffRef(1) = humans_goal_vels_it->second.twist.angular.z;
-        }
-      }
-      else
-      {
-        human_goal_vel.second.setZero();
-      }
-      humans_vel_goal_[human_id] = human_goal_vel;
+      human_goal_vel.second.coeffRef(0) = initial_human_plan_vel_kv.second.goal_vel.linear.x;
+      human_goal_vel.second.coeffRef(1) = initial_human_plan_vel_kv.second.goal_vel.angular.z;
+      humans_vel_start_[human_id] = human_goal_vel;
   }
   auto human_prep_time = ros::Time::now() - human_prep_time_start;
 
@@ -1263,25 +1239,26 @@ void TebOptimalPlanner::getFullTrajectory(std::vector<TrajectoryPointMsg>& traje
   goal.time_from_start.fromSec(curr_time);
 }
 
-void TebOptimalPlanner::getFullHUmanTrajectories(std::map<uint64_t, std::vector<TrajectoryPointMsg>>& human_trajectories)
+void TebOptimalPlanner::getFullHumanTrajectory(const uint64_t human_id, std::vector<TrajectoryPointMsg> &human_trajectory)
 {
-  for(auto &human_teb_kv : humans_tebs_map_)
+  auto human_teb_it = humans_tebs_map_.find(human_id);
+  if (human_teb_it != humans_tebs_map_.end())
   {
-    auto& human_id = human_teb_kv.first;
-    auto& human_teb = human_teb_kv.second;
+    auto &human_teb = human_teb_it->second;
 
     auto human_teb_size = human_teb.sizePoses();
-    if(human_teb_size == 0)
+    if(human_teb_size < 3)
     {
-      continue;
+      ROS_WARN("TEB size is %ld for human %ld", human_teb_size, human_id);
+      return;
     }
 
-    std::vector<TrajectoryPointMsg> trajectory(human_teb_size);
+    human_trajectory.resize(human_teb_size);
 
     double curr_time = 0;
 
     // start
-    TrajectoryPointMsg& start = trajectory.front();
+    TrajectoryPointMsg& start = human_trajectory.front();
     human_teb.Pose(0).toPoseMsg(start.pose);
     start.velocity.linear.y = start.velocity.linear.z = 0;
     start.velocity.angular.x = start.velocity.angular.y = 0;
@@ -1294,7 +1271,7 @@ void TebOptimalPlanner::getFullHUmanTrajectories(std::map<uint64_t, std::vector<
     // intermediate points
     for (int i=1; i < human_teb_size-1; ++i)
     {
-      TrajectoryPointMsg& point = trajectory[i];
+      TrajectoryPointMsg& point = human_trajectory[i];
       human_teb.Pose(i).toPoseMsg(point.pose);
       point.velocity.linear.y = point.velocity.linear.z = 0;
       point.velocity.angular.x = point.velocity.angular.y = 0;
@@ -1309,15 +1286,13 @@ void TebOptimalPlanner::getFullHUmanTrajectories(std::map<uint64_t, std::vector<
     }
 
     // goal
-    TrajectoryPointMsg& goal = trajectory.back();
+    TrajectoryPointMsg& goal = human_trajectory.back();
     human_teb.BackPose().toPoseMsg(goal.pose);
     goal.velocity.linear.y = goal.velocity.linear.z = 0;
     goal.velocity.angular.x = goal.velocity.angular.y = 0;
     goal.velocity.linear.x = humans_vel_goal_[human_id].second.x();
     goal.velocity.angular.z = humans_vel_goal_[human_id].second.y();
     goal.time_from_start.fromSec(curr_time);
-
-    human_trajectories[human_id] = trajectory;
   }
   return;
 }

@@ -53,12 +53,20 @@
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/TwistStamped.h>
+#include <hanp_msgs/HumanPath.h>
 
 #include <teb_local_planner/TrajectoryMsg.h>
 
 namespace teb_local_planner
 {
 
+typedef struct {
+  std::vector<geometry_msgs::PoseStamped> plan;
+  geometry_msgs::Twist start_vel;
+  geometry_msgs::Twist goal_vel;
+} PlanStartVelGoalVel;
+
+using HumanPlanVelMap = std::map<uint64_t, PlanStartVelGoalVel>;
 
 /**
  * @class PlannerInterface
@@ -97,11 +105,9 @@ public:
    * @return \c true if planning was successful, \c false otherwise
    */
   virtual bool plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan,
-                    const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>>& initial_humans_plans_map,
                     const geometry_msgs::Twist* start_vel = NULL,
-                    const std::map<uint64_t, geometry_msgs::TwistStamped> *humans_start_vels_map = NULL,
-                    const std::map<uint64_t, geometry_msgs::TwistStamped> *humans_goals_vels_map = NULL,
-                    bool free_goal_vel=false) = 0;
+                    bool free_goal_vel = false,
+                    const HumanPlanVelMap *initial_human_plan_vels =  NULL) = 0;
 
   /**
    * @brief Plan a trajectory between a given start and goal pose (tf::Pose version).
@@ -194,7 +200,7 @@ public:
   {
   }
 
-  virtual void getFullHUmanTrajectories(std::map<uint64_t, std::vector<TrajectoryPointMsg>>& human_trajectories) = 0;
+  virtual void getFullHumanTrajectory(const uint64_t human_id, std::vector<TrajectoryPointMsg> &human_trajectory) = 0;
 
 
   double local_weight_optimaltime_;

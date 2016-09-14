@@ -182,11 +182,9 @@ public:
    * @return \c true if planning was successful, \c false otherwise
    */
   virtual bool plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan,
-                    const std::map<uint64_t, std::vector<geometry_msgs::PoseStamped>>& initial_humans_plans_map,
                     const geometry_msgs::Twist* start_vel = NULL,
-                    const std::map<uint64_t, geometry_msgs::TwistStamped> *humans_start_vels_map = NULL,
-                    const std::map<uint64_t, geometry_msgs::TwistStamped> *humans_goals_vels_map = NULL,
-                    bool free_goal_vel=false);
+                    bool free_goal_vel = false,
+                    const HumanPlanVelMap *initial_human_plan_vels =  NULL);
 
   /**
    * @brief Plan a trajectory between a given start and goal pose (tf::Pose version).
