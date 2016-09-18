@@ -435,7 +435,7 @@ public:
       return false;
   }
 
-  virtual void getFullHUmanTrajectories(std::map<uint64_t, std::vector<TrajectoryPointMsg>>& human_trajectories);
+  virtual void getFullHumanTrajectory(const uint64_t human_id, std::vector<TrajectoryPointMsg> &human_trajectory);
 
 
 protected:
