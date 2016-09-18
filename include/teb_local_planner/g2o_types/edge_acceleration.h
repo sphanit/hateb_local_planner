@@ -6,6 +6,9 @@
  *  TU Dortmund - Institute of Control Theory and Systems Engineering.
  *  All rights reserved.
  *
+ *  Copyright (c) 2016 LAAS/CNRS
+ *  All rights reserved.
+ *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
  *  are met:
@@ -38,7 +41,8 @@
  * g2o-framework. g2o is licensed under the terms of the BSD License.
  * Refer to the base class source for detailed licensing information.
  *
- * Author: Christoph Rösmann
+ * Authors: Christoph Rösmann
+ *          Harmish Khambhaita (harmish@laas.fr)
  *********************************************************************/
 
 #ifndef EDGE_ACCELERATION_H_
@@ -604,9 +608,6 @@ protected:
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
-
-
-
 
 /**
  * @class EdgeAccelerationGoal

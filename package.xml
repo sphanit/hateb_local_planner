@@ -33,7 +33,6 @@
   <build_depend>message_generation</build_depend>
   <build_depend>nav_core</build_depend>
   <build_depend>nav_msgs</build_depend>
-  <build_depend>path_array_rviz_plugin</build_depend>
   <build_depend>pluginlib</build_depend>
   <build_depend>roscpp</build_depend>
   <build_depend>std_msgs</build_depend>
@@ -53,7 +52,6 @@
   <run_depend>message_runtime</run_depend>
   <run_depend>nav_core</run_depend>
   <run_depend>nav_msgs</run_depend>
-  <run_depend>path_array_rviz_plugin</run_depend>
   <run_depend>pluginlib</run_depend>
   <run_depend>roscpp</run_depend>
   <run_depend>std_msgs</run_depend>
