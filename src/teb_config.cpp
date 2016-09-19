@@ -42,11 +42,9 @@
 
 #include <teb_local_planner/teb_config.h>
 
-namespace teb_local_planner
-{
+namespace teb_local_planner {
 
-void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle& nh)
-{
+void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
 
   nh.param("odom_topic", odom_topic, odom_topic);
   nh.param("map_frame", map_frame, map_frame);
@@ -56,109 +54,173 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle& nh)
   nh.param("dt_ref", trajectory.dt_ref, trajectory.dt_ref);
   nh.param("dt_hysteresis", trajectory.dt_hysteresis, trajectory.dt_hysteresis);
   nh.param("min_samples", trajectory.min_samples, trajectory.min_samples);
-  nh.param("global_plan_overwrite_orientation", trajectory.global_plan_overwrite_orientation, trajectory.global_plan_overwrite_orientation);
-  nh.param("global_plan_via_point_sep", trajectory.global_plan_viapoint_sep, trajectory.global_plan_viapoint_sep);
-  nh.param("via_points_ordered", trajectory.via_points_ordered, trajectory.via_points_ordered);
-  nh.param("max_global_plan_lookahead_dist", trajectory.max_global_plan_lookahead_dist, trajectory.max_global_plan_lookahead_dist);
-  nh.param("force_reinit_new_goal_dist", trajectory.force_reinit_new_goal_dist, trajectory.force_reinit_new_goal_dist);
-  nh.param("feasibility_check_no_poses", trajectory.feasibility_check_no_poses, trajectory.feasibility_check_no_poses);
-  nh.param("publish_feedback", trajectory.publish_feedback, trajectory.publish_feedback);
-  nh.param("shrink_horizon_backup", trajectory.shrink_horizon_backup, trajectory.shrink_horizon_backup);
+  nh.param("global_plan_overwrite_orientation",
+           trajectory.global_plan_overwrite_orientation,
+           trajectory.global_plan_overwrite_orientation);
+  nh.param("global_plan_via_point_sep", trajectory.global_plan_viapoint_sep,
+           trajectory.global_plan_viapoint_sep);
+  nh.param("via_points_ordered", trajectory.via_points_ordered,
+           trajectory.via_points_ordered);
+  nh.param("max_global_plan_lookahead_dist",
+           trajectory.max_global_plan_lookahead_dist,
+           trajectory.max_global_plan_lookahead_dist);
+  nh.param("force_reinit_new_goal_dist", trajectory.force_reinit_new_goal_dist,
+           trajectory.force_reinit_new_goal_dist);
+  nh.param("feasibility_check_no_poses", trajectory.feasibility_check_no_poses,
+           trajectory.feasibility_check_no_poses);
+  nh.param("publish_feedback", trajectory.publish_feedback,
+           trajectory.publish_feedback);
+  nh.param("shrink_horizon_backup", trajectory.shrink_horizon_backup,
+           trajectory.shrink_horizon_backup);
 
   // Robot
   nh.param("max_vel_x", robot.max_vel_x, robot.max_vel_x);
-  nh.param("max_vel_x_backwards", robot.max_vel_x_backwards, robot.max_vel_x_backwards);
+  nh.param("max_vel_x_backwards", robot.max_vel_x_backwards,
+           robot.max_vel_x_backwards);
   nh.param("max_vel_theta", robot.max_vel_theta, robot.max_vel_theta);
   nh.param("acc_lim_x", robot.acc_lim_x, robot.acc_lim_x);
   nh.param("acc_lim_theta", robot.acc_lim_theta, robot.acc_lim_theta);
-  nh.param("min_turning_radius", robot.min_turning_radius, robot.min_turning_radius);
+  nh.param("min_turning_radius", robot.min_turning_radius,
+           robot.min_turning_radius);
   nh.param("wheelbase", robot.wheelbase, robot.wheelbase);
-  nh.param("cmd_angle_instead_rotvel", robot.cmd_angle_instead_rotvel, robot.cmd_angle_instead_rotvel);
+  nh.param("cmd_angle_instead_rotvel", robot.cmd_angle_instead_rotvel,
+           robot.cmd_angle_instead_rotvel);
 
   // Human
   nh.param("min_human_dist", human.min_human_dist, human.min_human_dist);
   nh.param("human_radius", human.radius, human.radius);
   nh.param("max_human_vel_x", human.max_vel_x, human.max_vel_x);
-  nh.param("max_human_vel_x_backwards", human.max_vel_x_backwards, human.max_vel_x_backwards);
+  nh.param("max_human_vel_x_backwards", human.max_vel_x_backwards,
+           human.max_vel_x_backwards);
   nh.param("max_human_vel_theta", human.max_vel_theta, human.max_vel_theta);
   nh.param("human_acc_lim_x", human.acc_lim_x, human.acc_lim_x);
   nh.param("human_acc_lim_theta", human.acc_lim_theta, human.acc_lim_theta);
-  nh.param("use_external_prediction", human.use_external_prediction, human.use_external_prediction);
+  nh.param("use_external_prediction", human.use_external_prediction,
+           human.use_external_prediction);
 
   // GoalTolerance
-  nh.param("xy_goal_tolerance", goal_tolerance.xy_goal_tolerance, goal_tolerance.xy_goal_tolerance);
-  nh.param("yaw_goal_tolerance", goal_tolerance.yaw_goal_tolerance, goal_tolerance.yaw_goal_tolerance);
-  nh.param("free_goal_vel", goal_tolerance.free_goal_vel, goal_tolerance.free_goal_vel);
+  nh.param("xy_goal_tolerance", goal_tolerance.xy_goal_tolerance,
+           goal_tolerance.xy_goal_tolerance);
+  nh.param("yaw_goal_tolerance", goal_tolerance.yaw_goal_tolerance,
+           goal_tolerance.yaw_goal_tolerance);
+  nh.param("free_goal_vel", goal_tolerance.free_goal_vel,
+           goal_tolerance.free_goal_vel);
 
   // Obstacles
-  nh.param("min_obstacle_dist", obstacles.min_obstacle_dist, obstacles.min_obstacle_dist);
-  nh.param("include_costmap_obstacles", obstacles.include_costmap_obstacles, obstacles.include_costmap_obstacles);
-  nh.param("costmap_obstacles_behind_robot_dist", obstacles.costmap_obstacles_behind_robot_dist, obstacles.costmap_obstacles_behind_robot_dist);
-  nh.param("obstacle_poses_affected", obstacles.obstacle_poses_affected, obstacles.obstacle_poses_affected);
-  nh.param("costmap_converter_plugin", obstacles.costmap_converter_plugin, obstacles.costmap_converter_plugin);
-  nh.param("costmap_converter_spin_thread", obstacles.costmap_converter_spin_thread, obstacles.costmap_converter_spin_thread);
+  nh.param("min_obstacle_dist", obstacles.min_obstacle_dist,
+           obstacles.min_obstacle_dist);
+  nh.param("include_costmap_obstacles", obstacles.include_costmap_obstacles,
+           obstacles.include_costmap_obstacles);
+  nh.param("costmap_obstacles_behind_robot_dist",
+           obstacles.costmap_obstacles_behind_robot_dist,
+           obstacles.costmap_obstacles_behind_robot_dist);
+  nh.param("obstacle_poses_affected", obstacles.obstacle_poses_affected,
+           obstacles.obstacle_poses_affected);
+  nh.param("costmap_converter_plugin", obstacles.costmap_converter_plugin,
+           obstacles.costmap_converter_plugin);
+  nh.param("costmap_converter_spin_thread",
+           obstacles.costmap_converter_spin_thread,
+           obstacles.costmap_converter_spin_thread);
 
   // Optimization
-  nh.param("no_inner_iterations", optim.no_inner_iterations, optim.no_inner_iterations);
-  nh.param("no_outer_iterations", optim.no_outer_iterations, optim.no_outer_iterations);
-  nh.param("optimization_activate", optim.optimization_activate, optim.optimization_activate);
-  nh.param("optimization_verbose", optim.optimization_verbose, optim.optimization_verbose);
+  nh.param("no_inner_iterations", optim.no_inner_iterations,
+           optim.no_inner_iterations);
+  nh.param("no_outer_iterations", optim.no_outer_iterations,
+           optim.no_outer_iterations);
+  nh.param("optimization_activate", optim.optimization_activate,
+           optim.optimization_activate);
+  nh.param("optimization_verbose", optim.optimization_verbose,
+           optim.optimization_verbose);
   nh.param("penalty_epsilon", optim.penalty_epsilon, optim.penalty_epsilon);
   nh.param("weight_max_vel_x", optim.weight_max_vel_x, optim.weight_max_vel_x);
-  nh.param("weight_max_human_vel_x", optim.weight_max_vel_x, optim.weight_max_vel_x);
-  nh.param("weight_max_vel_theta", optim.weight_max_vel_theta, optim.weight_max_vel_theta);
-  nh.param("weight_max_human_vel_theta", optim.weight_max_vel_theta, optim.weight_max_vel_theta);
+  nh.param("weight_max_human_vel_x", optim.weight_max_vel_x,
+           optim.weight_max_vel_x);
+  nh.param("weight_max_vel_theta", optim.weight_max_vel_theta,
+           optim.weight_max_vel_theta);
+  nh.param("weight_max_human_vel_theta", optim.weight_max_vel_theta,
+           optim.weight_max_vel_theta);
   nh.param("weight_acc_lim_x", optim.weight_acc_lim_x, optim.weight_acc_lim_x);
-  nh.param("weight_human_acc_lim_x", optim.weight_acc_lim_x, optim.weight_acc_lim_x);
-  nh.param("weight_acc_lim_theta", optim.weight_acc_lim_theta, optim.weight_acc_lim_theta);
-  nh.param("weight_human_acc_lim_theta", optim.weight_acc_lim_theta, optim.weight_acc_lim_theta);
-  nh.param("weight_kinematics_nh", optim.weight_kinematics_nh, optim.weight_kinematics_nh);
-  nh.param("weight_kinematics_forward_drive", optim.weight_kinematics_forward_drive, optim.weight_kinematics_forward_drive);
-  nh.param("weight_kinematics_turning_radius", optim.weight_kinematics_turning_radius, optim.weight_kinematics_turning_radius);
-  nh.param("weight_optimaltime", optim.weight_optimaltime, optim.weight_optimaltime);
+  nh.param("weight_human_acc_lim_x", optim.weight_acc_lim_x,
+           optim.weight_acc_lim_x);
+  nh.param("weight_acc_lim_theta", optim.weight_acc_lim_theta,
+           optim.weight_acc_lim_theta);
+  nh.param("weight_human_acc_lim_theta", optim.weight_acc_lim_theta,
+           optim.weight_acc_lim_theta);
+  nh.param("weight_kinematics_nh", optim.weight_kinematics_nh,
+           optim.weight_kinematics_nh);
+  nh.param("weight_kinematics_forward_drive",
+           optim.weight_kinematics_forward_drive,
+           optim.weight_kinematics_forward_drive);
+  nh.param("weight_kinematics_turning_radius",
+           optim.weight_kinematics_turning_radius,
+           optim.weight_kinematics_turning_radius);
+  nh.param("weight_optimaltime", optim.weight_optimaltime,
+           optim.weight_optimaltime);
   nh.param("weight_obstacle", optim.weight_obstacle, optim.weight_obstacle);
-  nh.param("weight_dynamic_obstacle", optim.weight_dynamic_obstacle, optim.weight_dynamic_obstacle);
+  nh.param("weight_dynamic_obstacle", optim.weight_dynamic_obstacle,
+           optim.weight_dynamic_obstacle);
   nh.param("weight_viapoint", optim.weight_viapoint, optim.weight_viapoint);
-  nh.param("weight_human_viapoint", optim.weight_human_viapoint, optim.weight_human_viapoint);
-  nh.param("weight_human_robot", optim.weight_human_robot, optim.weight_human_robot);
+  nh.param("weight_human_viapoint", optim.weight_human_viapoint,
+           optim.weight_human_viapoint);
+  nh.param("weight_human_robot", optim.weight_human_robot,
+           optim.weight_human_robot);
 
   // Homotopy Class Planner
-  nh.param("enable_homotopy_class_planning", hcp.enable_homotopy_class_planning, hcp.enable_homotopy_class_planning);
-  nh.param("enable_multithreading", hcp.enable_multithreading, hcp.enable_multithreading);
-  nh.param("simple_exploration", hcp.simple_exploration, hcp.simple_exploration);
-  nh.param("max_number_classes", hcp.max_number_classes, hcp.max_number_classes);
-  nh.param("selection_obst_cost_scale", hcp.selection_obst_cost_scale, hcp.selection_obst_cost_scale);
-  nh.param("selection_viapoint_cost_scale", hcp.selection_viapoint_cost_scale, hcp.selection_viapoint_cost_scale);
-  nh.param("selection_cost_hysteresis", hcp.selection_cost_hysteresis, hcp.selection_cost_hysteresis);
-  nh.param("selection_alternative_time_cost", hcp.selection_alternative_time_cost, hcp.selection_alternative_time_cost);
-  nh.param("roadmap_graph_samples", hcp.roadmap_graph_no_samples, hcp.roadmap_graph_no_samples);
-  nh.param("roadmap_graph_area_width", hcp.roadmap_graph_area_width, hcp.roadmap_graph_area_width);
-  nh.param("h_signature_prescaler", hcp.h_signature_prescaler, hcp.h_signature_prescaler);
-  nh.param("h_signature_threshold", hcp.h_signature_threshold, hcp.h_signature_threshold);
-  nh.param("obstacle_keypoint_offset", hcp.obstacle_keypoint_offset, hcp.obstacle_keypoint_offset);
-  nh.param("obstacle_heading_threshold", hcp.obstacle_heading_threshold, hcp.obstacle_heading_threshold);
-  nh.param("viapoints_all_candidates", hcp.viapoints_all_candidates, hcp.viapoints_all_candidates);
-  nh.param("visualize_hc_graph", hcp.visualize_hc_graph, hcp.visualize_hc_graph);
+  nh.param("enable_homotopy_class_planning", hcp.enable_homotopy_class_planning,
+           hcp.enable_homotopy_class_planning);
+  nh.param("enable_multithreading", hcp.enable_multithreading,
+           hcp.enable_multithreading);
+  nh.param("simple_exploration", hcp.simple_exploration,
+           hcp.simple_exploration);
+  nh.param("max_number_classes", hcp.max_number_classes,
+           hcp.max_number_classes);
+  nh.param("selection_obst_cost_scale", hcp.selection_obst_cost_scale,
+           hcp.selection_obst_cost_scale);
+  nh.param("selection_viapoint_cost_scale", hcp.selection_viapoint_cost_scale,
+           hcp.selection_viapoint_cost_scale);
+  nh.param("selection_cost_hysteresis", hcp.selection_cost_hysteresis,
+           hcp.selection_cost_hysteresis);
+  nh.param("selection_alternative_time_cost",
+           hcp.selection_alternative_time_cost,
+           hcp.selection_alternative_time_cost);
+  nh.param("roadmap_graph_samples", hcp.roadmap_graph_no_samples,
+           hcp.roadmap_graph_no_samples);
+  nh.param("roadmap_graph_area_width", hcp.roadmap_graph_area_width,
+           hcp.roadmap_graph_area_width);
+  nh.param("h_signature_prescaler", hcp.h_signature_prescaler,
+           hcp.h_signature_prescaler);
+  nh.param("h_signature_threshold", hcp.h_signature_threshold,
+           hcp.h_signature_threshold);
+  nh.param("obstacle_keypoint_offset", hcp.obstacle_keypoint_offset,
+           hcp.obstacle_keypoint_offset);
+  nh.param("obstacle_heading_threshold", hcp.obstacle_heading_threshold,
+           hcp.obstacle_heading_threshold);
+  nh.param("viapoints_all_candidates", hcp.viapoints_all_candidates,
+           hcp.viapoints_all_candidates);
+  nh.param("visualize_hc_graph", hcp.visualize_hc_graph,
+           hcp.visualize_hc_graph);
 
   // Visualization
-  nh.param("pose_array_z_scale", visualization.pose_array_z_scale, visualization.pose_array_z_scale);
+  nh.param("pose_array_z_scale", visualization.pose_array_z_scale,
+           visualization.pose_array_z_scale);
 
   checkParameters();
   checkDeprecated(nh);
 }
 
-void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig& cfg)
-{
+void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   boost::mutex::scoped_lock l(config_mutex_);
 
   // Trajectory
   trajectory.teb_autosize = cfg.teb_autosize;
   trajectory.dt_ref = cfg.dt_ref;
   trajectory.dt_hysteresis = cfg.dt_hysteresis;
-  trajectory.global_plan_overwrite_orientation = cfg.global_plan_overwrite_orientation;
+  trajectory.global_plan_overwrite_orientation =
+      cfg.global_plan_overwrite_orientation;
   trajectory.global_plan_viapoint_sep = cfg.global_plan_viapoint_sep;
   trajectory.via_points_ordered = cfg.via_points_ordered;
-  trajectory.max_global_plan_lookahead_dist = cfg.max_global_plan_lookahead_dist;
+  trajectory.max_global_plan_lookahead_dist =
+      cfg.max_global_plan_lookahead_dist;
   trajectory.force_reinit_new_goal_dist = cfg.force_reinit_new_goal_dist;
   trajectory.feasibility_check_no_poses = cfg.feasibility_check_no_poses;
   trajectory.publish_feedback = cfg.publish_feedback;
@@ -190,9 +252,9 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig& cfg)
   // Obstacles
   obstacles.min_obstacle_dist = cfg.min_obstacle_dist;
   obstacles.include_costmap_obstacles = cfg.include_costmap_obstacles;
-  obstacles.costmap_obstacles_behind_robot_dist = cfg.costmap_obstacles_behind_robot_dist;
+  obstacles.costmap_obstacles_behind_robot_dist =
+      cfg.costmap_obstacles_behind_robot_dist;
   obstacles.obstacle_poses_affected = cfg.obstacle_poses_affected;
-
 
   // Optimization
   optim.no_inner_iterations = cfg.no_inner_iterations;
@@ -242,71 +304,108 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig& cfg)
   checkParameters();
 }
 
-
-void TebConfig::checkParameters() const
-{
+void TebConfig::checkParameters() const {
   // positive backward velocity?
   if (robot.max_vel_x_backwards <= 0)
-    ROS_WARN("TebLocalPlannerROS() Param Warning: Do not choose max_vel_x_backwards to be <=0. Disable backwards driving by increasing the optimization weight for penalyzing backwards driving.");
+    ROS_WARN("TebLocalPlannerROS() Param Warning: Do not choose "
+             "max_vel_x_backwards to be <=0. Disable backwards driving by "
+             "increasing the optimization weight for penalyzing backwards "
+             "driving.");
 
   // bounds smaller than penalty epsilon
   if (robot.max_vel_x <= optim.penalty_epsilon)
-    ROS_WARN("TebLocalPlannerROS() Param Warning: max_vel_x <= penalty_epsilon. The resulting bound is negative. Undefined behavior... Change at least one of them!");
+    ROS_WARN("TebLocalPlannerROS() Param Warning: max_vel_x <= "
+             "penalty_epsilon. The resulting bound is negative. Undefined "
+             "behavior... Change at least one of them!");
 
   if (robot.max_vel_x_backwards <= optim.penalty_epsilon)
-    ROS_WARN("TebLocalPlannerROS() Param Warning: max_vel_x_backwards <= penalty_epsilon. The resulting bound is negative. Undefined behavior... Change at least one of them!");
+    ROS_WARN("TebLocalPlannerROS() Param Warning: max_vel_x_backwards <= "
+             "penalty_epsilon. The resulting bound is negative. Undefined "
+             "behavior... Change at least one of them!");
 
   if (robot.max_vel_theta <= optim.penalty_epsilon)
-    ROS_WARN("TebLocalPlannerROS() Param Warning: max_vel_theta <= penalty_epsilon. The resulting bound is negative. Undefined behavior... Change at least one of them!");
+    ROS_WARN("TebLocalPlannerROS() Param Warning: max_vel_theta <= "
+             "penalty_epsilon. The resulting bound is negative. Undefined "
+             "behavior... Change at least one of them!");
 
   if (robot.acc_lim_x <= optim.penalty_epsilon)
-    ROS_WARN("TebLocalPlannerROS() Param Warning: acc_lim_x <= penalty_epsilon. The resulting bound is negative. Undefined behavior... Change at least one of them!");
+    ROS_WARN("TebLocalPlannerROS() Param Warning: acc_lim_x <= "
+             "penalty_epsilon. The resulting bound is negative. Undefined "
+             "behavior... Change at least one of them!");
 
   if (robot.acc_lim_theta <= optim.penalty_epsilon)
-    ROS_WARN("TebLocalPlannerROS() Param Warning: acc_lim_theta <= penalty_epsilon. The resulting bound is negative. Undefined behavior... Change at least one of them!");
+    ROS_WARN("TebLocalPlannerROS() Param Warning: acc_lim_theta <= "
+             "penalty_epsilon. The resulting bound is negative. Undefined "
+             "behavior... Change at least one of them!");
 
   // dt_ref and dt_hyst
   if (trajectory.dt_ref <= trajectory.dt_hysteresis)
-    ROS_WARN("TebLocalPlannerROS() Param Warning: dt_ref <= dt_hysteresis. The hysteresis is not allowed to be greater or equal!. Undefined behavior... Change at least one of them!");
+    ROS_WARN("TebLocalPlannerROS() Param Warning: dt_ref <= dt_hysteresis. The "
+             "hysteresis is not allowed to be greater or equal!. Undefined "
+             "behavior... Change at least one of them!");
 
   // min number of samples
-  if (trajectory.min_samples <3)
-    ROS_WARN("TebLocalPlannerROS() Param Warning: parameter min_samples is smaller than 3! Sorry, I haven't enough degrees of freedom to plan a trajectory for you. Please increase ...");
+  if (trajectory.min_samples < 3)
+    ROS_WARN("TebLocalPlannerROS() Param Warning: parameter min_samples is "
+             "smaller than 3! Sorry, I haven't enough degrees of freedom to "
+             "plan a trajectory for you. Please increase ...");
 
   // costmap obstacle behind robot
   if (obstacles.costmap_obstacles_behind_robot_dist < 0)
-    ROS_WARN("TebLocalPlannerROS() Param Warning: parameter 'costmap_obstacles_behind_robot_dist' should be positive or zero.");
+    ROS_WARN("TebLocalPlannerROS() Param Warning: parameter "
+             "'costmap_obstacles_behind_robot_dist' should be positive or "
+             "zero.");
 
   // hcp: obstacle heading threshold
-  if (hcp.obstacle_keypoint_offset>=1 || hcp.obstacle_keypoint_offset<=0)
-    ROS_WARN("TebLocalPlannerROS() Param Warning: parameter obstacle_heading_threshold must be in the interval ]0,1[. 0=0deg opening angle, 1=90deg opening angle.");
+  if (hcp.obstacle_keypoint_offset >= 1 || hcp.obstacle_keypoint_offset <= 0)
+    ROS_WARN("TebLocalPlannerROS() Param Warning: parameter "
+             "obstacle_heading_threshold must be in the interval ]0,1[. 0=0deg "
+             "opening angle, 1=90deg opening angle.");
 
   // carlike
-  if (robot.cmd_angle_instead_rotvel && robot.wheelbase==0)
-    ROS_WARN("TebLocalPlannerROS() Param Warning: parameter cmd_angle_instead_rotvel is non-zero but wheelbase is set to zero: undesired behavior.");
+  if (robot.cmd_angle_instead_rotvel && robot.wheelbase == 0)
+    ROS_WARN("TebLocalPlannerROS() Param Warning: parameter "
+             "cmd_angle_instead_rotvel is non-zero but wheelbase is set to "
+             "zero: undesired behavior.");
 
-  if (robot.cmd_angle_instead_rotvel && robot.min_turning_radius==0)
-    ROS_WARN("TebLocalPlannerROS() Param Warning: parameter cmd_angle_instead_rotvel is non-zero but min_turning_radius is set to zero: undesired behavior. You are mixing a carlike and a diffdrive robot");
-
+  if (robot.cmd_angle_instead_rotvel && robot.min_turning_radius == 0)
+    ROS_WARN("TebLocalPlannerROS() Param Warning: parameter "
+             "cmd_angle_instead_rotvel is non-zero but min_turning_radius is "
+             "set to zero: undesired behavior. You are mixing a carlike and a "
+             "diffdrive robot");
 }
 
-void TebConfig::checkDeprecated(const ros::NodeHandle& nh) const
-{
-  if (nh.hasParam("line_obstacle_poses_affected") || nh.hasParam("polygon_obstacle_poses_affected"))
-    ROS_WARN("TebLocalPlannerROS() Param Warning: 'line_obstacle_poses_affected' and 'polygon_obstacle_poses_affected' are deprecated. They share now the common parameter 'obstacle_poses_affected'.");
+void TebConfig::checkDeprecated(const ros::NodeHandle &nh) const {
+  if (nh.hasParam("line_obstacle_poses_affected") ||
+      nh.hasParam("polygon_obstacle_poses_affected"))
+    ROS_WARN("TebLocalPlannerROS() Param Warning: "
+             "'line_obstacle_poses_affected' and "
+             "'polygon_obstacle_poses_affected' are deprecated. They share now "
+             "the common parameter 'obstacle_poses_affected'.");
 
-  if (nh.hasParam("weight_point_obstacle") || nh.hasParam("weight_line_obstacle") || nh.hasParam("weight_poly_obstacle"))
-    ROS_WARN("TebLocalPlannerROS() Param Warning: 'weight_point_obstacle', 'weight_line_obstacle' and 'weight_poly_obstacle' are deprecated. They are replaced by the single param 'weight_obstacle'.");
+  if (nh.hasParam("weight_point_obstacle") ||
+      nh.hasParam("weight_line_obstacle") ||
+      nh.hasParam("weight_poly_obstacle"))
+    ROS_WARN("TebLocalPlannerROS() Param Warning: 'weight_point_obstacle', "
+             "'weight_line_obstacle' and 'weight_poly_obstacle' are "
+             "deprecated. They are replaced by the single param "
+             "'weight_obstacle'.");
 
   if (nh.hasParam("costmap_obstacles_front_only"))
-    ROS_WARN("TebLocalPlannerROS() Param Warning: 'costmap_obstacles_front_only' is deprecated. It is replaced by 'costmap_obstacles_behind_robot_dist' to define the actual area taken into account.");
+    ROS_WARN("TebLocalPlannerROS() Param Warning: "
+             "'costmap_obstacles_front_only' is deprecated. It is replaced by "
+             "'costmap_obstacles_behind_robot_dist' to define the actual area "
+             "taken into account.");
 
   if (nh.hasParam("costmap_emergency_stop_dist"))
-    ROS_WARN("TebLocalPlannerROS() Param Warning: 'costmap_emergency_stop_dist' is deprecated. You can safely remove it from your parameter config.");
+    ROS_WARN("TebLocalPlannerROS() Param Warning: "
+             "'costmap_emergency_stop_dist' is deprecated. You can safely "
+             "remove it from your parameter config.");
 
   if (nh.hasParam("alternative_time_cost"))
-    ROS_WARN("TebLocalPlannerROS() Param Warning: 'alternative_time_cost' is deprecated. It has been replaced by 'selection_alternative_time_cost'.");
+    ROS_WARN("TebLocalPlannerROS() Param Warning: 'alternative_time_cost' is "
+             "deprecated. It has been replaced by "
+             "'selection_alternative_time_cost'.");
 }
-
 
 } // namespace teb_local_planner
