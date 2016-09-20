@@ -366,13 +366,13 @@ public:
     robot.cmd_angle_instead_rotvel = false;
 
     // Human
-    human.radius = 0.4;
-    human.min_human_dist = 0.2;
-    human.max_vel_x = 0.4;
-    human.max_vel_x_backwards = 0.2;
-    human.max_vel_theta = 0.3;
-    human.acc_lim_x = 0.5;
-    human.acc_lim_theta = 0.5;
+    human.radius = 0.2;
+    human.min_human_dist = 0.6;
+    human.max_vel_x = 1.1;
+    human.max_vel_x_backwards = 0.0;
+    human.max_vel_theta = 1.1;
+    human.acc_lim_x = 0.6;
+    human.acc_lim_theta = 0.8;
     human.use_external_prediction = false;
 
     // GoalTolerance

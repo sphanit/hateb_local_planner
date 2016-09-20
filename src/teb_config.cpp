@@ -252,11 +252,12 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   robot.cmd_angle_instead_rotvel = cfg.cmd_angle_instead_rotvel;
 
   // Human
-  human.max_vel_x = cfg.max_vel_x;
-  human.max_vel_x_backwards = cfg.max_vel_x_backwards;
-  human.max_vel_theta = cfg.max_vel_theta;
-  human.acc_lim_x = cfg.acc_lim_x;
-  human.acc_lim_theta = cfg.acc_lim_theta;
+  human.min_human_dist = cfg.min_human_dist;
+  human.max_vel_x = cfg.max_human_vel_x;
+  human.max_vel_x_backwards = cfg.max_human_vel_x_backwards;
+  human.max_vel_theta = cfg.max_human_vel_theta;
+  human.acc_lim_x = cfg.human_acc_lim_x;
+  human.acc_lim_theta = cfg.human_acc_lim_theta;
   human.use_external_prediction = cfg.use_external_prediction;
 
   // GoalTolerance
