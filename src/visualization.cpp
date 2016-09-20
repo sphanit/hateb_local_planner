@@ -40,6 +40,15 @@
  *          Harmish Khambhaita (harmish@laas.fr)
  *********************************************************************/
 
+#define GLOBAL_PLAN_TOPIC "global_plan"
+#define LOCAL_PLAN_TOPIC "local_plan"
+#define LOCAL_PLAN_POSES_TOPIC "local_plan_poses"
+#define HUMAN_GLOBAL_PLANS_TOPIC "human_global_plans"
+#define HUMAN_LOCAL_PLANS_TOPIC "human_local_plans"
+#define HUMAN_LOCAL_PLAN_POSES_TOPIC "human_local_plan_poses"
+#define GLOBAL_PLAN_TOPIC "global_plan"
+#define CLEARING_TIMER_DURATION 1.0 // seconds
+
 #include <teb_local_planner/visualization.h>
 #include <teb_local_planner/optimal_planner.h>
 #include <teb_local_planner/FeedbackMsg.h>
@@ -61,27 +70,44 @@ void TebVisualization::initialize(ros::NodeHandle &nh, const TebConfig &cfg) {
   cfg_ = &cfg;
 
   // register topics
-  global_plan_pub_ = nh.advertise<nav_msgs::Path>("global_plan", 1);
-  local_plan_pub_ = nh.advertise<nav_msgs::Path>("local_plan", 1);
+  global_plan_pub_ = nh.advertise<nav_msgs::Path>(GLOBAL_PLAN_TOPIC, 1);
+  local_plan_pub_ = nh.advertise<nav_msgs::Path>(LOCAL_PLAN_TOPIC, 1);
+  teb_poses_pub_ =
+      nh.advertise<geometry_msgs::PoseArray>(LOCAL_PLAN_POSES_TOPIC, 1);
   humans_global_plans_pub_ =
-      nh.advertise<hanp_msgs::HumanPathArray>("humans_global_plans", 1);
+      nh.advertise<hanp_msgs::HumanPathArray>(HUMAN_GLOBAL_PLANS_TOPIC, 1);
   humans_local_plans_pub_ =
-      nh.advertise<hanp_msgs::HumanTrajectoryArray>("humans_local_plans", 1);
-  teb_poses_pub_ = nh.advertise<geometry_msgs::PoseArray>("teb_poses", 100);
+      nh.advertise<hanp_msgs::HumanTrajectoryArray>(HUMAN_LOCAL_PLANS_TOPIC, 1);
   humans_tebs_poses_pub_ =
-      nh.advertise<geometry_msgs::PoseArray>("humans_tebs_poses", 1);
+      nh.advertise<geometry_msgs::PoseArray>(HUMAN_LOCAL_PLAN_POSES_TOPIC, 1);
   teb_marker_pub_ =
       nh.advertise<visualization_msgs::Marker>("teb_markers", 1000);
   feedback_pub_ =
       nh.advertise<teb_local_planner::FeedbackMsg>("teb_feedback", 10);
+
+  last_publish_robot_global_plan =
+      cfg_->visualization.publish_robot_global_plan;
+  last_publish_robot_local_plan = cfg_->visualization.publish_robot_local_plan;
+  last_publish_robot_local_plan_poses =
+      cfg_->visualization.publish_robot_local_plan_poses;
+  last_publish_human_global_plans =
+      cfg_->visualization.publish_human_global_plans;
+  last_publish_human_local_plans =
+      cfg_->visualization.publish_human_local_plans;
+  last_publish_human_local_plan_poses =
+      cfg_->visualization.publish_human_local_plan_poses;
+  clearing_timer_ = nh.createTimer(ros::Duration(CLEARING_TIMER_DURATION),
+                                   &TebVisualization::clearingTimerCB, this);
 
   initialized_ = true;
 }
 
 void TebVisualization::publishGlobalPlan(
     const std::vector<geometry_msgs::PoseStamped> &global_plan) const {
-  if (printErrorWhenNotInitialized())
+  if (printErrorWhenNotInitialized() ||
+      !cfg_->visualization.publish_robot_global_plan) {
     return;
+  }
   base_local_planner::publishPlan(global_plan, global_plan_pub_);
 }
 
@@ -94,13 +120,17 @@ void TebVisualization::publishLocalPlan(
 
 void TebVisualization::publishHumansPlans(
     const std::vector<HumanPlanCombined> &humans_plans) const {
-  if (printErrorWhenNotInitialized())
+  if (printErrorWhenNotInitialized() ||
+      !cfg_->visualization.publish_human_global_plans || humans_plans.empty()) {
     return;
+  }
 
-  if (humans_plans.empty())
-    return;
+  auto now = ros::Time::now();
+  auto frame_id = cfg_->map_frame;
 
   hanp_msgs::HumanPathArray human_path_array;
+  human_path_array.header.stamp = now;
+  human_path_array.header.frame_id = frame_id;
 
   for (auto &human_plan_combined : humans_plans) {
     auto total_size = human_plan_combined.plan_before.size() +
@@ -111,6 +141,9 @@ void TebVisualization::publishHumansPlans(
     }
 
     nav_msgs::Path path;
+    path.header.stamp = now;
+    path.header.frame_id = frame_id;
+
     path.poses.resize(total_size);
     size_t index = 0;
     for (size_t i = 0; i < human_plan_combined.plan_before.size(); ++i) {
@@ -125,45 +158,47 @@ void TebVisualization::publishHumansPlans(
       path.poses[i + index] = human_plan_combined.plan_after[i];
     }
 
-    path.header.stamp = ros::Time::now();
-    path.header.frame_id = path.poses[0].header.frame_id;
-
     hanp_msgs::HumanPath human_path;
-    human_path.header.stamp = path.header.stamp;
-    human_path.header.frame_id = path.header.frame_id;
+    human_path.header.stamp = now;
+    human_path.header.frame_id = frame_id;
     human_path.id = human_plan_combined.id;
     human_path.path = path;
 
     human_path_array.paths.push_back(human_path);
   }
 
-  human_path_array.header.stamp = human_path_array.paths[0].header.stamp;
-  human_path_array.header.frame_id = human_path_array.paths[0].header.frame_id;
-
-  humans_global_plans_pub_.publish(human_path_array);
+  if (!human_path_array.paths.empty()) {
+    humans_global_plans_pub_.publish(human_path_array);
+  }
 }
 
 void TebVisualization::publishLocalPlanAndPoses(
     const TimedElasticBand &teb) const {
-  if (printErrorWhenNotInitialized())
+  if (printErrorWhenNotInitialized() ||
+      (!cfg_->visualization.publish_robot_local_plan &&
+       !cfg_->visualization.publish_robot_local_plan_poses)) {
     return;
+  }
+
+  auto frame_id = cfg_->map_frame;
+  auto now = ros::Time::now();
 
   // create path msg
   nav_msgs::Path teb_path;
-  teb_path.header.frame_id = cfg_->map_frame;
-  teb_path.header.stamp = ros::Time::now();
+  teb_path.header.frame_id = frame_id;
+  teb_path.header.stamp = now;
 
   // create pose_array (along trajectory)
   geometry_msgs::PoseArray teb_poses;
-  teb_poses.header.frame_id = teb_path.header.frame_id;
-  teb_poses.header.stamp = teb_path.header.stamp;
+  teb_poses.header.frame_id = frame_id;
+  teb_poses.header.stamp = now;
 
   // fill path msgs with teb configurations
   double pose_time = 0.0;
   for (unsigned int i = 0; i < teb.sizePoses(); i++) {
     geometry_msgs::PoseStamped pose;
-    pose.header.frame_id = teb_path.header.frame_id;
-    pose.header.stamp = teb_path.header.stamp;
+    pose.header.frame_id = frame_id;
+    pose.header.stamp = now;
     pose.pose.position.x = teb.Pose(i).x();
     pose.pose.position.y = teb.Pose(i).y();
     pose.pose.position.z = 0;
@@ -175,17 +210,24 @@ void TebVisualization::publishLocalPlanAndPoses(
       pose_time += teb.TimeDiff(i);
     }
   }
-  local_plan_pub_.publish(teb_path);
-  teb_poses_pub_.publish(teb_poses);
+  if (!teb_path.poses.empty() && cfg_->visualization.publish_robot_local_plan) {
+    local_plan_pub_.publish(teb_path);
+  }
+  if (!teb_poses.poses.empty() &&
+      cfg_->visualization.publish_robot_local_plan_poses) {
+    teb_poses_pub_.publish(teb_poses);
+  }
 }
 
 void TebVisualization::publishHumanPlanPoses(
     const std::map<uint64_t, TimedElasticBand> &humans_tebs_map) const {
-  if (printErrorWhenNotInitialized() || humans_tebs_map.empty())
+  if (printErrorWhenNotInitialized() ||
+      !cfg_->visualization.publish_human_local_plan_poses ||
+      humans_tebs_map.empty()) {
     return;
+  }
 
   geometry_msgs::PoseArray gui_teb_poses;
-
   gui_teb_poses.header.frame_id = cfg_->map_frame;
   gui_teb_poses.header.stamp = ros::Time::now();
 
@@ -211,21 +253,32 @@ void TebVisualization::publishHumanPlanPoses(
     }
   }
 
-  if (gui_teb_poses.poses.empty())
-    return;
-
-  humans_tebs_poses_pub_.publish(gui_teb_poses);
+  if (!gui_teb_poses.poses.empty()) {
+    humans_tebs_poses_pub_.publish(gui_teb_poses);
+  }
 }
 
 void TebVisualization::publishHumanTrajectories(
     const std::vector<HumanPlanTrajCombined> &humans_plans_traj_combined)
     const {
+  if (printErrorWhenNotInitialized() ||
+      !cfg_->visualization.publish_human_local_plans) {
+    return;
+  }
+
+  auto now = ros::Time::now();
+  auto frame_id = cfg_->map_frame;
+
   hanp_msgs::HumanTrajectoryArray hanp_trajectory_array;
-  hanp_trajectory_array.header.frame_id = cfg_->map_frame;
-  hanp_trajectory_array.header.stamp = ros::Time::now();
+  hanp_trajectory_array.header.stamp = now;
+  hanp_trajectory_array.header.frame_id = frame_id;
 
   for (auto &human_plan_traj_combined : humans_plans_traj_combined) {
     hanp_msgs::HumanTrajectory hanp_trajectory;
+    hanp_trajectory.header.stamp = now;
+    hanp_trajectory.header.frame_id = frame_id;
+    hanp_trajectory.trajectory.header.stamp = now;
+    hanp_trajectory.trajectory.header.frame_id = frame_id;
 
     for (auto human_pose : human_plan_traj_combined.plan_before) {
       hanp_msgs::TrajectoryPoint hanp_trajectory_point;
@@ -270,13 +323,7 @@ void TebVisualization::publishHumanTrajectories(
     }
 
     if (!hanp_trajectory.trajectory.points.empty()) {
-      hanp_trajectory.header.frame_id = hanp_trajectory_array.header.frame_id;
-      hanp_trajectory.header.stamp = hanp_trajectory_array.header.stamp;
       hanp_trajectory.id = human_plan_traj_combined.id;
-      hanp_trajectory.trajectory.header.frame_id =
-          hanp_trajectory_array.header.frame_id;
-      hanp_trajectory.trajectory.header.stamp =
-          hanp_trajectory_array.header.stamp;
       hanp_trajectory_array.trajectories.push_back(hanp_trajectory);
     }
   }
@@ -284,8 +331,6 @@ void TebVisualization::publishHumanTrajectories(
   if (!hanp_trajectory_array.trajectories.empty()) {
     humans_local_plans_pub_.publish(hanp_trajectory_array);
   }
-
-  return;
 }
 
 void TebVisualization::publishRobotFootprintModel(
@@ -576,6 +621,79 @@ inline bool TebVisualization::printErrorWhenNotInitialized() const {
     return true;
   }
   return false;
+}
+
+void TebVisualization::clearingTimerCB(const ros::TimerEvent &event) {
+  if ((last_publish_robot_global_plan !=
+       cfg_->visualization.publish_robot_global_plan) &&
+      !cfg_->visualization.publish_robot_global_plan) {
+    // clear robot global plans
+    nav_msgs::Path empty_path;
+    empty_path.header.stamp = ros::Time::now();
+    empty_path.header.frame_id = cfg_->map_frame;
+    global_plan_pub_.publish(empty_path);
+  }
+  last_publish_robot_global_plan =
+      cfg_->visualization.publish_robot_global_plan;
+
+  if ((last_publish_robot_local_plan !=
+       cfg_->visualization.publish_robot_local_plan) &&
+      !cfg_->visualization.publish_robot_local_plan) {
+    // clear robot local plans
+    nav_msgs::Path empty_path;
+    empty_path.header.stamp = ros::Time::now();
+    empty_path.header.frame_id = cfg_->map_frame;
+    local_plan_pub_.publish(empty_path);
+  }
+  last_publish_robot_local_plan = cfg_->visualization.publish_robot_local_plan;
+
+  if ((last_publish_robot_local_plan_poses !=
+       cfg_->visualization.publish_robot_local_plan_poses) &&
+      !cfg_->visualization.publish_robot_local_plan_poses) {
+    // clear robot local plan poses
+    geometry_msgs::PoseArray empty_pose_array;
+    empty_pose_array.header.stamp = ros::Time::now();
+    empty_pose_array.header.frame_id = cfg_->map_frame;
+    teb_poses_pub_.publish(empty_pose_array);
+  }
+  last_publish_robot_local_plan_poses =
+      cfg_->visualization.publish_robot_local_plan_poses;
+
+  if ((last_publish_human_global_plans !=
+       cfg_->visualization.publish_human_global_plans) &&
+      !cfg_->visualization.publish_human_global_plans) {
+    // clear human global plans
+    hanp_msgs::HumanPathArray empty_path_array;
+    empty_path_array.header.stamp = ros::Time::now();
+    empty_path_array.header.frame_id = cfg_->map_frame;
+    humans_global_plans_pub_.publish(empty_path_array);
+  }
+  last_publish_human_global_plans =
+      cfg_->visualization.publish_human_global_plans;
+
+  if ((last_publish_human_local_plans !=
+       cfg_->visualization.publish_human_local_plans) &&
+      !cfg_->visualization.publish_human_local_plans) {
+    // clear human local plans
+    hanp_msgs::HumanTrajectoryArray empty_trajectory_array;
+    empty_trajectory_array.header.stamp = ros::Time::now();
+    empty_trajectory_array.header.frame_id = cfg_->map_frame;
+    humans_local_plans_pub_.publish(empty_trajectory_array);
+  }
+  last_publish_human_local_plans =
+      cfg_->visualization.publish_human_local_plans;
+
+  if ((last_publish_human_local_plan_poses !=
+       cfg_->visualization.publish_human_local_plan_poses) &&
+      !cfg_->visualization.publish_human_local_plan_poses) {
+    // clear human local plan poses
+    geometry_msgs::PoseArray empty_pose_array;
+    empty_pose_array.header.stamp = ros::Time::now();
+    empty_pose_array.header.frame_id = cfg_->map_frame;
+    humans_tebs_poses_pub_.publish(empty_pose_array);
+  }
+  last_publish_human_local_plan_poses =
+      cfg_->visualization.publish_human_local_plan_poses;
 }
 
 } // namespace teb_local_planner

@@ -302,13 +302,19 @@ protected:
       humans_tebs_poses_pub_; //!< Publisher for the trajectory pose sequence
   ros::Publisher teb_marker_pub_; //!< Publisher for visualization markers
   ros::Publisher feedback_pub_;   //!< Publisher for the feedback message for
-                                  //!analysis and debug purposes
+                                  //! analysis and debug purposes
 
   const TebConfig
       *cfg_; //!< Config class that stores and manages all related parameters
 
   bool initialized_; //!< Keeps track about the correct initialization of this
-                     //!class
+                     //! class
+
+  ros::Timer clearing_timer_;
+  void clearingTimerCB(const ros::TimerEvent &event);
+  bool last_publish_robot_global_plan, last_publish_robot_local_plan,
+      last_publish_robot_local_plan_poses, last_publish_human_global_plans,
+      last_publish_human_local_plans, last_publish_human_local_plan_poses;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
