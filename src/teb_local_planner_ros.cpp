@@ -104,17 +104,11 @@ void TebLocalPlannerROS::initialize(std::string name, tf::TransformListener *tf,
     RobotFootprintModelPtr robot_model = getRobotFootprintFromParamServer(nh);
 
     CircularRobotFootprintPtr human_model = NULL;
-    double human_radius;
-    if (!nh.getParam("human_radius", human_radius)) {
-      ROS_ERROR_STREAM("Human model 'circular' cannot be loaded for trajectory "
-                       "optimization, since param '"
-                       << nh.getNamespace()
-                       << "/human_radius' does not exist. Using zero radius.");
-      human_model = boost::make_shared<CircularRobotFootprint>(0.0);
+    auto human_radius = cfg_.human.radius;
+    if (human_radius < 0.0) {
+      ROS_WARN("human radius is set to negative, using 0.0");
+      human_radius = 0.0;
     }
-    ROS_INFO_STREAM("Human model 'circular' (radius: "
-                    << human_radius
-                    << "m) loaded for trajectory optimization.");
     human_model = boost::make_shared<CircularRobotFootprint>(human_radius);
 
     // create the planner instance
