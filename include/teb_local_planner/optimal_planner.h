@@ -70,7 +70,8 @@
 #include <teb_local_planner/g2o_types/edge_obstacle.h>
 #include <teb_local_planner/g2o_types/edge_dynamic_obstacle.h>
 #include <teb_local_planner/g2o_types/edge_via_point.h>
-#include <teb_local_planner/g2o_types/edge_human_robot.h>
+#include <teb_local_planner/g2o_types/edge_human_robot_safety.h>
+#include <teb_local_planner/g2o_types/edge_human_robot_ttc.h>
 
 // messages
 #include <nav_msgs/Path.h>
@@ -735,6 +736,7 @@ protected:
    * @see optimizeGraph
    */
   void AddEdgesTimeOptimal();
+  void AddEdgesTimeOptimalForHumans();
 
   /**
    * @brief Add all edges (local cost functions) related to keeping a distance
@@ -786,7 +788,8 @@ protected:
    */
   void AddEdgesKinematicsCarlike();
 
-  void AddEdgesHumanRobot(std::stringstream &ss);
+  void AddEdgesHumanRobotSafety();
+  void AddEdgesHumanRobotTTC();
 
   //@}
 
@@ -824,6 +827,8 @@ protected:
                      //!class
   bool optimized_;   //!< This variable is \c true as long as the last
                      //!optimization has been completed successful
+
+  double human_radius_, robot_radius_;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

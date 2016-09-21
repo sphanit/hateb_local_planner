@@ -97,6 +97,7 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
   nh.param("human_acc_lim_theta", human.acc_lim_theta, human.acc_lim_theta);
   nh.param("use_external_prediction", human.use_external_prediction,
            human.use_external_prediction);
+  nh.param("ttc_threshold", human.ttc_threshold, human.ttc_threshold);
 
   // GoalTolerance
   nh.param("xy_goal_tolerance", goal_tolerance.xy_goal_tolerance,
@@ -164,6 +165,14 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
            optim.weight_human_viapoint);
   nh.param("weight_human_robot", optim.weight_human_robot,
            optim.weight_human_robot);
+  nh.param("weight_human_robot_ttc", optim.weight_human_robot_ttc,
+           optim.weight_human_robot_ttc);
+  nh.param("use_human_robot_safety_c", optim.use_human_robot_safety_c,
+           optim.use_human_robot_safety_c);
+  nh.param("use_human_robot_ttc_c", optim.use_human_robot_ttc_c,
+           optim.use_human_robot_ttc_c);
+  nh.param("use_human_robot_dir_c", optim.use_human_robot_dir_c,
+           optim.use_human_robot_dir_c);
 
   // Homotopy Class Planner
   nh.param("enable_homotopy_class_planning", hcp.enable_homotopy_class_planning,
@@ -259,6 +268,7 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   human.acc_lim_x = cfg.human_acc_lim_x;
   human.acc_lim_theta = cfg.human_acc_lim_theta;
   human.use_external_prediction = cfg.use_external_prediction;
+  human.ttc_threshold = cfg.ttc_threshold;
 
   // GoalTolerance
   goal_tolerance.xy_goal_tolerance = cfg.xy_goal_tolerance;
@@ -295,6 +305,10 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   optim.weight_viapoint = cfg.weight_viapoint;
   optim.weight_human_viapoint = cfg.weight_human_viapoint;
   optim.weight_human_robot = cfg.weight_human_robot;
+  optim.weight_human_robot_ttc = cfg.weight_human_robot_ttc;
+  optim.use_human_robot_safety_c = cfg.use_human_robot_safety_c;
+  optim.use_human_robot_ttc_c = cfg.use_human_robot_ttc_c;
+  optim.use_human_robot_dir_c = cfg.use_human_robot_dir_c;
 
   // Homotopy Class Planner
   hcp.enable_multithreading = cfg.enable_multithreading;

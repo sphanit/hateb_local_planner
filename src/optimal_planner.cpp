@@ -92,6 +92,10 @@ void TebOptimalPlanner::initialize(
 
   vel_goal_.first = true;
   vel_goal_.second.setZero();
+
+  robot_radius_ = robot_model_->getCircumscribedRadius();
+  human_radius_ = human_model_->getCircumscribedRadius();
+
   initialized_ = true;
 }
 
@@ -138,8 +142,14 @@ void TebOptimalPlanner::registerG2OTypes() {
       "EDGE_ACCELERATION_START",
       new g2o::HyperGraphElementCreator<EdgeAccelerationStart>);
   factory->registerType(
+      "EDGE_ACCELERATION_HUMAN_START",
+      new g2o::HyperGraphElementCreator<EdgeAccelerationHumanStart>);
+  factory->registerType(
       "EDGE_ACCELERATION_GOAL",
       new g2o::HyperGraphElementCreator<EdgeAccelerationGoal>);
+  factory->registerType(
+      "EDGE_ACCELERATION_HUMAN_GOAL",
+      new g2o::HyperGraphElementCreator<EdgeAccelerationHumanGoal>);
   factory->registerType(
       "EDGE_KINEMATICS_DIFF_DRIVE",
       new g2o::HyperGraphElementCreator<EdgeKinematicsDiffDrive>);
@@ -152,8 +162,10 @@ void TebOptimalPlanner::registerG2OTypes() {
                         new g2o::HyperGraphElementCreator<EdgeDynamicObstacle>);
   factory->registerType("EDGE_VIA_POINT",
                         new g2o::HyperGraphElementCreator<EdgeViaPoint>);
-  factory->registerType("EDGE_HUMAN_ROBOT",
-                        new g2o::HyperGraphElementCreator<EdgeHumanRobot>);
+  factory->registerType("EDGE_HUMAN_ROBOT_SAFETY",
+                        new g2o::HyperGraphElementCreator<EdgeHumanRobotSafety>);
+  factory->registerType("EDGE_HUMAN_ROBOT_TTC",
+                        new g2o::HyperGraphElementCreator<EdgeHumanRobotTTC>);
   return;
 }
 
@@ -476,6 +488,7 @@ bool TebOptimalPlanner::buildGraph() {
   AddEdgesAccelerationForHumans();
 
   AddEdgesTimeOptimal();
+  AddEdgesTimeOptimalForHumans();
 
   if (cfg_->robot.min_turning_radius == 0 ||
       cfg_->optim.weight_kinematics_turning_radius == 0)
@@ -486,8 +499,13 @@ bool TebOptimalPlanner::buildGraph() {
 
   AddEdgesKinematicsDiffDriveForHumans();
 
-  AddEdgesHumanRobot(ss);
-  // ROS_INFO_STREAM(ss.str());
+  if (cfg_->optim.use_human_robot_safety_c) {
+    AddEdgesHumanRobotSafety();
+  }
+
+  if (cfg_->optim.use_human_robot_ttc_c) {
+    AddEdgesHumanRobotTTC();
+  }
 
   return true;
 }
@@ -1012,6 +1030,28 @@ void TebOptimalPlanner::AddEdgesTimeOptimal() {
   }
 }
 
+void TebOptimalPlanner::AddEdgesTimeOptimalForHumans() {
+  if (local_weight_optimaltime_ == 0) {
+    return;
+  }
+
+  Eigen::Matrix<double, 1, 1> information;
+  information.fill(local_weight_optimaltime_);
+
+  for (auto &human_teb_kv : humans_tebs_map_) {
+    auto &human_teb = human_teb_kv.second;
+
+    std::size_t NoTimeDiffs(human_teb.sizeTimeDiffs());
+    for (std::size_t i = 0; i < NoTimeDiffs; ++i) {
+      EdgeTimeOptimal *timeoptimal_edge = new EdgeTimeOptimal;
+      timeoptimal_edge->setVertex(0, human_teb.TimeDiffVertex(i));
+      timeoptimal_edge->setInformation(information);
+      timeoptimal_edge->setTebConfig(*cfg_);
+      optimizer_->addEdge(timeoptimal_edge);
+    }
+  }
+}
+
 void TebOptimalPlanner::AddEdgesKinematicsDiffDrive() {
   if (cfg_->optim.weight_kinematics_nh == 0 &&
       cfg_->optim.weight_kinematics_forward_drive == 0)
@@ -1082,31 +1122,51 @@ void TebOptimalPlanner::AddEdgesKinematicsCarlike() {
   }
 }
 
-void TebOptimalPlanner::AddEdgesHumanRobot(std::stringstream &ss) {
+void TebOptimalPlanner::AddEdgesHumanRobotSafety() {
   auto robot_teb_size = teb_.sizePoses();
-
-  ss << "\nhuman-robot edges:";
-  unsigned int id_edge = 0;
 
   for (auto &human_teb_kv : humans_tebs_map_) {
     auto &human_teb = human_teb_kv.second;
 
-    id_edge = 0;
     for (unsigned int i = 0;
          (i < human_teb.sizePoses()) && (i < robot_teb_size); i++) {
       Eigen::Matrix<double, 1, 1> information_human_robot;
       information_human_robot.fill(cfg_->optim.weight_human_robot);
 
-      EdgeHumanRobot *human_robot_edge = new EdgeHumanRobot;
-      human_robot_edge->setVertex(0, teb_.PoseVertex(i));
-      human_robot_edge->setVertex(1, human_teb.PoseVertex(i));
-      human_robot_edge->setInformation(information_human_robot);
-      human_robot_edge->setParameters(*cfg_, robot_model_.get(),
-                                      human_model_.get());
-      optimizer_->addEdge(human_robot_edge);
-      id_edge += 1;
+      EdgeHumanRobotSafety *human_robot_safety_edge = new EdgeHumanRobotSafety;
+      human_robot_safety_edge->setVertex(0, teb_.PoseVertex(i));
+      human_robot_safety_edge->setVertex(1, human_teb.PoseVertex(i));
+      human_robot_safety_edge->setInformation(information_human_robot);
+      human_robot_safety_edge->setParameters(*cfg_, robot_model_.get(),
+                                             human_radius_);
+      optimizer_->addEdge(human_robot_safety_edge);
     }
-    ss << "\n\thuman-" << human_teb_kv.first << ": " << id_edge;
+  }
+}
+
+void TebOptimalPlanner::AddEdgesHumanRobotTTC() {
+  Eigen::Matrix<double, 1, 1> information_human_robot_ttc;
+  information_human_robot_ttc.fill(cfg_->optim.weight_human_robot_ttc);
+
+  auto robot_teb_size = teb_.sizePoses();
+  for (auto &human_teb_kv : humans_tebs_map_) {
+    auto &human_teb = human_teb_kv.second;
+
+    size_t human_teb_size = human_teb.sizePoses();
+    for (unsigned int i = 0;
+         (i < human_teb_size - 1) && (i < robot_teb_size - 1); i++) {
+
+      EdgeHumanRobotTTC *human_robot_ttc_edge = new EdgeHumanRobotTTC;
+      human_robot_ttc_edge->setVertex(0, teb_.PoseVertex(i));
+      human_robot_ttc_edge->setVertex(1, teb_.PoseVertex(i + 1));
+      human_robot_ttc_edge->setVertex(2, teb_.TimeDiffVertex(i));
+      human_robot_ttc_edge->setVertex(3, human_teb.PoseVertex(i));
+      human_robot_ttc_edge->setVertex(4, human_teb.PoseVertex(i + 1));
+      human_robot_ttc_edge->setVertex(5, human_teb.TimeDiffVertex(i));
+      human_robot_ttc_edge->setInformation(information_human_robot_ttc);
+      human_robot_ttc_edge->setParameters(*cfg_, robot_radius_, human_radius_);
+      optimizer_->addEdge(human_robot_ttc_edge);
+    }
   }
 }
 
@@ -1194,10 +1254,15 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
       continue;
     }
 
-    EdgeHumanRobot *edge_human_robot = dynamic_cast<EdgeHumanRobot *>(*it);
-    if (edge_human_robot != NULL) {
-      cost_ += edge_human_robot->getError().squaredNorm();
-      ;
+    EdgeHumanRobotSafety *edge_human_robot_safety = dynamic_cast<EdgeHumanRobotSafety *>(*it);
+    if (edge_human_robot_safety != NULL) {
+      cost_ += edge_human_robot_safety->getError().squaredNorm();
+      continue;
+    }
+
+    EdgeHumanRobotTTC *edge_human_robot_ttc = dynamic_cast<EdgeHumanRobotTTC *>(*it);
+    if (edge_human_robot_ttc != NULL) {
+      cost_ += edge_human_robot_ttc->getError().squaredNorm();
       continue;
     }
   }

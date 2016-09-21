@@ -6,6 +6,9 @@
  *  TU Dortmund - Institute of Control Theory and Systems Engineering.
  *  All rights reserved.
  *
+ *  Copyright (c) 2016 LAAS/CNRS
+ *  All rights reserved.
+ *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
  *  are met:
@@ -33,7 +36,8 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  *
- * Author: Christoph Rösmann
+ * Authors: Christoph Rösmann
+ *          Harmish Khambhaita (harmish@laas.fr)
  *********************************************************************/
 
 
@@ -92,7 +96,7 @@ public:
     */
   virtual void visualizeRobot(const PoseSE2& current_pose, std::vector<visualization_msgs::Marker>& markers ) const {}
 
-
+  virtual double getCircumscribedRadius() const = 0;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -137,6 +141,10 @@ public:
   virtual double calculateDistance(const PoseSE2& current_pose, const Obstacle* obstacle) const
   {
     return obstacle->getMinimumDistance(current_pose.position());
+  }
+
+  virtual double getCircumscribedRadius() const {
+    return 0.0;
   }
 
 };
@@ -201,8 +209,8 @@ public:
     marker.color.b = 0.0;
   }
 
-  void getRadius(double& radius) const {
-      radius = radius_;
+  virtual double getCircumscribedRadius() const {
+      return radius_;
   }
 
 private:
@@ -300,6 +308,10 @@ public:
 //       marker2.scale.z = 0.05;
       marker2.color = color;
     }
+  }
+
+  virtual double getCircumscribedRadius() const {
+    return std::max(front_offset_ + front_radius_, rear_offset_ + rear_radius_);
   }
 
 private:
@@ -426,6 +438,11 @@ public:
     marker.color = color;
   }
 
+  virtual double getCircumscribedRadius() const {
+    return std::max(std::hypot(line_start_.x(), line_start_.y()),
+                    std::hypot(line_end_.x(), line_end_.y()));
+  }
+
 private:
 
   Eigen::Vector2d line_start_;
@@ -527,6 +544,17 @@ public:
     marker.scale.x = 0.025;
     marker.color = color;
 
+  }
+
+  virtual double getCircumscribedRadius() const {
+    double radius = 0.0;
+    for (auto &vertex : vertices_) {
+      double dist = std::hypot(vertex.x(), vertex.y());
+      if (radius < dist) {
+        radius = dist;
+      }
+    }
+    return radius;
   }
 
 private:

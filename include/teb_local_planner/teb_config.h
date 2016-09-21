@@ -137,6 +137,7 @@ public:
     double acc_lim_x;
     double acc_lim_theta;
     bool use_external_prediction;
+    double ttc_threshold;
   } human;
 
   //! Goal tolerance related parameters
@@ -231,6 +232,10 @@ public:
                                   //! distance from human to its via-points
     double weight_human_robot; //!< Optimization weight for satisfying a minimum
                                //! seperation between human and robot
+    double weight_human_robot_ttc;
+    bool use_human_robot_safety_c;
+    bool use_human_robot_ttc_c;
+    bool use_human_robot_dir_c;
   } optim;                     //!< Optimization related parameters
 
   struct HomotopyClasses {
@@ -374,6 +379,7 @@ public:
     human.acc_lim_x = 0.6;
     human.acc_lim_theta = 0.8;
     human.use_external_prediction = false;
+    human.ttc_threshold = 5.0;
 
     // GoalTolerance
 
@@ -415,6 +421,10 @@ public:
     optim.weight_viapoint = 1;
     optim.weight_human_viapoint = 1;
     optim.weight_human_robot = 40;
+    optim.weight_human_robot_ttc = 20;
+    optim.use_human_robot_safety_c = true;
+    optim.use_human_robot_ttc_c = true;
+    optim.use_human_robot_dir_c = true;
 
     // Homotopy Class Planner
 
