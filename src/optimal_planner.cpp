@@ -162,10 +162,14 @@ void TebOptimalPlanner::registerG2OTypes() {
                         new g2o::HyperGraphElementCreator<EdgeDynamicObstacle>);
   factory->registerType("EDGE_VIA_POINT",
                         new g2o::HyperGraphElementCreator<EdgeViaPoint>);
-  factory->registerType("EDGE_HUMAN_ROBOT_SAFETY",
-                        new g2o::HyperGraphElementCreator<EdgeHumanRobotSafety>);
+  factory->registerType(
+      "EDGE_HUMAN_ROBOT_SAFETY",
+      new g2o::HyperGraphElementCreator<EdgeHumanRobotSafety>);
   factory->registerType("EDGE_HUMAN_ROBOT_TTC",
                         new g2o::HyperGraphElementCreator<EdgeHumanRobotTTC>);
+  factory->registerType(
+      "EDGE_HUMAN_ROBOT_DIRECTIONAL",
+      new g2o::HyperGraphElementCreator<EdgeHumanRobotDirectional>);
   return;
 }
 
@@ -505,6 +509,10 @@ bool TebOptimalPlanner::buildGraph() {
 
   if (cfg_->optim.use_human_robot_ttc_c) {
     AddEdgesHumanRobotTTC();
+  }
+
+  if (cfg_->optim.use_human_robot_dir_c) {
+    AddEdgesHumanRobotDirectional();
   }
 
   return true;
@@ -1131,7 +1139,7 @@ void TebOptimalPlanner::AddEdgesHumanRobotSafety() {
     for (unsigned int i = 0;
          (i < human_teb.sizePoses()) && (i < robot_teb_size); i++) {
       Eigen::Matrix<double, 1, 1> information_human_robot;
-      information_human_robot.fill(cfg_->optim.weight_human_robot);
+      information_human_robot.fill(cfg_->optim.weight_human_robot_safety);
 
       EdgeHumanRobotSafety *human_robot_safety_edge = new EdgeHumanRobotSafety;
       human_robot_safety_edge->setVertex(0, teb_.PoseVertex(i));
@@ -1166,6 +1174,33 @@ void TebOptimalPlanner::AddEdgesHumanRobotTTC() {
       human_robot_ttc_edge->setInformation(information_human_robot_ttc);
       human_robot_ttc_edge->setParameters(*cfg_, robot_radius_, human_radius_);
       optimizer_->addEdge(human_robot_ttc_edge);
+    }
+  }
+}
+
+void TebOptimalPlanner::AddEdgesHumanRobotDirectional() {
+  Eigen::Matrix<double, 1, 1> information_human_robot_directional;
+  information_human_robot_directional.fill(cfg_->optim.weight_human_robot_dir);
+
+  auto robot_teb_size = teb_.sizePoses();
+  for (auto &human_teb_kv : humans_tebs_map_) {
+    auto &human_teb = human_teb_kv.second;
+
+    size_t human_teb_size = human_teb.sizePoses();
+    for (unsigned int i = 0;
+         (i < human_teb_size - 1) && (i < robot_teb_size - 1); i++) {
+
+      EdgeHumanRobotDirectional *human_robot_dir_edge =
+          new EdgeHumanRobotDirectional;
+      human_robot_dir_edge->setVertex(0, teb_.PoseVertex(i));
+      human_robot_dir_edge->setVertex(1, teb_.PoseVertex(i + 1));
+      human_robot_dir_edge->setVertex(2, teb_.TimeDiffVertex(i));
+      human_robot_dir_edge->setVertex(3, human_teb.PoseVertex(i));
+      human_robot_dir_edge->setVertex(4, human_teb.PoseVertex(i + 1));
+      human_robot_dir_edge->setVertex(5, human_teb.TimeDiffVertex(i));
+      human_robot_dir_edge->setInformation(information_human_robot_directional);
+      human_robot_dir_edge->setTebConfig(*cfg_);
+      optimizer_->addEdge(human_robot_dir_edge);
     }
   }
 }
@@ -1254,15 +1289,24 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
       continue;
     }
 
-    EdgeHumanRobotSafety *edge_human_robot_safety = dynamic_cast<EdgeHumanRobotSafety *>(*it);
+    EdgeHumanRobotSafety *edge_human_robot_safety =
+        dynamic_cast<EdgeHumanRobotSafety *>(*it);
     if (edge_human_robot_safety != NULL) {
       cost_ += edge_human_robot_safety->getError().squaredNorm();
       continue;
     }
 
-    EdgeHumanRobotTTC *edge_human_robot_ttc = dynamic_cast<EdgeHumanRobotTTC *>(*it);
+    EdgeHumanRobotTTC *edge_human_robot_ttc =
+        dynamic_cast<EdgeHumanRobotTTC *>(*it);
     if (edge_human_robot_ttc != NULL) {
       cost_ += edge_human_robot_ttc->getError().squaredNorm();
+      continue;
+    }
+
+    EdgeHumanRobotDirectional *edge_human_robot_directional =
+        dynamic_cast<EdgeHumanRobotDirectional *>(*it);
+    if (edge_human_robot_directional != NULL) {
+      cost_ += edge_human_robot_directional->getError().squaredNorm();
       continue;
     }
   }

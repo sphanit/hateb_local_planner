@@ -74,6 +74,7 @@ public:
 
     double dist = robot_model_->calculateDistance(robot_bandpt->pose(), obs_) -
                   human_radius_;
+    ROS_INFO_THROTTLE(0.5, "human robot dist = %f", dist);
     _error[0] = penaltyBoundFromBelow(dist, cfg_->human.min_human_dist,
                                       cfg_->optim.penalty_epsilon);
 

@@ -32,8 +32,8 @@
  * Author: Harmish Khambhaita (harmish@laas.fr)
  */
 
-#ifndef EDGE_HUMAN_ROBOT_TTC_H_
-#define EDGE_HUMAN_ROBOT_TTC_H_
+#ifndef EDGE_HUMAN_ROBOT_DIR_H_
+#define EDGE_HUMAN_ROBOT_DIR_H_
 
 #include <teb_local_planner/g2o_types/vertex_pose.h>
 #include <teb_local_planner/g2o_types/vertex_timediff.h>
@@ -44,16 +44,16 @@
 
 namespace teb_local_planner {
 
-class EdgeHumanRobotTTC : public g2o::BaseMultiEdge<1, double> {
+class EdgeHumanRobotDirectional : public g2o::BaseMultiEdge<1, double> {
 public:
-  EdgeHumanRobotTTC() {
+  EdgeHumanRobotDirectional() {
     this->resize(6);
     // this->setMeasurement(0.);
     _vertices[0] = _vertices[1] = _vertices[2] = _vertices[3] = _vertices[4] =
         _vertices[5] = NULL;
   }
 
-  virtual ~EdgeHumanRobotTTC() {
+  virtual ~EdgeHumanRobotDirectional() {
     for (unsigned int i = 0; i < 6; i++) {
       if (_vertices[i])
         _vertices[i]->edges().erase(this);
@@ -61,9 +61,9 @@ public:
   }
 
   void computeError() {
-    ROS_ASSERT_MSG(cfg_ &&
-                       (radius_sum_ < std::numeric_limits<double>::infinity()),
-                   "You must call setParameters() on EdgeHumanRobotTTC()");
+    ROS_ASSERT_MSG(
+        cfg_ && (radius_sum_ < std::numeric_limits<double>::infinity()),
+        "You must call setTebConfig() on EdgeHumanRobotDirectional()");
     const VertexPose *robot_bandpt =
         static_cast<const VertexPose *>(_vertices[0]);
     const VertexPose *robot_bandpt_nxt =
@@ -84,41 +84,17 @@ public:
         human_bandpt_nxt->position() - human_bandpt->position();
     Eigen::Vector2d human_vel = diff_human / dt_human->dt();
 
-    Eigen::Vector2d C = human_bandpt->position() - robot_bandpt->position();
+    Eigen::Vector2d d_rtoh =
+        human_bandpt->position() - robot_bandpt->position();
+    Eigen::Vector2d d_htor =
+        robot_bandpt->position() - human_bandpt->position();
 
-    double ttc = std::numeric_limits<double>::infinity();
-    double C_sq = C.dot(C);
-    if (C_sq <= radius_sum_sq_) {
-      ttc = 0.0;
-    } else {
-      Eigen::Vector2d V = robot_vel - human_vel;
-      double C_dot_V = C.dot(V);
-      if (C_dot_V > 0) { // otherwise ttc is infinite
-        double V_sq = V.dot(V);
-        double f = (C_dot_V * C_dot_V) - (V_sq * (C_sq - radius_sum_sq_));
-        if (f > 0) { // otherwise ttc is infinite
-          ttc = (C_dot_V - std::sqrt(f)) / V_sq;
-        }
-      }
-    }
+    double dir_cost =
+        (robot_vel.dot(d_rtoh) + human_vel.dot(d_htor)) / d_rtoh.dot(d_rtoh);
+    ROS_INFO_THROTTLE(0.5, "dir_cost value : %f", dir_cost);
 
-    if (ttc < std::numeric_limits<double>::infinity()) {
-      // if (ttc > 0) {
-      //   // valid ttc
-      //   _error[0] = penaltyBoundFromBelow(ttc, cfg_->human.ttc_threshold,
-      //                                 cfg_->optim.penalty_epsilon);
-      // } else {
-      //   // already in collision
-      //   _error[0] = cfg_->optim.max_ttc_penalty;
-      // }
-      _error[0] = penaltyBoundFromBelow(ttc, cfg_->human.ttc_threshold,
-                                        cfg_->optim.penalty_epsilon);
-    } else {
-      // no collsion possible
-      _error[0] = 0.0;
-    }
-    ROS_INFO_THROTTLE(0.5, "ttc value : %f", ttc);
-
+    _error[0] = penaltyBoundFromBelow(dir_cost, cfg_->human.dir_cost_threshold,
+                                      cfg_->optim.penalty_epsilon);
 
     ROS_ASSERT_MSG(std::isfinite(_error[0]),
                    "EdgeHumanRobot::computeError() _error[0]=%f\n", _error[0]);
@@ -142,17 +118,8 @@ public:
 
   void setTebConfig(const TebConfig &cfg) { cfg_ = &cfg; }
 
-  void setParameters(const TebConfig &cfg, const double &robot_radius,
-                     const double &human_radius) {
-    cfg_ = &cfg;
-    radius_sum_ = robot_radius + human_radius;
-    radius_sum_sq_ = radius_sum_ * radius_sum_;
-  }
-
 protected:
   const TebConfig *cfg_;
-  double radius_sum_ = std::numeric_limits<double>::infinity();
-  double radius_sum_sq_ = std::numeric_limits<double>::infinity();
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -160,4 +127,4 @@ public:
 
 } // end namespace
 
-#endif // EDGE_HUMAN_ROBOT_TTC_H_
+#endif // EDGE_HUMAN_ROBOT_DIR_H_

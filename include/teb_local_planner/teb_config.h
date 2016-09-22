@@ -138,6 +138,7 @@ public:
     double acc_lim_theta;
     bool use_external_prediction;
     double ttc_threshold;
+    double dir_cost_threshold;
   } human;
 
   //! Goal tolerance related parameters
@@ -230,9 +231,10 @@ public:
                             //! to via-points
     double weight_human_viapoint; //!< Optimization weight for minimizing the
                                   //! distance from human to its via-points
-    double weight_human_robot; //!< Optimization weight for satisfying a minimum
+    double weight_human_robot_safety; //!< Optimization weight for satisfying a minimum
                                //! seperation between human and robot
     double weight_human_robot_ttc;
+    double weight_human_robot_dir;
     bool use_human_robot_safety_c;
     bool use_human_robot_ttc_c;
     bool use_human_robot_dir_c;
@@ -420,10 +422,13 @@ public:
     optim.weight_dynamic_obstacle = 10;
     optim.weight_viapoint = 1;
     optim.weight_human_viapoint = 1;
-    optim.weight_human_robot = 40;
+    optim.weight_human_robot_safety = 20;
     optim.weight_human_robot_ttc = 20;
+    optim.weight_human_robot_dir = 20;
+    optim.human_robot_ttc_scale_alpha = 1;
     optim.use_human_robot_safety_c = true;
     optim.use_human_robot_ttc_c = true;
+    optim.scale_human_robot_ttc_c = true;
     optim.use_human_robot_dir_c = true;
 
     // Homotopy Class Planner

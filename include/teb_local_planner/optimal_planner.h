@@ -72,6 +72,7 @@
 #include <teb_local_planner/g2o_types/edge_via_point.h>
 #include <teb_local_planner/g2o_types/edge_human_robot_safety.h>
 #include <teb_local_planner/g2o_types/edge_human_robot_ttc.h>
+#include <teb_local_planner/g2o_types/edge_human_robot_directional.h>
 
 // messages
 #include <nav_msgs/Path.h>
@@ -790,6 +791,7 @@ protected:
 
   void AddEdgesHumanRobotSafety();
   void AddEdgesHumanRobotTTC();
+  void AddEdgesHumanRobotDirectional();
 
   //@}
 

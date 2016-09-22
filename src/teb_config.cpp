@@ -163,10 +163,12 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
   nh.param("weight_viapoint", optim.weight_viapoint, optim.weight_viapoint);
   nh.param("weight_human_viapoint", optim.weight_human_viapoint,
            optim.weight_human_viapoint);
-  nh.param("weight_human_robot", optim.weight_human_robot,
-           optim.weight_human_robot);
+  nh.param("weight_human_robot_safety", optim.weight_human_robot_safety,
+           optim.weight_human_robot_safety);
   nh.param("weight_human_robot_ttc", optim.weight_human_robot_ttc,
            optim.weight_human_robot_ttc);
+  nh.param("weight_human_robot_dir", optim.weight_human_robot_dir,
+           optim.weight_human_robot_dir);
   nh.param("use_human_robot_safety_c", optim.use_human_robot_safety_c,
            optim.use_human_robot_safety_c);
   nh.param("use_human_robot_ttc_c", optim.use_human_robot_ttc_c,
@@ -304,8 +306,9 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   optim.weight_dynamic_obstacle = cfg.weight_dynamic_obstacle;
   optim.weight_viapoint = cfg.weight_viapoint;
   optim.weight_human_viapoint = cfg.weight_human_viapoint;
-  optim.weight_human_robot = cfg.weight_human_robot;
+  optim.weight_human_robot_safety = cfg.weight_human_robot_safety;
   optim.weight_human_robot_ttc = cfg.weight_human_robot_ttc;
+  optim.weight_human_robot_dir = cfg.weight_human_robot_dir;
   optim.use_human_robot_safety_c = cfg.use_human_robot_safety_c;
   optim.use_human_robot_ttc_c = cfg.use_human_robot_ttc_c;
   optim.use_human_robot_dir_c = cfg.use_human_robot_dir_c;
