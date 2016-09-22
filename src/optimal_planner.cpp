@@ -313,6 +313,7 @@ bool TebOptimalPlanner::plan(
   }
 
   humans_vel_start_.clear();
+  humans_vel_goal_.clear();
   for (auto &initial_human_plan_vel_kv : *initial_human_plan_vel_map) {
     auto &human_id = initial_human_plan_vel_kv.first;
     auto &initial_human_plan = initial_human_plan_vel_kv.second.plan;
@@ -370,7 +371,7 @@ bool TebOptimalPlanner::plan(
         initial_human_plan_vel_kv.second.goal_vel.linear.x;
     human_goal_vel.second.coeffRef(1) =
         initial_human_plan_vel_kv.second.goal_vel.angular.z;
-    humans_vel_start_[human_id] = human_goal_vel;
+    humans_vel_goal_[human_id] = human_goal_vel;
   }
   auto human_prep_time = ros::Time::now() - human_prep_time_start;
 
