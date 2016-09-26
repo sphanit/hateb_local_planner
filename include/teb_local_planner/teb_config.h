@@ -235,8 +235,10 @@ public:
                                //! seperation between human and robot
     double weight_human_robot_ttc;
     double weight_human_robot_dir;
+    double human_robot_ttc_scale_alpha;
     bool use_human_robot_safety_c;
     bool use_human_robot_ttc_c;
+    bool scale_human_robot_ttc_c;
     bool use_human_robot_dir_c;
   } optim;                     //!< Optimization related parameters
 

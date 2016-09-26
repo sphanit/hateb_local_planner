@@ -169,10 +169,14 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
            optim.weight_human_robot_ttc);
   nh.param("weight_human_robot_dir", optim.weight_human_robot_dir,
            optim.weight_human_robot_dir);
+  nh.param("human_robot_ttc_scale_alpha", optim.human_robot_ttc_scale_alpha,
+           optim.human_robot_ttc_scale_alpha);
   nh.param("use_human_robot_safety_c", optim.use_human_robot_safety_c,
            optim.use_human_robot_safety_c);
   nh.param("use_human_robot_ttc_c", optim.use_human_robot_ttc_c,
            optim.use_human_robot_ttc_c);
+  nh.param("scale_human_robot_ttc_c", optim.scale_human_robot_ttc_c,
+           optim.scale_human_robot_ttc_c);
   nh.param("use_human_robot_dir_c", optim.use_human_robot_dir_c,
            optim.use_human_robot_dir_c);
 
@@ -309,8 +313,10 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   optim.weight_human_robot_safety = cfg.weight_human_robot_safety;
   optim.weight_human_robot_ttc = cfg.weight_human_robot_ttc;
   optim.weight_human_robot_dir = cfg.weight_human_robot_dir;
+  optim.human_robot_ttc_scale_alpha = cfg.human_robot_ttc_scale_alpha;
   optim.use_human_robot_safety_c = cfg.use_human_robot_safety_c;
   optim.use_human_robot_ttc_c = cfg.use_human_robot_ttc_c;
+  optim.scale_human_robot_ttc_c = cfg.scale_human_robot_ttc_c;
   optim.use_human_robot_dir_c = cfg.use_human_robot_dir_c;
 
   // Homotopy Class Planner

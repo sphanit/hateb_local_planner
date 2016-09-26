@@ -89,8 +89,9 @@ public:
     Eigen::Vector2d d_htor =
         robot_bandpt->position() - human_bandpt->position();
 
-    double dir_cost =
-        (robot_vel.dot(d_rtoh) + human_vel.dot(d_htor)) / d_rtoh.dot(d_rtoh);
+    double dir_cost = (std::max(robot_vel.dot(d_rtoh), 0.0) +
+                       std::max(human_vel.dot(d_htor), 0.0)) /
+                      d_rtoh.dot(d_rtoh);
     ROS_INFO_THROTTLE(0.5, "dir_cost value : %f", dir_cost);
 
     _error[0] = penaltyBoundFromBelow(dir_cost, cfg_->human.dir_cost_threshold,
