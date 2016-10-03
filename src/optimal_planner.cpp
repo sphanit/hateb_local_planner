@@ -334,7 +334,7 @@ bool TebOptimalPlanner::plan(
       humans_tebs_map_[human_id] = TimedElasticBand();
       humans_tebs_map_[human_id].initTEBtoGoal(initial_human_plan,
                                                cfg_->trajectory.dt_ref, true,
-                                               cfg_->trajectory.min_samples);
+                                               cfg_->trajectory.human_min_samples);
     }
     // modify human-teb for existing human
     else {
@@ -353,7 +353,7 @@ bool TebOptimalPlanner::plan(
       //     specified threshold. Reinitializing human trajectories.");
       human_teb.clearTimedElasticBand();
       human_teb.initTEBtoGoal(initial_human_plan, cfg_->trajectory.dt_ref, true,
-                              cfg_->trajectory.min_samples);
+                              cfg_->trajectory.human_min_samples);
       // }
     }
     // give start and goal velocity for humans

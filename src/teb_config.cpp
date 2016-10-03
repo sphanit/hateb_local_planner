@@ -54,6 +54,7 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
   nh.param("dt_ref", trajectory.dt_ref, trajectory.dt_ref);
   nh.param("dt_hysteresis", trajectory.dt_hysteresis, trajectory.dt_hysteresis);
   nh.param("min_samples", trajectory.min_samples, trajectory.min_samples);
+  nh.param("human_min_samples", trajectory.human_min_samples, trajectory.human_min_samples);
   nh.param("global_plan_overwrite_orientation",
            trajectory.global_plan_overwrite_orientation,
            trajectory.global_plan_overwrite_orientation);

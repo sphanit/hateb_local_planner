@@ -77,6 +77,7 @@ public:
     //! of dt_ref
     int min_samples; //!< Minimum number of samples (should be always greater
                      //! than 2)
+    int human_min_samples;
     bool global_plan_overwrite_orientation; //!< Overwrite orientation of local
                                             //! subgoals provided by the global
     //! planner
@@ -354,6 +355,7 @@ public:
     trajectory.dt_ref = 0.3;
     trajectory.dt_hysteresis = 0.1;
     trajectory.min_samples = 3;
+    trajectory.human_min_samples = 3;
     trajectory.global_plan_overwrite_orientation = true;
     trajectory.global_plan_viapoint_sep = -1;
     trajectory.via_points_ordered = false;
