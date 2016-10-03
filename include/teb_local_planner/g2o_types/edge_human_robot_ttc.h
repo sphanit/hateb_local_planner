@@ -112,17 +112,17 @@ public:
       //   _error[0] = cfg_->optim.max_ttc_penalty;
       // }
 
-      if (cfg_->optim.scale_human_robot_ttc_c) {
-        ttc *= (cfg_->optim.human_robot_ttc_scale_alpha / C_sq);
-      }
       _error[0] = penaltyBoundFromBelow(ttc, cfg_->human.ttc_threshold,
                                         cfg_->optim.penalty_epsilon);
+      if (cfg_->optim.scale_human_robot_ttc_c) {
+        _error[0] = _error[0] * cfg_->optim.human_robot_ttc_scale_alpha / C_sq;
+      }
+
     } else {
       // no collsion possible
       _error[0] = 0.0;
     }
     ROS_INFO_THROTTLE(0.5, "ttc value : %f", ttc);
-
 
     ROS_ASSERT_MSG(std::isfinite(_error[0]),
                    "EdgeHumanRobot::computeError() _error[0]=%f\n", _error[0]);
