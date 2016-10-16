@@ -54,7 +54,8 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
   nh.param("dt_ref", trajectory.dt_ref, trajectory.dt_ref);
   nh.param("dt_hysteresis", trajectory.dt_hysteresis, trajectory.dt_hysteresis);
   nh.param("min_samples", trajectory.min_samples, trajectory.min_samples);
-  nh.param("human_min_samples", trajectory.human_min_samples, trajectory.human_min_samples);
+  nh.param("human_min_samples", trajectory.human_min_samples,
+           trajectory.human_min_samples);
   nh.param("global_plan_overwrite_orientation",
            trajectory.global_plan_overwrite_orientation,
            trajectory.global_plan_overwrite_orientation);
@@ -111,6 +112,12 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
   // Obstacles
   nh.param("min_obstacle_dist", obstacles.min_obstacle_dist,
            obstacles.min_obstacle_dist);
+  nh.param("use_nonlinear_obstacle_penalty",
+           obstacles.use_nonlinear_obstacle_penalty,
+           obstacles.use_nonlinear_obstacle_penalty);
+  nh.param("obstacle_cost_mult", obstacles.obstacle_cost_mult,
+           obstacles.obstacle_cost_mult);
+
   nh.param("include_costmap_obstacles", obstacles.include_costmap_obstacles,
            obstacles.include_costmap_obstacles);
   nh.param("costmap_obstacles_behind_robot_dist",
@@ -134,6 +141,10 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
   nh.param("optimization_verbose", optim.optimization_verbose,
            optim.optimization_verbose);
   nh.param("penalty_epsilon", optim.penalty_epsilon, optim.penalty_epsilon);
+  nh.param("time_penalty_epsilon", optim.time_penalty_epsilon,
+           optim.time_penalty_epsilon);
+  nh.param("cap_optimaltime_penalty", optim.cap_optimaltime_penalty,
+           optim.cap_optimaltime_penalty);
   nh.param("weight_max_vel_x", optim.weight_max_vel_x, optim.weight_max_vel_x);
   nh.param("weight_max_human_vel_x", optim.weight_max_vel_x,
            optim.weight_max_vel_x);
@@ -158,6 +169,8 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
            optim.weight_kinematics_turning_radius);
   nh.param("weight_optimaltime", optim.weight_optimaltime,
            optim.weight_optimaltime);
+  nh.param("weight_human_optimaltime", optim.weight_human_optimaltime,
+           optim.weight_human_optimaltime);
   nh.param("weight_obstacle", optim.weight_obstacle, optim.weight_obstacle);
   nh.param("weight_dynamic_obstacle", optim.weight_dynamic_obstacle,
            optim.weight_dynamic_obstacle);
@@ -284,6 +297,8 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
 
   // Obstacles
   obstacles.min_obstacle_dist = cfg.min_obstacle_dist;
+  obstacles.use_nonlinear_obstacle_penalty = cfg.use_nonlinear_obstacle_penalty;
+  obstacles.obstacle_cost_mult = cfg.obstacle_cost_mult;
   obstacles.include_costmap_obstacles = cfg.include_costmap_obstacles;
   obstacles.costmap_obstacles_behind_robot_dist =
       cfg.costmap_obstacles_behind_robot_dist;
@@ -295,6 +310,8 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   optim.optimization_activate = cfg.optimization_activate;
   optim.optimization_verbose = cfg.optimization_verbose;
   optim.penalty_epsilon = cfg.penalty_epsilon;
+  optim.time_penalty_epsilon = cfg.time_penalty_epsilon;
+  optim.cap_optimaltime_penalty = cfg.cap_optimaltime_penalty;
   optim.weight_max_vel_x = cfg.weight_max_vel_x;
   optim.weight_max_human_vel_x = cfg.weight_max_vel_x;
   optim.weight_max_vel_theta = cfg.weight_max_vel_theta;
@@ -307,6 +324,7 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   optim.weight_kinematics_forward_drive = cfg.weight_kinematics_forward_drive;
   optim.weight_kinematics_turning_radius = cfg.weight_kinematics_turning_radius;
   optim.weight_optimaltime = cfg.weight_optimaltime;
+  optim.weight_human_optimaltime = cfg.weight_human_optimaltime;
   optim.weight_obstacle = cfg.weight_obstacle;
   optim.weight_dynamic_obstacle = cfg.weight_dynamic_obstacle;
   optim.weight_viapoint = cfg.weight_viapoint;

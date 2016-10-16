@@ -332,9 +332,9 @@ bool TebOptimalPlanner::plan(
     // create new human-teb for new human
     if (humans_tebs_map_.find(human_id) == humans_tebs_map_.end()) {
       humans_tebs_map_[human_id] = TimedElasticBand();
-      humans_tebs_map_[human_id].initTEBtoGoal(initial_human_plan,
-                                               cfg_->trajectory.dt_ref, true,
-                                               cfg_->trajectory.human_min_samples);
+      humans_tebs_map_[human_id].initTEBtoGoal(
+          initial_human_plan, cfg_->trajectory.dt_ref, true,
+          cfg_->trajectory.human_min_samples);
     }
     // modify human-teb for existing human
     else {
@@ -1035,17 +1035,18 @@ void TebOptimalPlanner::AddEdgesTimeOptimal() {
     timeoptimal_edge->setVertex(0, teb_.TimeDiffVertex(i));
     timeoptimal_edge->setInformation(information);
     timeoptimal_edge->setTebConfig(*cfg_);
+    timeoptimal_edge->setInitialTime(teb_.TimeDiffVertex(i)->dt());
     optimizer_->addEdge(timeoptimal_edge);
   }
 }
 
 void TebOptimalPlanner::AddEdgesTimeOptimalForHumans() {
-  if (local_weight_optimaltime_ == 0) {
+  if (cfg_->optim.weight_human_optimaltime == 0) {
     return;
   }
 
   Eigen::Matrix<double, 1, 1> information;
-  information.fill(local_weight_optimaltime_);
+  information.fill(cfg_->optim.weight_human_optimaltime);
 
   for (auto &human_teb_kv : humans_tebs_map_) {
     auto &human_teb = human_teb_kv.second;
@@ -1056,6 +1057,7 @@ void TebOptimalPlanner::AddEdgesTimeOptimalForHumans() {
       timeoptimal_edge->setVertex(0, human_teb.TimeDiffVertex(i));
       timeoptimal_edge->setInformation(information);
       timeoptimal_edge->setTebConfig(*cfg_);
+      timeoptimal_edge->setInitialTime(human_teb.TimeDiffVertex(i)->dt());
       optimizer_->addEdge(timeoptimal_edge);
     }
   }

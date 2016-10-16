@@ -102,7 +102,18 @@ public:
 
     double dist = robot_model_->calculateDistance(bandpt->pose(), _measurement);
 
-    _error[0] = penaltyBoundFromBelow(dist, cfg_->obstacles.min_obstacle_dist, cfg_->optim.penalty_epsilon);
+    if (cfg_->obstacles.use_nonlinear_obstacle_penalty) {
+      if (dist <= 0.0) { // just checking, this should actually never happen
+        _error[0] = std::numeric_limits<double>::max() ;
+      } else if (dist > cfg_->obstacles.min_obstacle_dist) {
+        _error[0] = 0.0;
+      } else {
+        // inverse fucntion for increasing cost significantly near obstacles
+        _error[0] = cfg_->obstacles.obstacle_cost_mult / dist;
+      }
+    } else {
+      _error[0] = penaltyBoundFromBelow(dist, cfg_->obstacles.min_obstacle_dist, cfg_->optim.penalty_epsilon);
+    }
 
     ROS_ASSERT_MSG(std::isfinite(_error[0]), "EdgeObstacle::computeError() _error[0]=%f\n",_error[0]);
   }

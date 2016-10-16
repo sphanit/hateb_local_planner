@@ -154,6 +154,8 @@ public:
   //! Obstacle related parameters
   struct Obstacles {
     double min_obstacle_dist; //!< Minimum desired separation from obstacles
+    bool use_nonlinear_obstacle_penalty;
+    double obstacle_cost_mult;
     bool include_costmap_obstacles; //!< Specify whether the obstacles in the
                                     //! costmap should be taken into account
     //! directly
@@ -192,6 +194,8 @@ public:
 
     double penalty_epsilon; //!< Add a small safety margin to penalty functions
                             //! for hard-constraint approximations
+    double time_penalty_epsilon;
+    bool cap_optimaltime_penalty;
 
     double weight_max_vel_x; //!< Optimization weight for satisfying the maximum
                              //! allowed translational velocity
@@ -223,6 +227,8 @@ public:
                                              //! enforcing a minimum turning
     //! radius (carlike robots)
     double weight_optimaltime; //!< Optimization weight for contracting the
+                               //! trajectory w.r.t transition time
+    double weight_human_optimaltime; //!< Optimization weight for contracting the
                                //! trajectory w.r.t transition time
     double weight_obstacle;    //!< Optimization weight for satisfying a minimum
                                //! separation from obstacles
@@ -396,6 +402,8 @@ public:
     // Obstacles
 
     obstacles.min_obstacle_dist = 0.5;
+    obstacles.use_nonlinear_obstacle_penalty = true;
+    obstacles.obstacle_cost_mult = 1.0;
     obstacles.include_costmap_obstacles = true;
     obstacles.costmap_obstacles_behind_robot_dist = 0.5;
     obstacles.obstacle_poses_affected = 25;
@@ -410,6 +418,8 @@ public:
     optim.optimization_activate = true;
     optim.optimization_verbose = false;
     optim.penalty_epsilon = 0.1;
+    optim.time_penalty_epsilon = 0.1;
+    optim.cap_optimaltime_penalty = true;
     optim.weight_max_vel_x = 2; // 1
     optim.weight_max_human_vel_x = 1.5;
     optim.weight_max_vel_theta = 1;
@@ -422,6 +432,7 @@ public:
     optim.weight_kinematics_forward_drive = 1;
     optim.weight_kinematics_turning_radius = 1;
     optim.weight_optimaltime = 1;
+    optim.weight_human_optimaltime = 1;
     optim.weight_obstacle = 10;
     optim.weight_dynamic_obstacle = 10;
     optim.weight_viapoint = 1;

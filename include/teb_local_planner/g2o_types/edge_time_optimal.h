@@ -103,8 +103,12 @@ public:
     ROS_ASSERT_MSG(cfg_, "You must call setTebConfig on EdgeTimeOptimal()");
     const VertexTimeDiff* timediff = static_cast<const VertexTimeDiff*>(_vertices[0]);
 
-   _error[0] = timediff->dt();
-  
+    if (cfg_->optim.cap_optimaltime_penalty) {
+      _error[0] = penaltyBoundFromAbove(timediff->dt(), initial_time_, cfg_->optim.time_penalty_epsilon);
+    } else {
+      _error[0] = timediff->dt();
+    }
+
     ROS_ASSERT_MSG(std::isfinite(_error[0]), "EdgeTimeOptimal::computeError() _error[0]=%f\n",_error[0]);
   }
 
@@ -159,11 +163,16 @@ public:
     cfg_ = &cfg;
   }
 
+  void setInitialTime(const double initial_time) {
+    initial_time_ = initial_time;
+  }
+
 protected:
   
   const TebConfig* cfg_; //!< Store TebConfig class for parameters
-  
-public:        
+  double initial_time_;
+
+public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
