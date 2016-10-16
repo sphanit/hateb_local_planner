@@ -480,12 +480,9 @@ bool TebLocalPlannerROS::computeVelocityCommands(
         planner_->isHorizonReductionAppropriate(transformed_plan)) {
       horizon_reduced_ = true;
       planner_->local_weight_optimaltime_ = 0.4;
-      // ROS_WARN("TebLocalPlannerROS: trajectory is not feasible, but the
-      // planner suggests a shorter horizon temporary. Complying with its wish
-      // for at least 10s...");
-      ROS_WARN("TebLocalPlannerROS: trajectory is not feasible, but the "
-               "planner suggests a slower trajectory. Complying with its wish "
-               "for at least 5s...");
+
+      ROS_WARN("TebLocalPlannerROS: trajectory is not feasible, using slower "
+               "trajectory for next 5s...");
       horizon_reduced_stamp_ = ros::Time::now();
       return true; // commanded velocity is zero for this step
     }

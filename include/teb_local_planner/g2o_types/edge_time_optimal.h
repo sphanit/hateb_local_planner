@@ -6,6 +6,9 @@
  *  TU Dortmund - Institute of Control Theory and Systems Engineering.
  *  All rights reserved.
  *
+ *  Copyright (c) 2016 LAAS/CNRS
+ *  All rights reserved.
+ *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
  *  are met:
@@ -32,13 +35,14 @@
  *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * Notes:
  * The following class is derived from a class defined by the
  * g2o-framework. g2o is licensed under the terms of the BSD License.
  * Refer to the base class source for detailed licensing information.
  *
- * Author: Christoph Rösmann
+ * Authors: Christoph Rösmann
+ *          Harmish Khambhaita (harmish@laas.fr)
  *********************************************************************/
 
 #ifndef EDGE_TIMEOPTIMAL_H_
@@ -55,121 +59,115 @@
 
 #include <Eigen/Core>
 
-namespace teb_local_planner
-{
+namespace teb_local_planner {
 
-  
 /**
  * @class EdgeTimeOptimal
- * @brief Edge defining the cost function for minimizing transition time of the trajectory.
- * 
+ * @brief Edge defining the cost function for minimizing transition time of the
+ * trajectory.
+ *
  * The edge depends on a single vertex \f$ \Delta T_i \f$ and minimizes: \n
  * \f$ \min \Delta T_i^2 \cdot scale \cdot weight \f$. \n
- * \e scale is determined using the penaltyEquality() function, since we experiences good convergence speeds with it. \n
- * \e weight can be set using setInformation() (something around 1.0 seems to be fine). \n
+ * \e scale is determined using the penaltyEquality() function, since we
+ * experiences good convergence speeds with it. \n
+ * \e weight can be set using setInformation() (something around 1.0 seems to be
+ * fine). \n
  * @see TebOptimalPlanner::AddEdgesTimeOptimal
  * @remarks Do not forget to call setTebConfig()
  */
-class EdgeTimeOptimal : public g2o::BaseUnaryEdge<1, double, VertexTimeDiff>
-{
+class EdgeTimeOptimal : public g2o::BaseUnaryEdge<1, double, VertexTimeDiff> {
 public:
-		
   /**
    * @brief Construct edge.
    */
-  EdgeTimeOptimal()
-  {
+  EdgeTimeOptimal() {
     this->setMeasurement(0.);
     _vertices[0] = NULL;
   }
-  
+
   /**
    * @brief Destruct edge.
-   * 
-   * We need to erase vertices manually, since we want to keep them even if TebOptimalPlanner::clearGraph() is called.
-   * This is necessary since the vertices are managed by the Timed_Elastic_Band class.
+   *
+   * We need to erase vertices manually, since we want to keep them even if
+   * TebOptimalPlanner::clearGraph() is called.
+   * This is necessary since the vertices are managed by the Timed_Elastic_Band
+   * class.
    */
-  virtual ~EdgeTimeOptimal()
-  {
-    if(_vertices[0]) 
-      _vertices[0]->edges().erase(this); 
+  virtual ~EdgeTimeOptimal() {
+    if (_vertices[0])
+      _vertices[0]->edges().erase(this);
   }
 
   /**
    * @brief Actual cost function
    */
-  void computeError()
-  {
+  void computeError() {
     ROS_ASSERT_MSG(cfg_, "You must call setTebConfig on EdgeTimeOptimal()");
-    const VertexTimeDiff* timediff = static_cast<const VertexTimeDiff*>(_vertices[0]);
+    const VertexTimeDiff *timediff =
+        static_cast<const VertexTimeDiff *>(_vertices[0]);
 
     if (cfg_->optim.cap_optimaltime_penalty) {
-      _error[0] = penaltyBoundFromAbove(timediff->dt(), initial_time_, cfg_->optim.time_penalty_epsilon);
+      _error[0] = penaltyBoundFromAbove(timediff->dt(), initial_time_,
+                                        cfg_->optim.time_penalty_epsilon);
     } else {
       _error[0] = timediff->dt();
     }
 
-    ROS_ASSERT_MSG(std::isfinite(_error[0]), "EdgeTimeOptimal::computeError() _error[0]=%f\n",_error[0]);
+    ROS_ASSERT_MSG(std::isfinite(_error[0]),
+                   "EdgeTimeOptimal::computeError() _error[0]=%f\n", _error[0]);
   }
 
 #ifdef USE_ANALYTIC_JACOBI
   /**
    * @brief Jacobi matrix of the cost function specified in computeError().
    */
-  void linearizeOplus()
-  {
+  void linearizeOplus() {
     ROS_ASSERT_MSG(cfg_, "You must call setTebConfig on EdgeTimeOptimal()");
-    _jacobianOplusXi( 0 , 0 ) = 1;
+    _jacobianOplusXi(0, 0) = 1;
   }
 #endif
-    
+
   /**
    * @brief Compute and return error / cost value.
-   * 
-   * This method is called by TebOptimalPlanner::computeCurrentCost to obtain the current cost.
+   *
+   * This method is called by TebOptimalPlanner::computeCurrentCost to obtain
+   * the current cost.
    * @return 1D Cost / error vector
    */
-  ErrorVector& getError()
-  {
+  ErrorVector &getError() {
     computeError();
     return _error;
   }
-  
+
   /**
    * @brief Read values from input stream
    */
-  virtual bool read(std::istream& is)
-  {
+  virtual bool read(std::istream &is) {
     is >> _measurement;
-    is >> information()(0,0);
+    is >> information()(0, 0);
     return true;
   }
 
   /**
    * @brief Write values to an output stream
    */
-  virtual bool write(std::ostream& os) const
-  {
-    os << information()(0,0) << " Error: " << _error[0]; 
+  virtual bool write(std::ostream &os) const {
+    os << information()(0, 0) << " Error: " << _error[0];
     return os.good();
   }
-    
+
   /**
    * @brief Assign the TebConfig class for parameters.
    * @param cfg TebConfig class
-   */  
-  void setTebConfig(const TebConfig& cfg)
-  {
-    cfg_ = &cfg;
-  }
+   */
+  void setTebConfig(const TebConfig &cfg) { cfg_ = &cfg; }
 
   void setInitialTime(const double initial_time) {
     initial_time_ = initial_time;
   }
 
 protected:
-  
-  const TebConfig* cfg_; //!< Store TebConfig class for parameters
+  const TebConfig *cfg_; //!< Store TebConfig class for parameters
   double initial_time_;
 
 public:
