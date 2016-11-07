@@ -140,6 +140,7 @@ public:
     bool use_external_prediction;
     double ttc_threshold;
     double dir_cost_threshold;
+    double pose_prediction_reset_time;
   } human;
 
   //! Goal tolerance related parameters
@@ -392,6 +393,7 @@ public:
     human.acc_lim_theta = 0.8;
     human.use_external_prediction = false;
     human.ttc_threshold = 5.0;
+    human.pose_prediction_reset_time = 2.0;
 
     // GoalTolerance
 

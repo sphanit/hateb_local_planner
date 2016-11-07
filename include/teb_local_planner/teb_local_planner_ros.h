@@ -67,6 +67,7 @@
 // human data
 #include <hanp_prediction/HumanPosePredict.h>
 #include <std_srvs/SetBool.h>
+#include <std_srvs/Empty.h>
 
 // transforms
 #include <angles/angles.h>
@@ -493,8 +494,12 @@ private:
                      //!class
 
   // human perdiction service
-  ros::ServiceClient predict_humans_client_, publish_predicted_markers_client_;
+  ros::ServiceClient predict_humans_client_, reset_humans_prediction_client_,
+      publish_predicted_markers_client_;
   bool publish_predicted_human_markers_ = true;
+
+  void resetHumansPrediction();
+  ros::Time last_call_time_;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

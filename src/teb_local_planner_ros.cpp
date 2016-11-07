@@ -41,6 +41,8 @@
  *********************************************************************/
 
 #define PREDICT_SERVICE_NAME "/human_pose_prediction/predict_human_poses"
+#define RESET_PREDICTION_SERVICE_NAME                                          \
+  "/human_pose_prediction/reset_external_paths"
 #define PUBLISH_MARKERS_SRV_NAME                                               \
   "/human_pose_prediction/publish_prediction_markers"
 #define DEFAULT_HUMAN_SEGMENT hanp_msgs::TrackedSegmentType::TORSO
@@ -192,8 +194,13 @@ void TebLocalPlannerROS::initialize(std::string name, tf::TransformListener *tf,
     predict_humans_client_ =
         nh.serviceClient<hanp_prediction::HumanPosePredict>(
             PREDICT_SERVICE_NAME, true);
+    reset_humans_prediction_client_ =
+        nh.serviceClient<std_srvs::Empty>(RESET_PREDICTION_SERVICE_NAME, true);
     publish_predicted_markers_client_ =
         nh.serviceClient<std_srvs::SetBool>(PUBLISH_MARKERS_SRV_NAME, true);
+
+    last_call_time_ =
+        ros::Time::now() - ros::Duration(cfg_.human.pose_prediction_reset_time);
 
     // set initialized flag
     initialized_ = true;
@@ -231,6 +238,12 @@ bool TebLocalPlannerROS::setPlan(
 bool TebLocalPlannerROS::computeVelocityCommands(
     geometry_msgs::Twist &cmd_vel) {
   auto start_time = ros::Time::now();
+  if ((start_time - last_call_time_).toSec() >
+      cfg_.human.pose_prediction_reset_time) {
+    resetHumansPrediction();
+  }
+  last_call_time_ = start_time;
+
   // check if plugin initialized
   if (!initialized_) {
     ROS_ERROR("teb_local_planner has not been initialized, please call "
@@ -589,6 +602,7 @@ bool TebLocalPlannerROS::isGoalReached() {
   if (goal_reached_) {
     ROS_INFO("GOAL Reached!");
     planner_->clearPlanner();
+    resetHumansPrediction();
     return true;
   }
   return false;
@@ -1371,6 +1385,16 @@ TebLocalPlannerROS::getNumberFromXMLRPC(XmlRpc::XmlRpcValue &value,
   }
   return value.getType() == XmlRpc::XmlRpcValue::TypeInt ? (int)(value)
                                                          : (double)(value);
+}
+
+void TebLocalPlannerROS::resetHumansPrediction() {
+  std_srvs::Empty empty_service;
+  ROS_INFO("Resetting human pose prediction");
+  if (!reset_humans_prediction_client_ ||
+      !reset_humans_prediction_client_.call(empty_service)) {
+    ROS_WARN("Failed to call %s service, is human prediction server running?",
+             RESET_PREDICTION_SERVICE_NAME);
+  }
 }
 
 } // end namespace teb_local_planner

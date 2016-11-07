@@ -100,6 +100,8 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
   nh.param("use_external_prediction", human.use_external_prediction,
            human.use_external_prediction);
   nh.param("ttc_threshold", human.ttc_threshold, human.ttc_threshold);
+  nh.param("human_pose_prediction_reset_time", human.pose_prediction_reset_time,
+           human.pose_prediction_reset_time);
 
   // GoalTolerance
   nh.param("xy_goal_tolerance", goal_tolerance.xy_goal_tolerance,
@@ -289,6 +291,7 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   human.acc_lim_theta = cfg.human_acc_lim_theta;
   human.use_external_prediction = cfg.use_external_prediction;
   human.ttc_threshold = cfg.ttc_threshold;
+  human.pose_prediction_reset_time = cfg.human_pose_prediction_reset_time;
 
   // GoalTolerance
   goal_tolerance.xy_goal_tolerance = cfg.xy_goal_tolerance;
