@@ -133,6 +133,7 @@ public:
     double radius;
     double min_human_dist;
     double max_vel_x;
+    double nominal_vel_x;
     double max_vel_x_backwards;
     double max_vel_theta;
     double acc_lim_x;
@@ -203,6 +204,7 @@ public:
     double weight_max_human_vel_x; //!< Optimization weight for satisfying the
     //! maximum allowed translational velocity for
     //! humans
+    double weight_nominal_human_vel_x;
     double weight_max_vel_theta; //!< Optimization weight for satisfying the
                                  //! maximum allowed angular velocity
     double weight_max_human_vel_theta; //!< Optimization weight for satisfying
@@ -248,6 +250,7 @@ public:
     bool use_human_robot_ttc_c;
     bool scale_human_robot_ttc_c;
     bool use_human_robot_dir_c;
+    bool use_human_elastic_vel;
   } optim;                     //!< Optimization related parameters
 
   struct HomotopyClasses {
@@ -387,6 +390,7 @@ public:
     human.radius = 0.2;
     human.min_human_dist = 0.6;
     human.max_vel_x = 1.1;
+    human.nominal_vel_x = 0.8;
     human.max_vel_x_backwards = 0.0;
     human.max_vel_theta = 1.1;
     human.acc_lim_x = 0.6;
@@ -422,10 +426,11 @@ public:
     optim.penalty_epsilon = 0.1;
     optim.time_penalty_epsilon = 0.1;
     optim.cap_optimaltime_penalty = true;
-    optim.weight_max_vel_x = 2; // 1
-    optim.weight_max_human_vel_x = 1.5;
-    optim.weight_max_vel_theta = 1;
-    optim.weight_max_human_vel_theta = 1;
+    optim.weight_max_vel_x = 1.0;
+    optim.weight_max_human_vel_x = 2.0;
+    optim.weight_nominal_human_vel_x = 2.0;
+    optim.weight_max_vel_theta = 1.0;
+    optim.weight_max_human_vel_theta = 2.0;
     optim.weight_acc_lim_x = 1;
     optim.weight_human_acc_lim_x = 1;
     optim.weight_acc_lim_theta = 1;
@@ -447,6 +452,7 @@ public:
     optim.use_human_robot_ttc_c = true;
     optim.scale_human_robot_ttc_c = true;
     optim.use_human_robot_dir_c = true;
+    optim.use_human_elastic_vel = true;
 
     // Homotopy Class Planner
 

@@ -889,13 +889,15 @@ void TebOptimalPlanner::AddEdgesVelocity() {
 
 void TebOptimalPlanner::AddEdgesVelocityForHumans() {
   if (cfg_->optim.weight_max_human_vel_x == 0 &&
-      cfg_->optim.weight_max_human_vel_theta == 0)
+      cfg_->optim.weight_max_human_vel_theta == 0 &&
+      cfg_->optim.weight_nominal_human_vel_x == 0)
     return;
 
-  Eigen::Matrix<double, 2, 2> information;
+  Eigen::Matrix<double, 3, 3> information;
   information.fill(0);
   information(0, 0) = cfg_->optim.weight_max_human_vel_x;
   information(1, 1) = cfg_->optim.weight_max_human_vel_theta;
+  information(2, 2) = cfg_->optim.weight_nominal_human_vel_x;
 
   for (auto &human_teb_kv : humans_tebs_map_) {
     auto &human_teb = human_teb_kv.second;
@@ -924,7 +926,7 @@ void TebOptimalPlanner::AddEdgesAcceleration() {
   information(0, 0) = cfg_->optim.weight_acc_lim_x;
   information(1, 1) = cfg_->optim.weight_acc_lim_theta;
 
-  // check if an initial velocity should be taken into accound
+  // check if an initial velocity should be taken into account
   if (vel_start_.first) {
     EdgeAccelerationStart *acceleration_edge = new EdgeAccelerationStart;
     acceleration_edge->setVertex(0, teb_.PoseVertex(0));
@@ -949,7 +951,7 @@ void TebOptimalPlanner::AddEdgesAcceleration() {
     optimizer_->addEdge(acceleration_edge);
   }
 
-  // check if a goal velocity should be taken into accound
+  // check if a goal velocity should be taken into account
   if (vel_goal_.first) {
     EdgeAccelerationGoal *acceleration_edge = new EdgeAccelerationGoal;
     acceleration_edge->setVertex(0, teb_.PoseVertex(NoBandpts - 2));

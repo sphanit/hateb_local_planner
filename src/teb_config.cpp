@@ -92,6 +92,7 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
   nh.param("min_human_dist", human.min_human_dist, human.min_human_dist);
   nh.param("human_radius", human.radius, human.radius);
   nh.param("max_human_vel_x", human.max_vel_x, human.max_vel_x);
+  nh.param("nominal_human_vel_x", human.nominal_vel_x, human.nominal_vel_x);
   nh.param("max_human_vel_x_backwards", human.max_vel_x_backwards,
            human.max_vel_x_backwards);
   nh.param("max_human_vel_theta", human.max_vel_theta, human.max_vel_theta);
@@ -148,12 +149,14 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
   nh.param("cap_optimaltime_penalty", optim.cap_optimaltime_penalty,
            optim.cap_optimaltime_penalty);
   nh.param("weight_max_vel_x", optim.weight_max_vel_x, optim.weight_max_vel_x);
-  nh.param("weight_max_human_vel_x", optim.weight_max_vel_x,
-           optim.weight_max_vel_x);
+  nh.param("weight_max_human_vel_x", optim.weight_max_human_vel_x,
+           optim.weight_max_human_vel_x);
+  nh.param("weight_nominal_human_vel_x", optim.weight_nominal_human_vel_x,
+           optim.weight_nominal_human_vel_x);
   nh.param("weight_max_vel_theta", optim.weight_max_vel_theta,
            optim.weight_max_vel_theta);
-  nh.param("weight_max_human_vel_theta", optim.weight_max_vel_theta,
-           optim.weight_max_vel_theta);
+  nh.param("weight_max_human_vel_theta", optim.weight_max_human_vel_theta,
+           optim.weight_max_human_vel_theta);
   nh.param("weight_acc_lim_x", optim.weight_acc_lim_x, optim.weight_acc_lim_x);
   nh.param("weight_human_acc_lim_x", optim.weight_acc_lim_x,
            optim.weight_acc_lim_x);
@@ -195,6 +198,8 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
            optim.scale_human_robot_ttc_c);
   nh.param("use_human_robot_dir_c", optim.use_human_robot_dir_c,
            optim.use_human_robot_dir_c);
+  nh.param("use_human_elastic_vel", optim.use_human_elastic_vel,
+           optim.use_human_elastic_vel);
 
   // Homotopy Class Planner
   nh.param("enable_homotopy_class_planning", hcp.enable_homotopy_class_planning,
@@ -285,6 +290,7 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   // Human
   human.min_human_dist = cfg.min_human_dist;
   human.max_vel_x = cfg.max_human_vel_x;
+  human.nominal_vel_x = cfg.nominal_human_vel_x;
   human.max_vel_x_backwards = cfg.max_human_vel_x_backwards;
   human.max_vel_theta = cfg.max_human_vel_theta;
   human.acc_lim_x = cfg.human_acc_lim_x;
@@ -316,7 +322,8 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   optim.time_penalty_epsilon = cfg.time_penalty_epsilon;
   optim.cap_optimaltime_penalty = cfg.cap_optimaltime_penalty;
   optim.weight_max_vel_x = cfg.weight_max_vel_x;
-  optim.weight_max_human_vel_x = cfg.weight_max_vel_x;
+  optim.weight_max_human_vel_x = cfg.weight_max_human_vel_x;
+  optim.weight_nominal_human_vel_x = cfg.weight_nominal_human_vel_x;
   optim.weight_max_vel_theta = cfg.weight_max_vel_theta;
   optim.weight_max_human_vel_theta = cfg.weight_max_vel_theta;
   optim.weight_acc_lim_x = cfg.weight_acc_lim_x;
@@ -340,6 +347,7 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   optim.use_human_robot_ttc_c = cfg.use_human_robot_ttc_c;
   optim.scale_human_robot_ttc_c = cfg.scale_human_robot_ttc_c;
   optim.use_human_robot_dir_c = cfg.use_human_robot_dir_c;
+  optim.use_human_elastic_vel = cfg.use_human_elastic_vel;
 
   // Homotopy Class Planner
   hcp.enable_multithreading = cfg.enable_multithreading;

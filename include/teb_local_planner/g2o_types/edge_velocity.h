@@ -258,7 +258,7 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-class EdgeVelocityHuman : public g2o::BaseMultiEdge<2, double> {
+class EdgeVelocityHuman : public g2o::BaseMultiEdge<3, double> {
 public:
   EdgeVelocityHuman() {
     this->resize(3);
@@ -297,6 +297,13 @@ public:
     _error[1] = penaltyBoundToInterval(omega, cfg_->human.max_vel_theta,
                                        cfg_->optim.penalty_epsilon);
 
+    if (cfg_->optim.use_human_elastic_vel) {
+      double vel_diff = std::abs(cfg_->human.nominal_vel_x - vel);
+      _error[2] = vel_diff;
+    } else {
+      _error[2] = 0.0;
+    }
+
     ROS_ASSERT_MSG(
         std::isfinite(_error[0]),
         "EdgeVelocityHuman::computeError() _error[0]=%f _error[1]=%f\n",
@@ -317,7 +324,7 @@ public:
   virtual bool write(std::ostream &os) const {
     // os << measurement() << " ";
     os << information()(0, 0) << " Error Vel: " << _error[0]
-       << ", Error Omega: " << _error[1];
+       << ", Error Omega: " << _error[1] << "Error EVel: " << _error[2];
     return os.good();
   }
 
