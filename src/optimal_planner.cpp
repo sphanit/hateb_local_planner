@@ -281,11 +281,11 @@ bool TebOptimalPlanner::plan(
     PoseSE2 goal_(initial_plan.back().pose);
     if (teb_.sizePoses() > 0 &&
         (goal_.position() - teb_.BackPose().position()).norm() <
-            cfg_->trajectory.force_reinit_new_goal_dist) // actual warm start!
-      teb_.updateAndPruneTEB(start_, goal_,
-                             cfg_->trajectory.min_samples); // update TEB
-    else // goal too far away -> reinit
-    {
+            cfg_->trajectory.force_reinit_new_goal_dist) {
+      // actual warm start!, update TEB
+      teb_.updateAndPruneTEB(start_, goal_, cfg_->trajectory.min_samples);
+    } else {
+      // goal too far away -> reinit
       ROS_DEBUG("New goal: distance to existing goal is higher than the "
                 "specified threshold. Reinitalizing trajectories.");
       teb_.clearTimedElasticBand();
@@ -329,34 +329,31 @@ bool TebOptimalPlanner::plan(
       continue;
     }
 
-    // create new human-teb for new human
     if (humans_tebs_map_.find(human_id) == humans_tebs_map_.end()) {
+      // create new human-teb for new human
       humans_tebs_map_[human_id] = TimedElasticBand();
       humans_tebs_map_[human_id].initTEBtoGoal(
           initial_human_plan, cfg_->trajectory.dt_ref, true,
           cfg_->trajectory.human_min_samples);
-    }
-    // modify human-teb for existing human
-    else {
-      // PoseSE2 start_(initial_human_plan.front().pose);
-      // PoseSE2 goal_(initial_human_plan.back().pose);
+    } else {
+      // modify human-teb for existing human
+      PoseSE2 human_start_(initial_human_plan.front().pose);
+      PoseSE2 human_goal_(initial_human_plan.back().pose);
       auto &human_teb = humans_tebs_map_[human_id];
-      // if (human_teb.sizePoses()>0 && (goal_.position() -
-      // human_teb.BackPose().position())
-      //                                .norm()
-      //                                <
-      //                                cfg_->trajectory.force_reinit_new_goal_dist)
-      //     human_teb.updateAndPruneTEB(start_, goal_,
-      //                                 cfg_->trajectory.min_samples);
-      // else {
-      //     ROS_DEBUG("New goal: distance to existing goal is higher than the
-      //     specified threshold. Reinitializing human trajectories.");
-      human_teb.clearTimedElasticBand();
-      human_teb.initTEBtoGoal(initial_human_plan, cfg_->trajectory.dt_ref, true,
-                              cfg_->trajectory.human_min_samples);
-      // }
+      if (human_teb.sizePoses() > 0 &&
+          (human_goal_.position() - human_teb.BackPose().position()).norm() <
+              cfg_->trajectory.force_reinit_new_goal_dist)
+        human_teb.updateAndPruneTEB(human_start_, human_goal_,
+                                    cfg_->trajectory.human_min_samples);
+      else {
+        ROS_DEBUG("New goal: distance to existing goal is higher than the "
+                  "specified threshold. Reinitializing human trajectories.");
+        human_teb.clearTimedElasticBand();
+        human_teb.initTEBtoGoal(initial_human_plan, cfg_->trajectory.dt_ref,
+                                true, cfg_->trajectory.human_min_samples);
+      }
     }
-    // give start and goal velocity for humans
+    // give start velocity for humans
     std::pair<bool, Eigen::Vector2d> human_start_vel;
     human_start_vel.first = true;
     human_start_vel.second.coeffRef(0) =
@@ -365,13 +362,15 @@ bool TebOptimalPlanner::plan(
         initial_human_plan_vel_kv.second.start_vel.angular.z;
     humans_vel_start_[human_id] = human_start_vel;
 
+    // do not set goal velocity for humans
     std::pair<bool, Eigen::Vector2d> human_goal_vel;
-    human_goal_vel.first = true;
-    human_goal_vel.second.coeffRef(0) =
-        initial_human_plan_vel_kv.second.goal_vel.linear.x;
-    human_goal_vel.second.coeffRef(1) =
-        initial_human_plan_vel_kv.second.goal_vel.angular.z;
-    humans_vel_goal_[human_id] = human_goal_vel;
+    human_goal_vel.first = false;
+    // human_goal_vel.first = true;
+    // human_goal_vel.second.coeffRef(0) =
+    //     initial_human_plan_vel_kv.second.goal_vel.linear.x;
+    // human_goal_vel.second.coeffRef(1) =
+    //     initial_human_plan_vel_kv.second.goal_vel.angular.z;
+    // humans_vel_goal_[human_id] = human_goal_vel;
   }
   auto human_prep_time = ros::Time::now() - human_prep_time_start;
 
@@ -442,7 +441,7 @@ bool TebOptimalPlanner::plan(const PoseSE2 &start, const PoseSE2 &goal,
     setVelocityGoalFree();
   else
     vel_goal_.first = true; // we just reactivate and use the previously set
-                            // velocity (should be zero if nothing was modified)
+  // velocity (should be zero if nothing was modified)
   auto prep_time = ros::Time::now() - prep_start_time;
 
   // now optimize
@@ -553,9 +552,8 @@ bool TebOptimalPlanner::optimizeGraph(int no_iterations, bool clear_after) {
 }
 
 void TebOptimalPlanner::clearGraph() {
-  // clear optimizer states
-  // optimizer.edges().clear(); // optimizer.clear deletes edges!!! Therefore do
-  // not run optimizer.edges().clear()
+  // optimizer.clear deletes edges!!! Therefore do not run
+  // optimizer.edges().clear()
   optimizer_->vertices().clear(); // neccessary, because optimizer->clear
                                   // deletes pointer-targets (therefore it
                                   // deletes TEB states!)
@@ -1218,8 +1216,7 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
   bool graph_exist_flag(false);
   if (optimizer_->edges().empty() && optimizer_->vertices().empty()) {
     // here the graph is build again, for time efficiency make sure to call this
-    // function
-    // between buildGraph and Optimize (deleted), but it depends on the
+    // function between buildGraph and Optimize (deleted), but it depends on the
     // application
     buildGraph();
     optimizer_->initializeOptimization();
@@ -1234,8 +1231,8 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
   if (alternative_time_cost) {
     cost_ += teb_.getSumOfAllTimeDiffs();
     // TEST we use SumOfAllTimeDiffs() here, because edge cost depends on number
-    // of samples, which is not always the same for similar TEBs,
-    // since we are using an AutoResize Function with hysteresis.
+    // of samples, which is not always the same for similar TEBs, since we are
+    // using an AutoResize Function with hysteresis.
   }
 
   // now we need pointers to all edges -> calculate error for each edge-type
@@ -1507,9 +1504,9 @@ bool TebOptimalPlanner::isTrajectoryFeasible(
       return false;
 
     // check if distance between two poses is higher than the robot radius and
-    // interpolate in that case
-    // (if obstacles are pushing two consecutive poses away, the center between
-    // two consecutive poses might coincide with the obstacle ;-)!
+    // interpolate in that case (if obstacles are pushing two consecutive poses
+    // away, the center between two consecutive poses might coincide with the
+    // obstacle ;-)!
     if (i < look_ahead_idx) {
       if ((teb().Pose(i + 1).position() - teb().Pose(i).position()).norm() >
           inscribed_radius) {

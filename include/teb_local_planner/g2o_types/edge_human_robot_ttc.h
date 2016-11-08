@@ -122,7 +122,7 @@ public:
       // no collsion possible
       _error[0] = 0.0;
     }
-    ROS_INFO_THROTTLE(0.5, "ttc value : %f", ttc);
+    ROS_DEBUG_THROTTLE(0.5, "ttc value : %f", ttc);
 
     ROS_ASSERT_MSG(std::isfinite(_error[0]),
                    "EdgeHumanRobot::computeError() _error[0]=%f\n", _error[0]);
