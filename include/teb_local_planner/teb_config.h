@@ -139,6 +139,7 @@ public:
     double acc_lim_x;
     double acc_lim_theta;
     bool use_external_prediction;
+    bool predict_human_behind_robot;
     double ttc_threshold;
     double dir_cost_threshold;
     double pose_prediction_reset_time;
@@ -396,6 +397,7 @@ public:
     human.acc_lim_x = 0.6;
     human.acc_lim_theta = 0.8;
     human.use_external_prediction = false;
+    human.predict_human_behind_robot = false;
     human.ttc_threshold = 5.0;
     human.pose_prediction_reset_time = 2.0;
 

@@ -100,6 +100,8 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
   nh.param("human_acc_lim_theta", human.acc_lim_theta, human.acc_lim_theta);
   nh.param("use_external_prediction", human.use_external_prediction,
            human.use_external_prediction);
+  nh.param("predict_human_behind_robot", human.predict_human_behind_robot,
+           human.predict_human_behind_robot);
   nh.param("ttc_threshold", human.ttc_threshold, human.ttc_threshold);
   nh.param("human_pose_prediction_reset_time", human.pose_prediction_reset_time,
            human.pose_prediction_reset_time);
@@ -296,6 +298,7 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   human.acc_lim_x = cfg.human_acc_lim_x;
   human.acc_lim_theta = cfg.human_acc_lim_theta;
   human.use_external_prediction = cfg.use_external_prediction;
+  human.predict_human_behind_robot = cfg.predict_human_behind_robot;
   human.ttc_threshold = cfg.ttc_threshold;
   human.pose_prediction_reset_time = cfg.human_pose_prediction_reset_time;
 

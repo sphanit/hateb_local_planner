@@ -386,8 +386,13 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   auto human_start_time = ros::Time::now();
   hanp_prediction::HumanPosePredict predict_srv;
   if (cfg_.human.use_external_prediction) {
-    predict_srv.request.type =
-        hanp_prediction::HumanPosePredictRequest::EXTERNAL;
+    if (cfg_.human.predict_human_behind_robot) {
+      predict_srv.request.type =
+          hanp_prediction::HumanPosePredictRequest::BEHIND_ROBOT;
+    } else {
+      predict_srv.request.type =
+          hanp_prediction::HumanPosePredictRequest::EXTERNAL;
+    }
   } else {
     double traj_size = 10,
            predict_time = 5.0; // TODO: make these values configurable
