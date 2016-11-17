@@ -46,6 +46,7 @@
 #define PUBLISH_MARKERS_SRV_NAME                                               \
   "/human_pose_prediction/publish_prediction_markers"
 #define DEFAULT_HUMAN_SEGMENT hanp_msgs::TrackedSegmentType::TORSO
+#define THROTTLE_RATE 5.0 // seconds
 
 #include <teb_local_planner/teb_local_planner_ros.h>
 
@@ -445,7 +446,9 @@ bool TebLocalPlannerROS::computeVelocityCommands(
           plan_start_vel_goal_vel;
     }
   } else {
-    ROS_WARN("Failed to call %s service, is human prediction server running?",
+    ROS_WARN_THROTTLE(
+        THROTTLE_RATE,
+        "Failed to call %s service, is human prediction server running?",
              PREDICT_SERVICE_NAME);
 
     // re-initialize the service
