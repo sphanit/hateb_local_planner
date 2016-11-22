@@ -472,9 +472,8 @@ bool TebOptimalPlanner::buildGraph() {
     return false;
   }
 
-  std::stringstream ss;
   // add TEB vertices
-  AddTEBVertices(ss);
+  AddTEBVertices();
 
   // add Edges (local cost functions)
   AddEdgesObstacles();
@@ -560,45 +559,29 @@ void TebOptimalPlanner::clearGraph() {
   optimizer_->clear();
 }
 
-void TebOptimalPlanner::AddTEBVertices(std::stringstream &ss) {
-  ss << "\nvertices:";
-
+void TebOptimalPlanner::AddTEBVertices() {
   // add vertices to graph
   ROS_DEBUG_COND(cfg_->optim.optimization_verbose, "Adding TEB vertices ...");
   unsigned int id_counter = 0; // used for vertices ids
-  unsigned int id_pose = 0, id_time = 0;
   for (unsigned int i = 0; i < teb_.sizePoses(); ++i) {
     teb_.PoseVertex(i)->setId(id_counter++);
-    id_pose += 1;
     optimizer_->addVertex(teb_.PoseVertex(i));
     if (teb_.sizeTimeDiffs() != 0 && i < teb_.sizeTimeDiffs()) {
       teb_.TimeDiffVertex(i)->setId(id_counter++);
-      id_time += 1;
       optimizer_->addVertex(teb_.TimeDiffVertex(i));
     }
   }
-  ss << "\n\trobot pose:" << id_pose << "/" << teb_.sizePoses()
-     << ", time:" << id_time << "/" << teb_.sizeTimeDiffs();
-
-  unsigned int robot_teb_size = teb_.sizePoses();
 
   for (auto &human_teb_kv : humans_tebs_map_) {
     auto &human_teb = human_teb_kv.second;
-    id_pose = 0;
-    id_time = 0;
     for (unsigned int i = 0; i < human_teb.sizePoses(); ++i) {
       human_teb.PoseVertex(i)->setId(id_counter++);
-      id_pose += 1;
       optimizer_->addVertex(human_teb.PoseVertex(i));
       if (teb_.sizeTimeDiffs() != 0 && i < human_teb.sizeTimeDiffs()) {
         human_teb.TimeDiffVertex(i)->setId(id_counter++);
-        id_time += 1;
         optimizer_->addVertex(human_teb.TimeDiffVertex(i));
       }
     }
-    ss << "\n\thuman-" << human_teb_kv.first << " pose:" << id_pose << "/"
-       << human_teb.sizePoses() << ", time:" << id_time << "/"
-       << human_teb.sizeTimeDiffs();
   }
 }
 
@@ -1227,6 +1210,10 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
   optimizer_->computeInitialGuess();
 
   cost_ = 0;
+  double time_opt_cost = 0.0, kinematics_dd_cost = 0.0,
+         kinematics_cl_cost = 0.0, vel_cost = 0.0, acc_cost = 0.0,
+         obst_cost = 0.0, dyn_obst_cost = 0.0, via_cost = 0.0,
+         hr_safety_cost = 0.0, hr_ttc_cost = 0.0, hr_dir_cost = 0.0;
 
   if (alternative_time_cost) {
     cost_ += teb_.getSumOfAllTimeDiffs();
@@ -1243,6 +1230,7 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
     EdgeTimeOptimal *edge_time_optimal = dynamic_cast<EdgeTimeOptimal *>(*it);
     if (edge_time_optimal != NULL && !alternative_time_cost) {
       cost_ += edge_time_optimal->getError().squaredNorm();
+      time_opt_cost += edge_time_optimal->getError().squaredNorm();
       continue;
     }
 
@@ -1250,6 +1238,7 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
         dynamic_cast<EdgeKinematicsDiffDrive *>(*it);
     if (edge_kinematics_dd != NULL) {
       cost_ += edge_kinematics_dd->getError().squaredNorm();
+      kinematics_dd_cost += edge_kinematics_dd->getError().squaredNorm();
       continue;
     }
 
@@ -1257,24 +1246,28 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
         dynamic_cast<EdgeKinematicsCarlike *>(*it);
     if (edge_kinematics_cl != NULL) {
       cost_ += edge_kinematics_cl->getError().squaredNorm();
+      kinematics_cl_cost += edge_kinematics_cl->getError().squaredNorm();
       continue;
     }
 
     EdgeVelocity *edge_velocity = dynamic_cast<EdgeVelocity *>(*it);
     if (edge_velocity != NULL) {
       cost_ += edge_velocity->getError().squaredNorm();
+      vel_cost += edge_velocity->getError().squaredNorm();
       continue;
     }
 
     EdgeAcceleration *edge_acceleration = dynamic_cast<EdgeAcceleration *>(*it);
     if (edge_acceleration != NULL) {
       cost_ += edge_acceleration->getError().squaredNorm();
+      acc_cost += edge_acceleration->getError().squaredNorm();
       continue;
     }
 
     EdgeObstacle *edge_obstacle = dynamic_cast<EdgeObstacle *>(*it);
     if (edge_obstacle != NULL) {
       cost_ += edge_obstacle->getError().squaredNorm() * obst_cost_scale;
+      obst_cost += edge_obstacle->getError().squaredNorm();
       continue;
     }
 
@@ -1282,12 +1275,14 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
         dynamic_cast<EdgeDynamicObstacle *>(*it);
     if (edge_dyn_obstacle != NULL) {
       cost_ += edge_dyn_obstacle->getError().squaredNorm() * obst_cost_scale;
+      dyn_obst_cost += edge_dyn_obstacle->getError().squaredNorm();
       continue;
     }
 
     EdgeViaPoint *edge_viapoint = dynamic_cast<EdgeViaPoint *>(*it);
     if (edge_viapoint != NULL) {
       cost_ += edge_viapoint->getError().squaredNorm() * viapoint_cost_scale;
+      via_cost += edge_viapoint->getError().squaredNorm();
       continue;
     }
 
@@ -1295,6 +1290,7 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
         dynamic_cast<EdgeHumanRobotSafety *>(*it);
     if (edge_human_robot_safety != NULL) {
       cost_ += edge_human_robot_safety->getError().squaredNorm();
+      hr_safety_cost += edge_human_robot_safety->getError().squaredNorm();
       continue;
     }
 
@@ -1302,6 +1298,7 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
         dynamic_cast<EdgeHumanRobotTTC *>(*it);
     if (edge_human_robot_ttc != NULL) {
       cost_ += edge_human_robot_ttc->getError().squaredNorm();
+      hr_ttc_cost += edge_human_robot_ttc->getError().squaredNorm();
       continue;
     }
 
@@ -1309,9 +1306,19 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
         dynamic_cast<EdgeHumanRobotDirectional *>(*it);
     if (edge_human_robot_directional != NULL) {
       cost_ += edge_human_robot_directional->getError().squaredNorm();
+      hr_dir_cost += edge_human_robot_directional->getError().squaredNorm();
       continue;
     }
   }
+
+  ROS_DEBUG("Costs:\n\ttime_opt_cost = %.2f\n\tkinematics_dd_cost = "
+            "%.2f\n\tkinematics_cl_cost = %.2f\n\tvel_cost = %.2f\n\tacc_cost "
+            "= %.2f\n\tobst_cost = %.2f\n\tdyn_obst_cost = %.2f\n\tvia_cost = "
+            "%.2f\n\thr_safety_cost = %.2f\n\thr_ttc_cost = "
+            "%.2f\n\thr_dir_cost = %.2f",
+            time_opt_cost, kinematics_dd_cost, kinematics_cl_cost, vel_cost,
+            acc_cost, obst_cost, dyn_obst_cost, via_cost, hr_safety_cost,
+            hr_ttc_cost, hr_dir_cost);
 
   // delete temporary created graph
   if (!graph_exist_flag)

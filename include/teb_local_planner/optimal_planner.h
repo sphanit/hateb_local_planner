@@ -705,7 +705,7 @@ protected:
    * @see buildGraph
    * @see optimizeGraph
    */
-  void AddTEBVertices(std::stringstream &ss);
+  void AddTEBVertices();
 
   /**
    * @brief Add all edges (local cost functions) for limiting the translational
