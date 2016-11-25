@@ -186,6 +186,19 @@ inline double penaltyBoundFromBelowDerivative(const double &var,
   }
 }
 
+inline double penaltyBoundFromBelowExp(const double &var, const double &a,
+                                       const double &epsilon,
+                                       const double &mul) {
+  if (var >= a + epsilon) {
+    return 0.0;
+  } else if (var < 0.0) {
+    return (-var + (a + epsilon));
+  } else {
+    return std::max(((a + epsilon - var) / (mul * var + 1.0)),
+                    0.00001); // for numerical stability
+  }
+}
+
 } // namespace teb_local_planner
 
 #endif // PENALTIES_H
