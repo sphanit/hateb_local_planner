@@ -77,9 +77,13 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
 
   // Robot
   nh.param("max_vel_x", robot.max_vel_x, robot.max_vel_x);
+  nh.param("min_vel_x", robot.min_vel_x, robot.min_vel_x);
   nh.param("max_vel_x_backwards", robot.max_vel_x_backwards,
            robot.max_vel_x_backwards);
+  nh.param("min_vel_x_backwards", robot.min_vel_x_backwards,
+           robot.min_vel_x_backwards);
   nh.param("max_vel_theta", robot.max_vel_theta, robot.max_vel_theta);
+  nh.param("min_vel_theta", robot.min_vel_theta, robot.min_vel_theta);
   nh.param("acc_lim_x", robot.acc_lim_x, robot.acc_lim_x);
   nh.param("acc_lim_theta", robot.acc_lim_theta, robot.acc_lim_theta);
   nh.param("min_turning_radius", robot.min_turning_radius,
@@ -281,8 +285,11 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
 
   // Robot
   robot.max_vel_x = cfg.max_vel_x;
+  robot.min_vel_x = cfg.min_vel_x;
   robot.max_vel_x_backwards = cfg.max_vel_x_backwards;
+  robot.min_vel_x_backwards = cfg.min_vel_x_backwards;
   robot.max_vel_theta = cfg.max_vel_theta;
+  robot.min_vel_theta = cfg.min_vel_theta;
   robot.acc_lim_x = cfg.acc_lim_x;
   robot.acc_lim_theta = cfg.acc_lim_theta;
   robot.min_turning_radius = cfg.min_turning_radius;

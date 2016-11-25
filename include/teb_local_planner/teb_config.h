@@ -112,9 +112,13 @@ public:
   //! Robot related parameters
   struct Robot {
     double max_vel_x;           //!< Maximum translational velocity of the robot
+    double min_vel_x;           //!< Minumum translational velocity of the robot
     double max_vel_x_backwards; //!< Maximum translational velocity of the robot
                                 //! for driving backwards
+    double min_vel_x_backwards; //!< Minumum translational velocity of the robot
+                                //! for driving backwards
     double max_vel_theta;       //!< Maximum angular velocity of the robot
+    double min_vel_theta;       //!< Minumum angular velocity of the robot
     double acc_lim_x;     //!< Maximum translational acceleration of the robot
     double acc_lim_theta; //!< Maximum angular acceleration of the robot
     double min_turning_radius; //!< Minimum turning radius of a carlike robot
@@ -133,9 +137,12 @@ public:
     double radius;
     double min_human_dist;
     double max_vel_x;
+    double min_vel_x;
     double nominal_vel_x;
     double max_vel_x_backwards;
+    double min_vel_x_backwards;
     double max_vel_theta;
+    double min_vel_theta;
     double acc_lim_x;
     double acc_lim_theta;
     bool use_external_prediction;
@@ -379,8 +386,11 @@ public:
     // Robot
 
     robot.max_vel_x = 0.4;
+    robot.min_vel_x = 0.0;
     robot.max_vel_x_backwards = 0.2;
+    robot.min_vel_x_backwards = 0.0;
     robot.max_vel_theta = 0.3;
+    robot.min_vel_theta = 0.0;
     robot.acc_lim_x = 0.5;
     robot.acc_lim_theta = 0.5;
     robot.min_turning_radius = 0;

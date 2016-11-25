@@ -529,7 +529,9 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   // Saturate velocity, if the optimization results violates the constraints
   // (could be possible due to soft constraints).
   saturateVelocity(cmd_vel.linear.x, cmd_vel.angular.z, cfg_.robot.max_vel_x,
-                   cfg_.robot.max_vel_theta, cfg_.robot.max_vel_x_backwards);
+                   cfg_.robot.min_vel_x, cfg_.robot.max_vel_theta,
+                   cfg_.robot.min_vel_theta, cfg_.robot.max_vel_x_backwards,
+                   cfg_.robot.min_vel_x_backwards);
 
   // convert rot-vel to steering angle if desired (carlike robot).
   // The min_turning_radius is allowed to be slighly smaller since it is a
@@ -1156,26 +1158,40 @@ double TebLocalPlannerROS::estimateLocalGoalOrientation(
 }
 
 void TebLocalPlannerROS::saturateVelocity(double &v, double &omega,
-                                          double max_vel_x,
+                                          double max_vel_x, double min_vel_x,
                                           double max_vel_theta,
-                                          double max_vel_x_backwards) const {
+                                          double min_vel_theta,
+                                          double max_vel_x_backwards,
+                                          double min_vel_x_backwards) const {
   // Limit translational velocity for forward driving
-  if (v > max_vel_x)
+  if (v > 0.0) {
+    if (v > max_vel_x) {
     v = max_vel_x;
+    } else if (v < min_vel_x) {
+      v = min_vel_x;
+    }
+  } else if (v < 0.0) {
+    if (v < -max_vel_x_backwards) {
+      v = -max_vel_x_backwards;
+    } else if (v > -min_vel_x_backwards) {
+      v = -min_vel_x_backwards;
+    }
+  }
 
   // Limit angular velocity
-  if (omega > max_vel_theta)
+  if (omega > 0.0) {
+    if (omega > max_vel_theta) {
     omega = max_vel_theta;
-  else if (omega < -max_vel_theta)
+    } else if (omega < min_vel_theta) {
+      omega = min_vel_theta;
+    }
+  } else if (omega < 0.0) {
+    if (omega < -max_vel_theta) {
     omega = -max_vel_theta;
-
-  // Limit backwards velocity
-  if (max_vel_x_backwards <= 0) {
-    ROS_WARN_ONCE("TebLocalPlannerROS(): Do not choose max_vel_x_backwards to "
-                  "be <=0. Disable backwards driving by increasing the "
-                  "optimization weight for penalyzing backwards driving.");
-  } else if (v < -max_vel_x_backwards)
-    v = -max_vel_x_backwards;
+    } else if (omega > -min_vel_theta) {
+      omega = -min_vel_theta;
+    }
+  }
 }
 
 double TebLocalPlannerROS::convertTransRotVelToSteeringAngle(
@@ -1400,8 +1416,15 @@ void TebLocalPlannerROS::resetHumansPrediction() {
   ROS_INFO("Resetting human pose prediction");
   if (!reset_humans_prediction_client_ ||
       !reset_humans_prediction_client_.call(empty_service)) {
-    ROS_WARN("Failed to call %s service, is human prediction server running?",
-             RESET_PREDICTION_SERVICE_NAME);
+    ROS_WARN_THROTTLE(
+        THROTTLE_RATE,
+        "Failed to call %s service, is human prediction server running?",
+        PREDICT_SERVICE_NAME);
+
+    // re-initialize the service
+    // reset_humans_prediction_client_ =
+    //     nh.serviceClient<std_srvs::Empty>(RESET_PREDICTION_SERVICE_NAME,
+    //     true);
   }
 }
 

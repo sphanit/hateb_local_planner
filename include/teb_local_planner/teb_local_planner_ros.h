@@ -389,7 +389,9 @@ protected:
    * driving
    */
   void saturateVelocity(double &v, double &omega, double max_vel_x,
-                        double max_vel_theta, double max_vel_x_backwards) const;
+                        double min_vel_x, double max_vel_theta,
+                        double min_vel_theta, double max_vel_x_backwards,
+                        double min_vel_x_backwards) const;
 
   /**
    * @brief Convert translational and rotational velocities to a steering angle
