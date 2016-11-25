@@ -275,8 +275,11 @@ bool TebOptimalPlanner::plan(
     // init trajectory
     teb_.initTEBtoGoal(initial_plan, cfg_->trajectory.dt_ref, true,
                        cfg_->trajectory.min_samples);
-  } else // warm start
-  {
+  } else if (cfg_->optim.disable_warm_start) {
+    teb_.clearTimedElasticBand();
+    teb_.initTEBtoGoal(initial_plan, cfg_->trajectory.dt_ref, true,
+                       cfg_->trajectory.min_samples);
+  } else { // warm start
     PoseSE2 start_(initial_plan.front().pose);
     PoseSE2 goal_(initial_plan.back().pose);
     if (teb_.sizePoses() > 0 &&
@@ -335,6 +338,11 @@ bool TebOptimalPlanner::plan(
       humans_tebs_map_[human_id].initTEBtoGoal(
           initial_human_plan, cfg_->trajectory.dt_ref, true,
           cfg_->trajectory.human_min_samples);
+    } else if (cfg_->optim.disable_warm_start) {
+      auto &human_teb = humans_tebs_map_[human_id];
+      human_teb.clearTimedElasticBand();
+      human_teb.initTEBtoGoal(initial_human_plan, cfg_->trajectory.dt_ref, true,
+                              cfg_->trajectory.human_min_samples);
     } else {
       // modify human-teb for existing human
       PoseSE2 human_start_(initial_human_plan.front().pose);

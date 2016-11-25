@@ -260,6 +260,7 @@ public:
     bool scale_human_robot_ttc_c;
     bool use_human_robot_dir_c;
     bool use_human_elastic_vel;
+    bool disable_warm_start;
   } optim;                     //!< Optimization related parameters
 
   struct HomotopyClasses {
@@ -467,6 +468,7 @@ public:
     optim.scale_human_robot_ttc_c = true;
     optim.use_human_robot_dir_c = true;
     optim.use_human_elastic_vel = true;
+    optim.disable_warm_start = false;
 
     // Homotopy Class Planner
 

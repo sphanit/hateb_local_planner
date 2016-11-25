@@ -208,6 +208,8 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
            optim.use_human_robot_dir_c);
   nh.param("use_human_elastic_vel", optim.use_human_elastic_vel,
            optim.use_human_elastic_vel);
+  nh.param("disable_warm_start", optim.disable_warm_start,
+           optim.disable_warm_start);
 
   // Homotopy Class Planner
   nh.param("enable_homotopy_class_planning", hcp.enable_homotopy_class_planning,
@@ -361,6 +363,7 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   optim.scale_human_robot_ttc_c = cfg.scale_human_robot_ttc_c;
   optim.use_human_robot_dir_c = cfg.use_human_robot_dir_c;
   optim.use_human_elastic_vel = cfg.use_human_elastic_vel;
+  optim.disable_warm_start = cfg.disable_warm_start;
 
   // Homotopy Class Planner
   hcp.enable_multithreading = cfg.enable_multithreading;
