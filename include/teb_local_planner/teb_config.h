@@ -108,6 +108,7 @@ public:
                                 //! temporary (50%) in case of automatically
     //! detected issues.
     double horizon_reduction_amount;
+    double teb_init_skip_dist;
   } trajectory; //!< Trajectory related parameters
 
   //! Robot related parameters
@@ -385,6 +386,7 @@ public:
     trajectory.publish_feedback = false;
     trajectory.shrink_horizon_backup = true;
     trajectory.horizon_reduction_amount = 0.5;
+    trajectory.teb_init_skip_dist = 0.4;
 
     // Robot
 

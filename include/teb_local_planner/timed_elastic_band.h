@@ -420,7 +420,7 @@ public:
 	 * @param min_samples Minimum number of samples that should be initialized at least
    * @return true if everything was fine, false otherwise
    */
-  bool initTEBtoGoal(const std::vector<geometry_msgs::PoseStamped>& plan, double dt, bool estimate_orient=false, int min_samples = 3);
+  bool initTEBtoGoal(const std::vector<geometry_msgs::PoseStamped>& plan, double dt, bool estimate_orient=false, int min_samples = 3, double skip_dist = 0.0);
 
   //@}
 

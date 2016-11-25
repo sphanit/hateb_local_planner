@@ -274,11 +274,13 @@ bool TebOptimalPlanner::plan(
   if (!teb_.isInit()) {
     // init trajectory
     teb_.initTEBtoGoal(initial_plan, cfg_->trajectory.dt_ref, true,
-                       cfg_->trajectory.min_samples);
+                       cfg_->trajectory.min_samples,
+                       cfg_->trajectory.teb_init_skip_dist);
   } else if (cfg_->optim.disable_warm_start) {
     teb_.clearTimedElasticBand();
     teb_.initTEBtoGoal(initial_plan, cfg_->trajectory.dt_ref, true,
-                       cfg_->trajectory.min_samples);
+                       cfg_->trajectory.min_samples,
+                       cfg_->trajectory.teb_init_skip_dist);
   } else { // warm start
     PoseSE2 start_(initial_plan.front().pose);
     PoseSE2 goal_(initial_plan.back().pose);
@@ -293,7 +295,8 @@ bool TebOptimalPlanner::plan(
                 "specified threshold. Reinitalizing trajectories.");
       teb_.clearTimedElasticBand();
       teb_.initTEBtoGoal(initial_plan, cfg_->trajectory.dt_ref, true,
-                         cfg_->trajectory.min_samples);
+                         cfg_->trajectory.min_samples,
+                         cfg_->trajectory.teb_init_skip_dist);
     }
   }
   if (start_vel)
@@ -337,12 +340,14 @@ bool TebOptimalPlanner::plan(
       humans_tebs_map_[human_id] = TimedElasticBand();
       humans_tebs_map_[human_id].initTEBtoGoal(
           initial_human_plan, cfg_->trajectory.dt_ref, true,
-          cfg_->trajectory.human_min_samples);
+          cfg_->trajectory.human_min_samples,
+          cfg_->trajectory.teb_init_skip_dist);
     } else if (cfg_->optim.disable_warm_start) {
       auto &human_teb = humans_tebs_map_[human_id];
       human_teb.clearTimedElasticBand();
       human_teb.initTEBtoGoal(initial_human_plan, cfg_->trajectory.dt_ref, true,
-                              cfg_->trajectory.human_min_samples);
+                              cfg_->trajectory.human_min_samples,
+                              cfg_->trajectory.teb_init_skip_dist);
     } else {
       // modify human-teb for existing human
       PoseSE2 human_start_(initial_human_plan.front().pose);
@@ -358,7 +363,8 @@ bool TebOptimalPlanner::plan(
                   "specified threshold. Reinitializing human trajectories.");
         human_teb.clearTimedElasticBand();
         human_teb.initTEBtoGoal(initial_human_plan, cfg_->trajectory.dt_ref,
-                                true, cfg_->trajectory.human_min_samples);
+                                true, cfg_->trajectory.human_min_samples,
+                                cfg_->trajectory.teb_init_skip_dist);
       }
     }
     // give start velocity for humans
