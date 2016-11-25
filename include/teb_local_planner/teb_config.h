@@ -107,6 +107,7 @@ public:
     bool shrink_horizon_backup; //!< Allows the planner to shrink the horizon
                                 //! temporary (50%) in case of automatically
     //! detected issues.
+    double horizon_reduction_amount;
   } trajectory; //!< Trajectory related parameters
 
   //! Robot related parameters
@@ -382,6 +383,7 @@ public:
     trajectory.feasibility_check_no_poses = 5;
     trajectory.publish_feedback = false;
     trajectory.shrink_horizon_backup = true;
+    trajectory.horizon_reduction_amount = 0.5;
 
     // Robot
 

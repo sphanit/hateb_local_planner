@@ -74,6 +74,8 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
            trajectory.publish_feedback);
   nh.param("shrink_horizon_backup", trajectory.shrink_horizon_backup,
            trajectory.shrink_horizon_backup);
+  nh.param("horizon_reduction_amount", trajectory.horizon_reduction_amount,
+           trajectory.horizon_reduction_amount);
 
   // Robot
   nh.param("max_vel_x", robot.max_vel_x, robot.max_vel_x);
@@ -282,6 +284,7 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   trajectory.feasibility_check_no_poses = cfg.feasibility_check_no_poses;
   trajectory.publish_feedback = cfg.publish_feedback;
   trajectory.shrink_horizon_backup = cfg.shrink_horizon_backup;
+  trajectory.horizon_reduction_amount = cfg.horizon_reduction_amount;
 
   // Robot
   robot.max_vel_x = cfg.max_vel_x;

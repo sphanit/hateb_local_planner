@@ -298,7 +298,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   if (horizon_reduced_) {
     // reduce to 50 percent:
     // int horizon_reduction = goal_idx/2;
-    int horizon_reduction = (int)(goal_idx * 0.75);
+    int horizon_reduction = (int)(goal_idx * cfg_.trajectory.horizon_reduction_amount);
     // we have a small overhead here, since we already transformed 50% more of
     // the trajectory.
     // But that's ok for now, since we do not need to make transformGlobalPlan
@@ -475,6 +475,27 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   }
   auto plan_time = ros::Time::now() - plan_start_time;
 
+  // Now visualize everything
+  auto viz_start_time = ros::Time::now();
+  planner_->visualize();
+  visualization_->publishObstacles(obstacles_);
+  visualization_->publishViaPoints(via_points_);
+  visualization_->publishGlobalPlan(global_plan_);
+  visualization_->publishHumansPlans(transformed_human_plans);
+  std::vector<HumanPlanTrajCombined> human_plans_traj_array;
+  for (auto &human_plan_combined : transformed_human_plans) {
+    HumanPlanTrajCombined human_plan_traj_combined;
+    human_plan_traj_combined.id = human_plan_combined.id;
+    human_plan_traj_combined.plan_before = human_plan_combined.plan_before;
+    planner_->getFullHumanTrajectory(
+        human_plan_traj_combined.id,
+        human_plan_traj_combined.optimized_trajectory);
+    human_plan_traj_combined.plan_after = human_plan_combined.plan_after;
+    human_plans_traj_array.push_back(human_plan_traj_combined);
+  }
+  visualization_->publishHumanTrajectories(human_plans_traj_array);
+  auto viz_time = ros::Time::now() - viz_start_time;
+
   // Undo temporary horizon reduction
   auto hr2_start_time = ros::Time::now();
   if (horizon_reduced_ &&
@@ -551,27 +572,6 @@ bool TebLocalPlannerROS::computeVelocityCommands(
     }
   }
   auto vel_time = ros::Time::now() - vel_start_time;
-
-  // Now visualize everything
-  auto viz_start_time = ros::Time::now();
-  planner_->visualize();
-  visualization_->publishObstacles(obstacles_);
-  visualization_->publishViaPoints(via_points_);
-  visualization_->publishGlobalPlan(global_plan_);
-  visualization_->publishHumansPlans(transformed_human_plans);
-  std::vector<HumanPlanTrajCombined> human_plans_traj_array;
-  for (auto &human_plan_combined : transformed_human_plans) {
-    HumanPlanTrajCombined human_plan_traj_combined;
-    human_plan_traj_combined.id = human_plan_combined.id;
-    human_plan_traj_combined.plan_before = human_plan_combined.plan_before;
-    planner_->getFullHumanTrajectory(
-        human_plan_traj_combined.id,
-        human_plan_traj_combined.optimized_trajectory);
-    human_plan_traj_combined.plan_after = human_plan_combined.plan_after;
-    human_plans_traj_array.push_back(human_plan_traj_combined);
-  }
-  visualization_->publishHumanTrajectories(human_plans_traj_array);
-  auto viz_time = ros::Time::now() - viz_start_time;
 
   auto total_time = ros::Time::now() - start_time;
   ROS_INFO_STREAM_COND(
