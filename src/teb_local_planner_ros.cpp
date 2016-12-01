@@ -45,6 +45,7 @@
   "/human_pose_prediction/reset_external_paths"
 #define PUBLISH_MARKERS_SRV_NAME                                               \
   "/human_pose_prediction/publish_prediction_markers"
+#define OPTIMIZE_SRV_NAME "optimize"
 #define DEFAULT_HUMAN_SEGMENT hanp_msgs::TrackedSegmentType::TORSO
 #define THROTTLE_RATE 5.0 // seconds
 
@@ -200,6 +201,9 @@ void TebLocalPlannerROS::initialize(std::string name, tf::TransformListener *tf,
     publish_predicted_markers_client_ =
         nh.serviceClient<std_srvs::SetBool>(PUBLISH_MARKERS_SRV_NAME, true);
 
+    optimize_server_ = nh.advertiseService(
+        OPTIMIZE_SRV_NAME, &TebLocalPlannerROS::optimizeStandalone, this);
+
     last_call_time_ =
         ros::Time::now() - ros::Duration(cfg_.human.pose_prediction_reset_time);
 
@@ -298,7 +302,8 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   if (horizon_reduced_) {
     // reduce to 50 percent:
     // int horizon_reduction = goal_idx/2;
-    int horizon_reduction = (int)(goal_idx * cfg_.trajectory.horizon_reduction_amount);
+    int horizon_reduction =
+        (int)(goal_idx * cfg_.trajectory.horizon_reduction_amount);
     // we have a small overhead here, since we already transformed 50% more of
     // the trajectory.
     // But that's ok for now, since we do not need to make transformGlobalPlan
@@ -1426,6 +1431,186 @@ void TebLocalPlannerROS::resetHumansPrediction() {
     //     nh.serviceClient<std_srvs::Empty>(RESET_PREDICTION_SERVICE_NAME,
     //     true);
   }
+}
+
+bool TebLocalPlannerROS::optimizeStandalone(
+    teb_local_planner::Optimize::Request &req,
+    teb_local_planner::Optimize::Response &res) {
+  auto start_time = ros::Time::now();
+
+  // check if plugin initialized
+  if (!initialized_) {
+    res.success = false;
+    res.message = "planner has not been initialized";
+    return true;
+  }
+
+  // transform global plan to the frame of local costmap
+  auto trfm_start_time = ros::Time::now();
+  std::vector<geometry_msgs::PoseStamped> transformed_plan;
+  int goal_idx;
+  tf::StampedTransform tf_robot_plan_to_global;
+  tf::Stamped<tf::Pose> robot_pose_tf;
+  tf::poseStampedMsgToTF(req.robot_plan.poses.front(), robot_pose_tf);
+  if (!transformGlobalPlan(
+          *tf_, req.robot_plan.poses, robot_pose_tf, *costmap_, global_frame_,
+          cfg_.trajectory.max_global_plan_lookahead_dist, transformed_plan,
+          &goal_idx, &tf_robot_plan_to_global)) {
+    res.success = false;
+    res.message = "Could not transform the global plan to the local frame";
+    return true;
+  }
+  auto trfm_time = ros::Time::now() - trfm_start_time;
+
+  auto other_start_time = ros::Time::now();
+
+  // check if the transformed robot plan is empty
+  if (transformed_plan.empty()) {
+    res.success = false;
+    res.message = "Robot's transformed plan is empty";
+    return true;
+  }
+
+  // update obstacles container
+  auto cc_start_time = ros::Time::now() - other_start_time;
+  obstacles_.clear();
+  if (costmap_converter_)
+    updateObstacleContainerWithCostmapConverter();
+  else
+    updateObstacleContainerWithCostmap();
+  updateObstacleContainerWithCustomObstacles();
+  auto cc_time = ros::Time::now() - cc_start_time;
+
+  // update via-points container
+  auto via_start_time = ros::Time::now();
+  updateViaPointsContainer(transformed_plan,
+                           cfg_.trajectory.global_plan_viapoint_sep);
+  auto via_time = ros::Time::now() - via_start_time;
+
+  // do not allow config changes from now until end of optimization
+  boost::mutex::scoped_lock cfg_lock(cfg_.configMutex());
+
+  // update humans
+  auto human_start_time = ros::Time::now();
+
+  HumanPlanVelMap transformed_human_plan_vel_map;
+  std::vector<HumanPlanCombined> transformed_human_plans;
+  tf::StampedTransform tf_human_plan_to_global;
+  for (auto human_path : req.human_path_array.paths) {
+    HumanPlanCombined human_plan_combined;
+    geometry_msgs::TwistStamped transformed_vel;
+    std::vector<geometry_msgs::PoseWithCovarianceStamped> human_path_cov;
+    for (auto human_pose : human_path.path.poses) {
+      geometry_msgs::PoseWithCovarianceStamped human_pos_cov;
+      human_pos_cov.header = human_pose.header;
+      human_pos_cov.pose.pose = human_pose.pose;
+      human_path_cov.push_back(human_pos_cov);
+    }
+    if (!transformHumanPlan(*tf_, robot_pose_tf, *costmap_, global_frame_,
+                            human_path_cov, human_plan_combined,
+                            transformed_vel, &tf_human_plan_to_global)) {
+      res.success = false;
+      res.message = "could not transform human" +
+                    std::to_string(human_path.id) + " plan to the local frame";
+      return true;
+    }
+    // TODO: check for empty human transformed plan
+
+    human_plan_combined.id = human_path.id;
+    transformed_human_plans.push_back(human_plan_combined);
+
+    PlanStartVelGoalVel plan_start_vel_goal_vel;
+    plan_start_vel_goal_vel.plan = human_plan_combined.plan_to_optimize;
+    plan_start_vel_goal_vel.start_vel = transformed_vel.twist;
+    if (human_plan_combined.plan_after.size() > 0) {
+      plan_start_vel_goal_vel.goal_vel = transformed_vel.twist;
+    }
+    transformed_human_plan_vel_map[human_plan_combined.id] =
+        plan_start_vel_goal_vel;
+  }
+
+  updateHumanViaPointsContainers(transformed_human_plan_vel_map,
+                                 cfg_.trajectory.global_plan_viapoint_sep);
+  auto human_time = ros::Time::now() - human_start_time;
+
+  // now perform the actual planning
+  auto plan_start_time = ros::Time::now();
+  geometry_msgs::Twist robot_vel_twist;
+  bool success = planner_->plan(transformed_plan, &robot_vel_twist,
+                                cfg_.goal_tolerance.free_goal_vel,
+                                &transformed_human_plan_vel_map);
+  if (!success) {
+    planner_->clearPlanner();
+    res.success = false;
+    res.message =
+        "planner was not able to obtain a local plan for the current setting";
+    return true;
+  }
+  auto plan_time = ros::Time::now() - plan_start_time;
+
+  // now visualize everything
+  auto viz_start_time = ros::Time::now();
+  planner_->visualize();
+  visualization_->publishObstacles(obstacles_);
+  visualization_->publishViaPoints(via_points_);
+  visualization_->publishGlobalPlan(global_plan_);
+  visualization_->publishHumansPlans(transformed_human_plans);
+  std::vector<HumanPlanTrajCombined> human_plans_traj_array;
+  for (auto &human_plan_combined : transformed_human_plans) {
+    HumanPlanTrajCombined human_plan_traj_combined;
+    human_plan_traj_combined.id = human_plan_combined.id;
+    human_plan_traj_combined.plan_before = human_plan_combined.plan_before;
+    planner_->getFullHumanTrajectory(
+        human_plan_traj_combined.id,
+        human_plan_traj_combined.optimized_trajectory);
+    human_plan_traj_combined.plan_after = human_plan_combined.plan_after;
+    human_plans_traj_array.push_back(human_plan_traj_combined);
+  }
+  visualization_->publishHumanTrajectories(human_plans_traj_array);
+  auto viz_time = ros::Time::now() - viz_start_time;
+
+  res.message = "planning successful";
+  planner_->clearPlanner();
+  geometry_msgs::Twist cmd_vel;
+
+  // check feasibility of robot plan
+  auto fsb_start_time = ros::Time::now();
+  bool feasible = planner_->isTrajectoryFeasible(
+      costmap_model_.get(), footprint_spec_, robot_inscribed_radius_,
+      robot_circumscribed_radius, cfg_.trajectory.feasibility_check_no_poses);
+  if (!feasible) {
+    res.message += "\ntrajectory is not feasible";
+  }
+  auto fsb_time = ros::Time::now() - fsb_start_time;
+
+  // get the velocity command for this sampling interval
+  auto vel_start_time = ros::Time::now();
+  if (!planner_->getVelocityCommand(cmd_vel.linear.x, cmd_vel.angular.z)) {
+    res.message += "\nvelocity command invalid";
+  }
+
+  // saturate velocity
+  saturateVelocity(cmd_vel.linear.x, cmd_vel.angular.z, cfg_.robot.max_vel_x,
+                   cfg_.robot.min_vel_x, cfg_.robot.max_vel_theta,
+                   cfg_.robot.min_vel_theta, cfg_.robot.max_vel_x_backwards,
+                   cfg_.robot.min_vel_x_backwards);
+  auto vel_time = ros::Time::now() - vel_start_time;
+
+  auto total_time = ros::Time::now() - start_time;
+
+  res.message += "\ncompute velocity times:";
+  res.message +=
+      "\n\ttotal time                  " + std::to_string(total_time.toSec()) +
+      "\n\ttransform time              " + std::to_string(trfm_time.toSec()) +
+      "\n\tcostmap convert time        " + std::to_string(cc_time.toSec()) +
+      "\n\tvia points time             " + std::to_string(via_time.toSec()) +
+      "\n\thuman time                  " + std::to_string(human_time.toSec()) +
+      "\n\tplanning time               " + std::to_string(plan_time.toSec()) +
+      "\n\tplan feasibility check time " + std::to_string(fsb_time.toSec()) +
+      "\n\tvelocity extract time       " + std::to_string(vel_time.toSec()) +
+      "\n\tvisualization publish time  " + std::to_string(viz_time.toSec()) +
+      "\n=================================";
+  return true;
 }
 
 } // end namespace teb_local_planner

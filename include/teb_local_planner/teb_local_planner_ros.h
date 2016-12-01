@@ -63,6 +63,7 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <visualization_msgs/Marker.h>
 #include <teb_local_planner/ObstacleMsg.h>
+#include <teb_local_planner/Optimize.h>
 
 // human data
 #include <hanp_prediction/HumanPosePredict.h>
@@ -498,6 +499,13 @@ private:
   // human perdiction service
   ros::ServiceClient predict_humans_client_, reset_humans_prediction_client_,
       publish_predicted_markers_client_;
+
+  // optimize service
+  ros::ServiceServer optimize_server_;
+  std::string optimize_srv_name_;
+  bool optimizeStandalone(teb_local_planner::Optimize::Request &req,
+                          teb_local_planner::Optimize::Response &res);
+
   bool publish_predicted_human_markers_ = true;
 
   void resetHumansPrediction();
