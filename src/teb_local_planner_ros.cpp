@@ -1436,6 +1436,7 @@ void TebLocalPlannerROS::resetHumansPrediction() {
 bool TebLocalPlannerROS::optimizeStandalone(
     teb_local_planner::Optimize::Request &req,
     teb_local_planner::Optimize::Response &res) {
+  ROS_INFO("optimize service called");
   auto start_time = ros::Time::now();
 
   // check if plugin initialized
@@ -1445,13 +1446,16 @@ bool TebLocalPlannerROS::optimizeStandalone(
     return true;
   }
 
-  // transform global plan to the frame of local costmap
   auto trfm_start_time = ros::Time::now();
+  // get robot pose from the costmap
+  tf::Stamped<tf::Pose> robot_pose_tf;
+  costmap_ros_->getRobotPose(robot_pose_tf);
+
+  // transform global plan to the frame of local costmap
+  ROS_INFO("transforming robot global plans");
   std::vector<geometry_msgs::PoseStamped> transformed_plan;
   int goal_idx;
   tf::StampedTransform tf_robot_plan_to_global;
-  tf::Stamped<tf::Pose> robot_pose_tf;
-  tf::poseStampedMsgToTF(req.robot_plan.poses.front(), robot_pose_tf);
   if (!transformGlobalPlan(
           *tf_, req.robot_plan.poses, robot_pose_tf, *costmap_, global_frame_,
           cfg_.trajectory.max_global_plan_lookahead_dist, transformed_plan,
@@ -1460,9 +1464,8 @@ bool TebLocalPlannerROS::optimizeStandalone(
     res.message = "Could not transform the global plan to the local frame";
     return true;
   }
-  auto trfm_time = ros::Time::now() - trfm_start_time;
-
-  auto other_start_time = ros::Time::now();
+  ROS_INFO("transformed plan contains %ld points (out of %ld)",
+           transformed_plan.size(), req.robot_plan.poses.size());
 
   // check if the transformed robot plan is empty
   if (transformed_plan.empty()) {
@@ -1470,9 +1473,10 @@ bool TebLocalPlannerROS::optimizeStandalone(
     res.message = "Robot's transformed plan is empty";
     return true;
   }
+  auto trfm_time = ros::Time::now() - trfm_start_time;
 
   // update obstacles container
-  auto cc_start_time = ros::Time::now() - other_start_time;
+  auto cc_start_time = ros::Time::now();
   obstacles_.clear();
   if (costmap_converter_)
     updateObstacleContainerWithCostmapConverter();
@@ -1499,6 +1503,7 @@ bool TebLocalPlannerROS::optimizeStandalone(
   for (auto human_path : req.human_path_array.paths) {
     HumanPlanCombined human_plan_combined;
     geometry_msgs::TwistStamped transformed_vel;
+    transformed_vel.header.frame_id = global_frame_;
     std::vector<geometry_msgs::PoseWithCovarianceStamped> human_path_cov;
     for (auto human_pose : human_path.path.poses) {
       geometry_msgs::PoseWithCovarianceStamped human_pos_cov;
@@ -1506,6 +1511,7 @@ bool TebLocalPlannerROS::optimizeStandalone(
       human_pos_cov.pose.pose = human_pose.pose;
       human_path_cov.push_back(human_pos_cov);
     }
+    ROS_INFO("transforming human %ld plan", human_path.id);
     if (!transformHumanPlan(*tf_, robot_pose_tf, *costmap_, global_frame_,
                             human_path_cov, human_plan_combined,
                             transformed_vel, &tf_human_plan_to_global)) {
@@ -1514,6 +1520,16 @@ bool TebLocalPlannerROS::optimizeStandalone(
                     std::to_string(human_path.id) + " plan to the local frame";
       return true;
     }
+    auto transformed_plan_size = human_plan_combined.plan_before.size() +
+                                 human_plan_combined.plan_to_optimize.size() +
+                                 human_plan_combined.plan_after.size();
+    ROS_INFO("transformed human %ld plan contains %ld (before %ld, "
+             "to-optimize %ld, after %ld) points (out of %ld (%ld))",
+             human_path.id, transformed_plan_size,
+             human_plan_combined.plan_before.size(),
+             human_plan_combined.plan_to_optimize.size(),
+             human_plan_combined.plan_after.size(), human_path_cov.size(),
+             human_path.path.poses.size());
     // TODO: check for empty human transformed plan
 
     human_plan_combined.id = human_path.id;
@@ -1570,7 +1586,6 @@ bool TebLocalPlannerROS::optimizeStandalone(
   auto viz_time = ros::Time::now() - viz_start_time;
 
   res.message = "planning successful";
-  planner_->clearPlanner();
   geometry_msgs::Twist cmd_vel;
 
   // check feasibility of robot plan
@@ -1588,6 +1603,9 @@ bool TebLocalPlannerROS::optimizeStandalone(
   if (!planner_->getVelocityCommand(cmd_vel.linear.x, cmd_vel.angular.z)) {
     res.message += "\nvelocity command invalid";
   }
+
+  // clear the planner only after getting the velocity command
+  planner_->clearPlanner();
 
   // saturate velocity
   saturateVelocity(cmd_vel.linear.x, cmd_vel.angular.z, cfg_.robot.max_vel_x,
