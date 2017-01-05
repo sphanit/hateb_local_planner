@@ -1585,6 +1585,7 @@ bool TebLocalPlannerROS::optimizeStandalone(
   visualization_->publishHumanTrajectories(human_plans_traj_array);
   auto viz_time = ros::Time::now() - viz_start_time;
 
+  res.success = true;
   res.message = "planning successful";
   geometry_msgs::Twist cmd_vel;
 
@@ -1594,14 +1595,15 @@ bool TebLocalPlannerROS::optimizeStandalone(
       costmap_model_.get(), footprint_spec_, robot_inscribed_radius_,
       robot_circumscribed_radius, cfg_.trajectory.feasibility_check_no_poses);
   if (!feasible) {
-    res.message += "\ntrajectory is not feasible";
+    res.message += "\nhowever, trajectory is not feasible";
   }
   auto fsb_time = ros::Time::now() - fsb_start_time;
 
   // get the velocity command for this sampling interval
   auto vel_start_time = ros::Time::now();
   if (!planner_->getVelocityCommand(cmd_vel.linear.x, cmd_vel.angular.z)) {
-    res.message += "\nvelocity command invalid";
+    res.message += feasible ? "\nhowever," : "\nand";
+    res.message += " velocity command is invalid";
   }
 
   // clear the planner only after getting the velocity command
