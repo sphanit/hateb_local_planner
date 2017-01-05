@@ -337,9 +337,11 @@ public:
     bool publish_robot_global_plan;
     bool publish_robot_local_plan;
     bool publish_robot_local_plan_poses;
+    bool publish_robot_local_plan_fp_poses;
     bool publish_human_global_plans;
     bool publish_human_local_plans;
     bool publish_human_local_plan_poses;
+    bool publish_human_local_plan_fp_poses;
     double pose_array_z_scale;
   } visualization;
 
@@ -498,9 +500,11 @@ public:
     visualization.publish_robot_global_plan = true;
     visualization.publish_robot_local_plan = true;
     visualization.publish_robot_local_plan_poses = false;
+    visualization.publish_robot_local_plan_fp_poses = false;
     visualization.publish_human_global_plans = false;
     visualization.publish_human_local_plans = true;
     visualization.publish_human_local_plan_poses = false;
+    visualization.publish_human_local_plan_fp_poses = false;
     visualization.pose_array_z_scale = 1.0;
   }
 

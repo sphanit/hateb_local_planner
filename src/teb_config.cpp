@@ -256,6 +256,9 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
   nh.param("publish_robot_local_plan_poses",
            visualization.publish_robot_local_plan_poses,
            visualization.publish_robot_local_plan_poses);
+  nh.param("publish_robot_local_plan_fp_poses",
+           visualization.publish_robot_local_plan_fp_poses,
+           visualization.publish_robot_local_plan_fp_poses);
   nh.param("publish_human_global_plans",
            visualization.publish_human_global_plans,
            visualization.publish_human_global_plans);
@@ -264,6 +267,9 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
   nh.param("publish_human_local_plan_poses",
            visualization.publish_human_local_plan_poses,
            visualization.publish_human_local_plan_poses);
+  nh.param("publish_human_local_plan_fp_poses",
+           visualization.publish_human_local_plan_fp_poses,
+           visualization.publish_human_local_plan_fp_poses);
   nh.param("pose_array_z_scale", visualization.pose_array_z_scale,
            visualization.pose_array_z_scale);
 
@@ -391,10 +397,14 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   visualization.publish_robot_local_plan = cfg.publish_robot_local_plan;
   visualization.publish_robot_local_plan_poses =
       cfg.publish_robot_local_plan_poses;
+  visualization.publish_robot_local_plan_fp_poses =
+      cfg.publish_robot_local_plan_fp_poses;
   visualization.publish_human_global_plans = cfg.publish_human_global_plans;
   visualization.publish_human_local_plans = cfg.publish_human_local_plans;
   visualization.publish_human_local_plan_poses =
       cfg.publish_human_local_plan_poses;
+  visualization.publish_human_local_plan_fp_poses =
+      cfg.publish_human_local_plan_fp_poses;
   visualization.pose_array_z_scale = cfg.pose_array_z_scale;
 
   checkParameters();

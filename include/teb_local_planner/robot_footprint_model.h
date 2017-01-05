@@ -94,7 +94,13 @@ public:
     * @param current_pose Current robot pose
     * @param[out] markers container of marker messages describing the robot shape
     */
-  virtual void visualizeRobot(const PoseSE2& current_pose, std::vector<visualization_msgs::Marker>& markers ) const {}
+  virtual void visualizeRobot(const PoseSE2& current_pose, std::vector<visualization_msgs::Marker>& markers ) const
+  {
+    geometry_msgs::Pose robot_pose;
+    current_pose.toPoseMsg(robot_pose);
+    visualizeRobot(robot_pose, markers);
+  }
+  virtual void visualizeRobot(const geometry_msgs::Pose& current_pose, std::vector<visualization_msgs::Marker>& markers ) const {}
 
   virtual double getCircumscribedRadius() const = 0;
 
@@ -195,12 +201,12 @@ public:
     * @param current_pose Current robot pose
     * @param[out] markers container of marker messages describing the robot shape
     */
-  virtual void visualizeRobot(const PoseSE2& current_pose, std::vector<visualization_msgs::Marker>& markers ) const
+  virtual void visualizeRobot(const geometry_msgs::Pose& current_pose, std::vector<visualization_msgs::Marker>& markers ) const
   {
     markers.resize(1);
     visualization_msgs::Marker& marker = markers.back();
     marker.type = visualization_msgs::Marker::CYLINDER;
-    current_pose.toPoseMsg(marker.pose);
+    marker.pose = current_pose;
     marker.scale.x = marker.scale.y = 2*radius_; // scale = diameter
     marker.scale.z = 0.05;
     marker.color.a = 0.5;
@@ -274,7 +280,7 @@ public:
     * @param current_pose Current robot pose
     * @param[out] markers container of marker messages describing the robot shape
     */
-  virtual void visualizeRobot(const PoseSE2& current_pose, std::vector<visualization_msgs::Marker>& markers ) const
+  virtual void visualizeRobot(const geometry_msgs::Pose& current_pose, std::vector<visualization_msgs::Marker>& markers ) const
   {
     std_msgs::ColorRGBA color;
     color.a  = 0.5;
@@ -282,13 +288,14 @@ public:
     color.g = 0.8;
     color.b  = 0.0;
 
-    Eigen::Vector2d dir = current_pose.orientationUnitVec();
+    auto current_yaw = tf::getYaw(current_pose.orientation);
+    auto dir = Eigen::Vector2d(std::cos(current_yaw), std::sin(current_yaw));
     if (front_radius_>0)
     {
       markers.push_back(visualization_msgs::Marker());
       visualization_msgs::Marker& marker1 = markers.front();
       marker1.type = visualization_msgs::Marker::CYLINDER;
-      current_pose.toPoseMsg(marker1.pose);
+      marker1.pose = current_pose;
       marker1.pose.position.x += front_offset_*dir.x();
       marker1.pose.position.y += front_offset_*dir.y();
       marker1.scale.x = marker1.scale.y = 2*front_radius_; // scale = diameter
@@ -301,7 +308,7 @@ public:
       markers.push_back(visualization_msgs::Marker());
       visualization_msgs::Marker& marker2 = markers.back();
       marker2.type = visualization_msgs::Marker::CYLINDER;
-      current_pose.toPoseMsg(marker2.pose);
+      marker2.pose = current_pose;
       marker2.pose.position.x -= rear_offset_*dir.x();
       marker2.pose.position.y -= rear_offset_*dir.y();
       marker2.scale.x = marker2.scale.y = 2*rear_radius_; // scale = diameter
@@ -408,7 +415,7 @@ public:
     * @param current_pose Current robot pose
     * @param[out] markers container of marker messages describing the robot shape
     */
-  virtual void visualizeRobot(const PoseSE2& current_pose, std::vector<visualization_msgs::Marker>& markers ) const
+  virtual void visualizeRobot(const geometry_msgs::Pose& current_pose, std::vector<visualization_msgs::Marker>& markers ) const
   {
     std_msgs::ColorRGBA color;
     color.a  = 0.5;
@@ -419,7 +426,7 @@ public:
     markers.push_back(visualization_msgs::Marker());
     visualization_msgs::Marker& marker = markers.front();
     marker.type = visualization_msgs::Marker::LINE_STRIP;
-    current_pose.toPoseMsg(marker.pose); // all points are transformed into the robot frame!
+    marker.pose = current_pose; // all points are transformed into the robot frame!
 
     // line
     geometry_msgs::Point line_start_world;
@@ -510,7 +517,7 @@ public:
     * @param current_pose Current robot pose
     * @param[out] markers container of marker messages describing the robot shape
     */
-  virtual void visualizeRobot(const PoseSE2& current_pose, std::vector<visualization_msgs::Marker>& markers ) const
+  virtual void visualizeRobot(const geometry_msgs::Pose& current_pose, std::vector<visualization_msgs::Marker>& markers ) const
   {
     if (vertices_.empty())
       return;
@@ -524,7 +531,7 @@ public:
     markers.push_back(visualization_msgs::Marker());
     visualization_msgs::Marker& marker = markers.front();
     marker.type = visualization_msgs::Marker::LINE_STRIP;
-    current_pose.toPoseMsg(marker.pose); // all points are transformed into the robot frame!
+    marker.pose = current_pose; // all points are transformed into the robot frame!
 
     for (std::size_t i = 0; i < vertices_.size(); ++i)
     {

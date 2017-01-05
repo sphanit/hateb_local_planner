@@ -107,8 +107,8 @@ void TebOptimalPlanner::visualize() {
   if (!visualization_)
     return;
 
-  visualization_->publishLocalPlanAndPoses(teb_);
-  visualization_->publishHumanPlanPoses(humans_tebs_map_);
+  visualization_->publishLocalPlanAndPoses(teb_, *robot_model_);
+  visualization_->publishHumanPlanPoses(humans_tebs_map_, *human_model_);
 
   if (teb_.sizePoses() > 0)
     visualization_->publishRobotFootprintModel(teb_.Pose(0), *robot_model_);

@@ -208,7 +208,7 @@ void HomotopyClassPlanner::visualize()
     TebOptimalPlannerConstPtr best_teb = bestTeb();
     if (best_teb)
     {
-      visualization_->publishLocalPlanAndPoses(best_teb->teb());
+      visualization_->publishLocalPlanAndPoses(best_teb->teb(), *robot_model_);
 
       if (best_teb->teb().sizePoses() > 0) //TODO maybe store current pose (start) within plan method as class field.
         visualization_->publishRobotFootprintModel(best_teb->teb().Pose(0), *robot_model_);
@@ -477,7 +477,7 @@ void HomotopyClassPlanner::DepthFirst(HcGraph& g, std::vector<HcGraphVertexType>
 
   if ((int)tebs_.size() >= cfg_->hcp.max_number_classes)
     return; // We do not need to search for further possible alternative homotopy classes.
-  
+
   HcGraphVertexType back = visited.back();
 
   /// Examine adjacent nodes
@@ -490,18 +490,18 @@ void HomotopyClassPlanner::DepthFirst(HcGraph& g, std::vector<HcGraphVertexType>
     if ( *it == goal ) // goal reached
     {
       visited.push_back(*it);
-      
-      
+
+
       // check H-Signature
       std::complex<long double> H = calculateHSignature(visited.begin(), visited.end(), boost::bind(getCplxFromHcGraph, _1, boost::cref(graph_)), obstacles_, cfg_->hcp.h_signature_prescaler);
-      
+
       // check if H-Signature is already known
       // and init new TEB if no duplicate was found
       if ( addHSignatureIfNew(H) )
       {
         addAndInitNewTeb(visited.begin(), visited.end(), boost::bind(getVector2dFromHcGraph, _1, boost::cref(graph_)), start_orientation, goal_orientation, start_velocity);
       }
-      
+
       visited.pop_back();
       break;
     }
@@ -512,51 +512,51 @@ for ( boost::tie(it,end) = boost::adjacent_vertices(back,g); it!=end; ++it)
 {
   if ( std::find(visited.begin(), visited.end(), *it)!=visited.end() || *it == goal)
     continue; // already visited || goal reached
-  
-  
+
+
   visited.push_back(*it);
-  
+
   // recursion step
   DepthFirst(g, visited, goal, start_orientation, goal_orientation, start_velocity);
-  
+
   visited.pop_back();
 }
 }
- 
- 
+
+
 bool HomotopyClassPlanner::hasHSignature(const std::complex<long double>& H) const
 {
   // iterate existing h-signatures and check if there is an existing H-Signature similar the candidate
   for (std::vector< std::pair<std::complex<long double>, bool> >::const_iterator it = h_signatures_.begin(); it != h_signatures_.end(); ++it)
   {
     if (isHSignatureSimilar(it->first, H, cfg_->hcp.h_signature_threshold))
-      return true; // Found! Homotopy class already exists, therefore nothing added  
+      return true; // Found! Homotopy class already exists, therefore nothing added
   }
   return false;
 }
 
 bool HomotopyClassPlanner::addHSignatureIfNew(const std::complex<long double>& H, bool lock)
-{	  
+{
   if (!std::isfinite(H.real()) || !std::isfinite(H.imag()))
   {
     ROS_WARN("HomotopyClassPlanner: Ignoring nan/inf H-signature");
     return false;
   }
-  
+
   if (hasHSignature(H))
     return false;
 
   // Homotopy class not found -> Add to class-list, return that the h-signature is new
-  h_signatures_.push_back(std::make_pair(H,lock));	 
+  h_signatures_.push_back(std::make_pair(H,lock));
   return true;
 }
- 
- 
 
-  
-//! Small helper function to check whether two h-signatures are assumed to be equal. 
+
+
+
+//! Small helper function to check whether two h-signatures are assumed to be equal.
 inline bool compareH( std::pair<TebOptPlannerContainer::iterator, std::complex<long double> > i, std::complex<long double> j ) {return std::abs(i.second.real()-j.real())<0.1 && std::abs(i.second.imag()-j.imag())<0.1;};
- 
+
 
 void HomotopyClassPlanner::renewAndAnalyzeOldTebs(bool delete_detours)
 {
@@ -572,7 +572,7 @@ void HomotopyClassPlanner::renewAndAnalyzeOldTebs(bool delete_detours)
   while(it_teb != tebs_.end())
   {
     // delete Detours if there is at least one other TEB candidate left in the container
-    if (delete_detours && tebs_.size()>1 && it_teb->get()->teb().detectDetoursBackwards(-0.1)) 
+    if (delete_detours && tebs_.size()>1 && it_teb->get()->teb().detectDetoursBackwards(-0.1))
     {
       it_teb = tebs_.erase(it_teb); // delete candidate and set iterator to the next valid candidate
       continue;
@@ -580,9 +580,9 @@ void HomotopyClassPlanner::renewAndAnalyzeOldTebs(bool delete_detours)
 
     // calculate H Signature for the current candidate
     std::complex<long double> H = calculateHSignature(it_teb->get()->teb().poses().begin(), it_teb->get()->teb().poses().end(), getCplxFromVertexPosePtr ,obstacles_, cfg_->hcp.h_signature_prescaler);
-    
+
 //     teb_candidates.push_back(std::make_pair(it_teb,H));
-    
+
     // WORKAROUND until the commented code below works
     // Here we do not compare cost values. Just first come first serve...
     bool new_flag = addHSignatureIfNew(H);
@@ -591,17 +591,17 @@ void HomotopyClassPlanner::renewAndAnalyzeOldTebs(bool delete_detours)
       it_teb = tebs_.erase(it_teb);
       continue;
     }
-    
+
     ++it_teb;
   }
 
-  // Find multiple candidates and delete the one with higher cost 
+  // Find multiple candidates and delete the one with higher cost
   // TODO: this code needs to be adpated. Erasing tebs from the teb container_ could make iteratores stored in the candidate list invalid!
 //   TebCandidateType::reverse_iterator cand_i = teb_candidates.rbegin();
 //   int test_idx = 0;
 //   while (cand_i != teb_candidates.rend())
 //   {
-//          
+//
 //     TebCandidateType::reverse_iterator cand_j = std::find_if(boost::next(cand_i),teb_candidates.rend(), boost::bind(compareH,_1,cand_i->second));
 //     if (cand_j != teb_candidates.rend() && cand_j != cand_i)
 //     {
@@ -613,7 +613,7 @@ void HomotopyClassPlanner::renewAndAnalyzeOldTebs(bool delete_detours)
 //       {
 // 	// found one that has higher cost, therefore erase cand_j
 // 	tebs_.erase(cand_j->first);
-// 	teb_candidates.erase(cand_j);         
+// 	teb_candidates.erase(cand_j);
 //       }
 //       else   // otherwise erase cand_i
 //       {
@@ -621,13 +621,13 @@ void HomotopyClassPlanner::renewAndAnalyzeOldTebs(bool delete_detours)
 // 	cand_i = teb_candidates.erase(cand_i);
 //       }
 //     }
-//     else 
+//     else
 //     {
 //         ROS_WARN_STREAM("increase cand_i");
-//         ++cand_i;	
+//         ++cand_i;
 //     }
 //   }
-  
+
   // now add the h-signatures to the internal lookup-table (but only if there is no existing duplicate)
 //   for (TebCandidateType::iterator cand=teb_candidates.begin(); cand!=teb_candidates.end(); ++cand)
 //   {
@@ -638,20 +638,20 @@ void HomotopyClassPlanner::renewAndAnalyzeOldTebs(bool delete_detours)
 //       tebs_.erase(cand->first);
 //     }
 //   }
-	
+
 }
- 
+
 void HomotopyClassPlanner::updateReferenceTrajectoryViaPoints(bool all_trajectories)
 {
   if ( (!all_trajectories && !initial_plan_) || !via_points_ || via_points_->empty() || cfg_->optim.weight_viapoint <= 0)
     return;
-  
+
   if(h_signatures_.size() < tebs_.size())
   {
     ROS_ERROR("HomotopyClassPlanner::updateReferenceTrajectoryWithViaPoints(): Number of h-signatures does not match number of trajectories.");
     return;
   }
-  
+
   if (all_trajectories)
   {
     // enable via-points for all tebs
@@ -672,8 +672,8 @@ void HomotopyClassPlanner::updateReferenceTrajectoryViaPoints(bool all_trajector
     }
   }
 }
- 
- 
+
+
 void HomotopyClassPlanner::exploreHomotopyClassesAndInitTebs(const PoseSE2& start, const PoseSE2& goal, double dist_to_obst, boost::optional<const Eigen::Vector2d&> start_vel)
 {
   // first process old trajectories
@@ -682,20 +682,20 @@ void HomotopyClassPlanner::exploreHomotopyClassesAndInitTebs(const PoseSE2& star
   // inject initial plan if available and not yet captured
   if (initial_plan_ && addHSignatureIfNew(initial_plan_h_sig_, true)) // also prevent candidate from deletion
     addAndInitNewTeb(*initial_plan_, start_vel);
-    
+
   // now explore new homotopy classes and initialize tebs if new ones are found.
   if (cfg_->hcp.simple_exploration)
     createGraph(start,goal,dist_to_obst,cfg_->hcp.obstacle_heading_threshold, start_vel);
   else
     createProbRoadmapGraph(start,goal,dist_to_obst,cfg_->hcp.roadmap_graph_no_samples,cfg_->hcp.obstacle_heading_threshold, start_vel);
-} 
+}
 
 
 void HomotopyClassPlanner::addAndInitNewTeb(const PoseSE2& start, const PoseSE2& goal, boost::optional<const Eigen::Vector2d&> start_velocity)
 {
   tebs_.push_back( TebOptimalPlannerPtr( new TebOptimalPlanner(*cfg_, obstacles_, robot_model_) ) );
   tebs_.back()->teb().initTEBtoGoal(start, goal, 0, cfg_->trajectory.dt_ref, cfg_->trajectory.min_samples);
-  
+
   if (start_velocity)
     tebs_.back()->setVelocityStart(*start_velocity);
 }
@@ -703,8 +703,8 @@ void HomotopyClassPlanner::addAndInitNewTeb(const PoseSE2& start, const PoseSE2&
 void HomotopyClassPlanner::addAndInitNewTeb(const std::vector<geometry_msgs::PoseStamped>& initial_plan, boost::optional<const Eigen::Vector2d&> start_velocity)
 {
   tebs_.push_back( TebOptimalPlannerPtr( new TebOptimalPlanner(*cfg_, obstacles_, robot_model_) ) );
-  tebs_.back()->teb().initTEBtoGoal(*initial_plan_, cfg_->trajectory.dt_ref, true, cfg_->trajectory.min_samples); 
-  
+  tebs_.back()->teb().initTEBtoGoal(*initial_plan_, cfg_->trajectory.dt_ref, true, cfg_->trajectory.min_samples);
+
   if (start_velocity)
     tebs_.back()->setVelocityStart(*start_velocity);
 }
@@ -718,8 +718,8 @@ void HomotopyClassPlanner::updateAllTEBs(boost::optional<const PoseSE2&> start, 
       ROS_DEBUG("New goal: distance to existing goal is higher than the specified threshold. Reinitalizing trajectories.");
       tebs_.clear();
       h_signatures_.clear();
-  }  
-  
+  }
+
   // hot-start from previous solutions
   for (TebOptPlannerContainer::iterator it_teb = tebs_.begin(); it_teb != tebs_.end(); ++it_teb)
   {
@@ -729,7 +729,7 @@ void HomotopyClassPlanner::updateAllTEBs(boost::optional<const PoseSE2&> start, 
   }
 }
 
- 
+
 void HomotopyClassPlanner::optimizeAllTEBs(unsigned int iter_innerloop, unsigned int iter_outerloop)
 {
   // optimize TEBs in parallel since they are independend of each other
@@ -748,21 +748,21 @@ void HomotopyClassPlanner::optimizeAllTEBs(unsigned int iter_innerloop, unsigned
   {
     for (TebOptPlannerContainer::iterator it_teb = tebs_.begin(); it_teb != tebs_.end(); ++it_teb)
     {
-      it_teb->get()->optimizeTEB(iter_innerloop,iter_outerloop, true, cfg_->hcp.selection_obst_cost_scale, 
+      it_teb->get()->optimizeTEB(iter_innerloop,iter_outerloop, true, cfg_->hcp.selection_obst_cost_scale,
                                  cfg_->hcp.selection_viapoint_cost_scale, cfg_->hcp.selection_alternative_time_cost); // compute cost as well inside optimizeTEB (last argument = true)
     }
   }
-} 
- 
+}
+
 void HomotopyClassPlanner::deleteTebDetours(double threshold)
 {
   TebOptPlannerContainer::iterator it_teb = tebs_.begin();
   bool modified;
   int h_idx = 0; // keep track about the current h-signature idx
   while(it_teb != tebs_.end())
-  { 
+  {
     modified = false;
-    
+
     if (!h_signatures_[h_idx].second) // check if h-signature is locked
     {
       // delete Detours if other TEBs will remain!
@@ -772,27 +772,27 @@ void HomotopyClassPlanner::deleteTebDetours(double threshold)
 	modified = true;
       }
     }
-    
+
     // Also delete tebs that cannot be optimized (last optim call failed)
     // here, we ignore the lock-state, since we cannot keep trajectories that are not optimizable
     if (!it_teb->get()->isOptimized())
     {
 	it_teb = tebs_.erase(it_teb);
-	modified = true;      
-    }  
-    
+	modified = true;
+    }
+
     if (!modified)
        ++it_teb;
-    
+
     ++h_idx;
   }
-} 
- 
- 
+}
+
+
 TebOptimalPlannerPtr HomotopyClassPlanner::selectBestTeb()
 {
   double min_cost = std::numeric_limits<double>::max(); // maximum cost
-  
+
   // check if last best_teb is still a valid candidate
   if (std::find(tebs_.begin(), tebs_.end(), best_teb_) != tebs_.end())
   {
@@ -806,7 +806,7 @@ TebOptimalPlannerPtr HomotopyClassPlanner::selectBestTeb()
   {
     if (*it_teb == best_teb_)
       continue; // skip already known cost value of the last best_teb
-    
+
     double teb_cost = it_teb->get()->getCurrentCost();
 
     if (teb_cost < min_cost)
@@ -815,25 +815,25 @@ TebOptimalPlannerPtr HomotopyClassPlanner::selectBestTeb()
       best_teb_ = *it_teb;
       min_cost = teb_cost;
     }
-  }	
+  }
   return best_teb_;
-} 
+}
 
 int HomotopyClassPlanner::bestTebIdx() const
 {
   if (tebs_.size() == 1)
     return 0;
-    
+
   if (!best_teb_)
     return -1;
-  
+
   int idx = 0;
   for (TebOptPlannerContainer::const_iterator it_teb = tebs_.begin(); it_teb != tebs_.end(); ++it_teb, ++idx)
   {
     if (*it_teb == best_teb_)
       return idx;
   }
-  return -1;  
+  return -1;
 }
 
 bool HomotopyClassPlanner::isTrajectoryFeasible(base_local_planner::CostmapModel* costmap_model, const std::vector<geometry_msgs::Point>& footprint_spec,
@@ -842,7 +842,7 @@ bool HomotopyClassPlanner::isTrajectoryFeasible(base_local_planner::CostmapModel
   TebOptimalPlannerPtr best = bestTeb();
   if (!best)
     return false;
-  
+
   return best->isTrajectoryFeasible(costmap_model,footprint_spec, inscribed_radius, circumscribed_radius, look_ahead_idx);
 }
 
@@ -851,7 +851,7 @@ bool HomotopyClassPlanner::isHorizonReductionAppropriate(const std::vector<geome
   TebOptimalPlannerPtr best = bestTeb();
   if (!best)
     return false;
-  
+
   return best->isHorizonReductionAppropriate(initial_plan);
 }
 
@@ -860,7 +860,7 @@ void HomotopyClassPlanner::computeCurrentCost(std::vector<double>& cost, double 
   for (TebOptPlannerContainer::iterator it_teb = tebs_.begin(); it_teb != tebs_.end(); ++it_teb)
   {
     it_teb->get()->computeCurrentCost(cost, obst_cost_scale, viapoint_cost_scale, alternative_time_cost);
-  } 
+  }
 }
 
 void HomotopyClassPlanner::getFullHumanTrajectory(const uint64_t human_id, std::vector<TrajectoryPointMsg> &human_trajectory)

@@ -68,6 +68,7 @@
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
 #include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 #include <hanp_msgs/HumanPathArray.h>
 #include <hanp_msgs/HumanTrajectoryArray.h>
 
@@ -150,9 +151,12 @@ public:
    * and the pose sequence to  \e ../../teb_poses.
    * @param teb const reference to a Timed_Elastic_Band
    */
-  void publishLocalPlanAndPoses(const TimedElasticBand &teb) const;
+  void
+  publishLocalPlanAndPoses(const TimedElasticBand &teb,
+                           const BaseRobotFootprintModel &robot_model) const;
   void publishHumanPlanPoses(
-      const std::map<uint64_t, TimedElasticBand> &humans_tebs_map) const;
+      const std::map<uint64_t, TimedElasticBand> &humans_tebs_map,
+      const BaseRobotFootprintModel &human_model) const;
   void publishHumanTrajectories(
       const std::vector<HumanPlanTrajCombined> &humans_plans_combined) const;
 
@@ -297,9 +301,10 @@ protected:
   ros::Publisher local_plan_pub_;          //!< Publisher for the local plan
   ros::Publisher humans_global_plans_pub_; //!< Publisher for the local plan
   ros::Publisher humans_local_plans_pub_;  //!< Publisher for the local plan
-  ros::Publisher teb_poses_pub_; //!< Publisher for the trajectory pose sequence
-  ros::Publisher
-      humans_tebs_poses_pub_; //!< Publisher for the trajectory pose sequence
+  ros::Publisher teb_poses_pub_,
+      teb_fp_poses_pub_; //!< Publisher for the trajectory pose sequence
+  ros::Publisher humans_tebs_poses_pub_,
+      humans_tebs_fp_poses_pub_; //!< Publisher for the trajectory pose sequence
   ros::Publisher teb_marker_pub_; //!< Publisher for visualization markers
   ros::Publisher feedback_pub_;   //!< Publisher for the feedback message for
                                   //! analysis and debug purposes
@@ -313,8 +318,12 @@ protected:
   ros::Timer clearing_timer_;
   void clearingTimerCB(const ros::TimerEvent &event);
   bool last_publish_robot_global_plan, last_publish_robot_local_plan,
-      last_publish_robot_local_plan_poses, last_publish_human_global_plans,
-      last_publish_human_local_plans, last_publish_human_local_plan_poses;
+      last_publish_robot_local_plan_poses,
+      last_publish_robot_local_plan_fp_poses, last_publish_human_global_plans,
+      last_publish_human_local_plans, last_publish_human_local_plan_poses,
+      last_publish_human_local_plan_fp_poses;
+
+  mutable int last_robot_fp_poses_idx_, last_human_fp_poses_idx_;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
