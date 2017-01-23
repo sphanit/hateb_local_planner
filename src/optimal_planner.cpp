@@ -309,6 +309,13 @@ bool TebOptimalPlanner::plan(
   auto prep_time = ros::Time::now() - prep_start_time;
 
   auto human_prep_time_start = ros::Time::now();
+  humans_vel_start_.clear();
+  humans_vel_goal_.clear();
+  switch (cfg_->planning_mode) {
+  case 0:
+    humans_tebs_map_.clear();
+    break;
+  case 1: {
   auto itr = humans_tebs_map_.begin();
   while (itr != humans_tebs_map_.end()) {
     if (initial_human_plan_vel_map->find(itr->first) ==
@@ -318,8 +325,6 @@ bool TebOptimalPlanner::plan(
       ++itr;
   }
 
-  humans_vel_start_.clear();
-  humans_vel_goal_.clear();
   for (auto &initial_human_plan_vel_kv : *initial_human_plan_vel_map) {
     auto &human_id = initial_human_plan_vel_kv.first;
     auto &initial_human_plan = initial_human_plan_vel_kv.second.plan;
@@ -328,8 +333,8 @@ bool TebOptimalPlanner::plan(
     if (initial_human_plan.empty()) {
       auto itr = humans_tebs_map_.find(human_id);
       if (itr != humans_tebs_map_.end()) {
-        ROS_DEBUG(
-            "New plan: new human plan is empty. Removing human trajectories.");
+          ROS_DEBUG("New plan: new human plan is empty. Removing human "
+                    "trajectories.");
         humans_tebs_map_.erase(itr);
       }
       continue;
@@ -345,8 +350,8 @@ bool TebOptimalPlanner::plan(
     } else if (cfg_->optim.disable_warm_start) {
       auto &human_teb = humans_tebs_map_[human_id];
       human_teb.clearTimedElasticBand();
-      human_teb.initTEBtoGoal(initial_human_plan, cfg_->trajectory.dt_ref, true,
-                              cfg_->trajectory.human_min_samples,
+        human_teb.initTEBtoGoal(initial_human_plan, cfg_->trajectory.dt_ref,
+                                true, cfg_->trajectory.human_min_samples,
                               cfg_->trajectory.teb_init_skip_dist);
     } else {
       // modify human-teb for existing human
@@ -385,6 +390,14 @@ bool TebOptimalPlanner::plan(
     // human_goal_vel.second.coeffRef(1) =
     //     initial_human_plan_vel_kv.second.goal_vel.angular.z;
     // humans_vel_goal_[human_id] = human_goal_vel;
+    }
+    break;
+  }
+  case 2: {
+    break;
+  }
+  default:
+    humans_tebs_map_.clear();
   }
   auto human_prep_time = ros::Time::now() - human_prep_time_start;
 
@@ -491,21 +504,14 @@ bool TebOptimalPlanner::buildGraph() {
 
   // add Edges (local cost functions)
   AddEdgesObstacles();
-  AddEdgesObstaclesForHumans();
   AddEdgesDynamicObstacles();
-  // AddEdgesDynamicObstaclesForHumans();
 
   AddEdgesViaPoints();
-  AddEdgesViaPointsForHumans();
 
   AddEdgesVelocity();
-  AddEdgesVelocityForHumans();
-
   AddEdgesAcceleration();
-  AddEdgesAccelerationForHumans();
 
   AddEdgesTimeOptimal();
-  AddEdgesTimeOptimalForHumans();
 
   if (cfg_->robot.min_turning_radius == 0 ||
       cfg_->optim.weight_kinematics_turning_radius == 0)
@@ -513,6 +519,20 @@ bool TebOptimalPlanner::buildGraph() {
   else
     AddEdgesKinematicsCarlike(); // we have a carlike robot since the turning
                                  // radius is bounded from below.
+
+  switch (cfg_->planning_mode) {
+  case 0:
+    break;
+  case 1:
+    AddEdgesObstaclesForHumans();
+    // AddEdgesDynamicObstaclesForHumans();
+
+    AddEdgesViaPointsForHumans();
+
+    AddEdgesVelocityForHumans();
+    AddEdgesAccelerationForHumans();
+
+    AddEdgesTimeOptimalForHumans();
 
   AddEdgesKinematicsDiffDriveForHumans();
 
@@ -526,6 +546,12 @@ bool TebOptimalPlanner::buildGraph() {
 
   if (cfg_->optim.use_human_robot_dir_c) {
     AddEdgesHumanRobotDirectional();
+  }
+    break;
+  case 2:
+    break;
+  default:
+    break;
   }
 
   return true;

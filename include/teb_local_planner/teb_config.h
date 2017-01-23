@@ -66,6 +66,8 @@ public:
                           //! the robot driver or simulator
   std::string map_frame;  //!< Global planning frame
 
+  int planning_mode;
+
   //! Trajectory related parameters
   struct Trajectory {
     double teb_autosize; //!< Enable automatic resizing of the trajectory w.r.t
@@ -345,6 +347,11 @@ public:
     double pose_array_z_scale;
   } visualization;
 
+  struct Approach {
+    double human_approach_dist;
+    double human_approach_angle;
+  } approach;
+
   /**
    * @brief Construct the TebConfig using default values.
    * @warning If the \b rosparam server or/and \b dynamic_reconfigure
@@ -371,6 +378,8 @@ public:
 
     odom_topic = "odom";
     map_frame = "odom";
+
+    planning_mode = 1; // Human-Aware planning by default
 
     // Trajectory
 
@@ -506,6 +515,10 @@ public:
     visualization.publish_human_local_plan_poses = false;
     visualization.publish_human_local_plan_fp_poses = false;
     visualization.pose_array_z_scale = 1.0;
+
+    // approach
+    approach.human_approach_dist = 0.5;
+    approach.human_approach_angle = 3.14;
   }
 
   /**

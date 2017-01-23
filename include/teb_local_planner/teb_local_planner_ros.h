@@ -64,6 +64,7 @@
 #include <visualization_msgs/Marker.h>
 #include <teb_local_planner/ObstacleMsg.h>
 #include <teb_local_planner/Optimize.h>
+#include <teb_local_planner/Approach.h>
 
 // human data
 #include <hanp_prediction/HumanPosePredict.h>
@@ -347,6 +348,12 @@ protected:
       HumanPlanCombined &transformed_human_plan_combined,
       geometry_msgs::TwistStamped &transformed_human_twist,
       tf::StampedTransform *tf_human_plan_to_global = NULL) const;
+  bool
+  transformHumanPose(const tf::TransformListener &tf,
+                     const std::string &global_frame,
+                     geometry_msgs::PoseWithCovarianceStamped &human_pose,
+                     geometry_msgs::PoseStamped &transformed_human_pose) const;
+
   /**
     * @brief Estimate the orientation of a pose from the global_plan that is
    * treated as a local goal for the local planner.
@@ -362,10 +369,10 @@ protected:
     * @param local_goal Current local goal
     * @param current_goal_idx Index of the current (local) goal pose in the
    * global plan
-    * @param[out] tf_plan_to_global Transformation between the global plan and
-   * the global planning frame
-    * @param moving_average_length number of future poses of the global plan to
-   * be taken into account
+    * @param[out] tf_plan_to_global Transformation between the global plan
+   * and the global planning frame
+    * @param moving_average_length number of future poses of the global plan
+   * to be taken into account
     * @return orientation (yaw-angle) estimate
     */
   double estimateLocalGoalOrientation(
@@ -501,10 +508,12 @@ private:
       publish_predicted_markers_client_;
 
   // optimize service
-  ros::ServiceServer optimize_server_;
-  std::string optimize_srv_name_;
+  ros::ServiceServer optimize_server_, approach_server_;
   bool optimizeStandalone(teb_local_planner::Optimize::Request &req,
                           teb_local_planner::Optimize::Response &res);
+  bool setApproachID(teb_local_planner::Approach::Request &req,
+                     teb_local_planner::Approach::Response &res);
+  int approach_id_;
 
   bool publish_predicted_human_markers_ = true;
 

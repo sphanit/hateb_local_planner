@@ -46,6 +46,7 @@
 #define PUBLISH_MARKERS_SRV_NAME                                               \
   "/human_pose_prediction/publish_prediction_markers"
 #define OPTIMIZE_SRV_NAME "optimize"
+#define APPROACH_SRV_NAME "set_approach_id"
 #define DEFAULT_HUMAN_SEGMENT hanp_msgs::TrackedSegmentType::TORSO
 #define THROTTLE_RATE 5.0 // seconds
 
@@ -203,6 +204,8 @@ void TebLocalPlannerROS::initialize(std::string name, tf::TransformListener *tf,
 
     optimize_server_ = nh.advertiseService(
         OPTIMIZE_SRV_NAME, &TebLocalPlannerROS::optimizeStandalone, this);
+    approach_server_ = nh.advertiseService(
+        APPROACH_SRV_NAME, &TebLocalPlannerROS::setApproachID, this);
 
     last_call_time_ =
         ros::Time::now() - ros::Duration(cfg_.human.pose_prediction_reset_time);
@@ -358,10 +361,6 @@ bool TebLocalPlannerROS::computeVelocityCommands(
     robot_goal_.theta() = tf::getYaw(goal_point.getRotation());
   }
 
-  // overwrite/update start of the transformed plan with the actual robot
-  // position (allows using the plan as initial trajectory)
-  tf::poseTFToMsg(robot_pose, transformed_plan.front().pose);
-
   // clear currently existing obstacles
   obstacles_.clear();
   auto other_time = ros::Time::now() - other_start_time;
@@ -379,17 +378,17 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   updateObstacleContainerWithCustomObstacles();
   auto cc_time = ros::Time::now() - cc_start_time;
 
-  // update via-points container
-  auto via_start_time = ros::Time::now();
-  updateViaPointsContainer(transformed_plan,
-                           cfg_.trajectory.global_plan_viapoint_sep);
-  auto via_time = ros::Time::now() - via_start_time;
-
   // Do not allow config changes during the following optimization step
   boost::mutex::scoped_lock cfg_lock(cfg_.configMutex());
 
   // update humans
   auto human_start_time = ros::Time::now();
+  std::vector<HumanPlanCombined> transformed_human_plans;
+  HumanPlanVelMap transformed_human_plan_vel_map;
+  switch (cfg_.planning_mode) {
+  case 0:
+    break;
+  case 1: {
   hanp_prediction::HumanPosePredict predict_srv;
   if (cfg_.human.use_external_prediction) {
     if (cfg_.human.predict_human_behind_robot) {
@@ -402,26 +401,23 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   } else {
     double traj_size = 10,
            predict_time = 5.0; // TODO: make these values configurable
-    std::vector<double> predict_times;
     for (double i = 1.0; i <= traj_size; ++i) {
       predict_srv.request.predict_times.push_back(predict_time *
                                                   (i / traj_size));
     }
-    // predict_srv.request.predict_times = predict_times;
     predict_srv.request.type =
         hanp_prediction::HumanPosePredictRequest::VELOCITY_OBSTACLE;
   }
 
   std_srvs::SetBool publish_predicted_markers_srv;
-  publish_predicted_markers_srv.request.data = publish_predicted_human_markers_;
+    publish_predicted_markers_srv.request.data =
+        publish_predicted_human_markers_;
   if (!publish_predicted_markers_client_ &&
       publish_predicted_markers_client_.call(publish_predicted_markers_srv)) {
     ROS_WARN("Failed to call %s service, is human prediction server running?",
              PUBLISH_MARKERS_SRV_NAME);
   }
 
-  HumanPlanVelMap transformed_human_plan_vel_map;
-  std::vector<HumanPlanCombined> transformed_human_plans;
   if (predict_humans_client_ && predict_humans_client_.call(predict_srv)) {
     tf::StampedTransform tf_plan_to_global;
     for (auto predicted_humans_poses :
@@ -430,8 +426,9 @@ bool TebLocalPlannerROS::computeVelocityCommands(
       HumanPlanCombined human_plan_combined;
       auto &transformed_vel = predicted_humans_poses.start_velocity;
       if (!transformHumanPlan(*tf_, robot_pose, *costmap_, global_frame_,
-                              predicted_humans_poses.poses, human_plan_combined,
-                              transformed_vel, &tf_plan_to_global)) {
+                                predicted_humans_poses.poses,
+                                human_plan_combined, transformed_vel,
+                                &tf_plan_to_global)) {
         ROS_WARN("Could not transform the human %ld plan to the frame of the "
                  "controller",
                  predicted_humans_poses.id);
@@ -463,7 +460,83 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   }
   updateHumanViaPointsContainers(transformed_human_plan_vel_map,
                                  cfg_.trajectory.global_plan_viapoint_sep);
+    break;
+  }
+  case 2: {
+    hanp_prediction::HumanPosePredict predict_srv;
+    predict_srv.request.predict_times.push_back(0.0);
+    predict_srv.request.predict_times.push_back(5.0);
+    predict_srv.request.type =
+        hanp_prediction::HumanPosePredictRequest::VELOCITY_OBSTACLE;
+
+    // setup marker publishing
+    std_srvs::SetBool publish_predicted_markers_srv;
+    publish_predicted_markers_srv.request.data =
+        publish_predicted_human_markers_;
+    if (!publish_predicted_markers_client_ &&
+        publish_predicted_markers_client_.call(publish_predicted_markers_srv)) {
+      ROS_WARN("Failed to call %s service, is human prediction server running?",
+               PUBLISH_MARKERS_SRV_NAME);
+    }
+
+    // call human prediction server
+    if (predict_humans_client_ && predict_humans_client_.call(predict_srv)) {
+      for (auto predicted_humans_poses :
+           predict_srv.response.predicted_humans_poses) {
+        if (predicted_humans_poses.id == approach_id_) {
+          geometry_msgs::PoseStamped transformed_human_pose;
+          if (!transformHumanPose(*tf_, global_frame_,
+                                  predicted_humans_poses.poses.front(),
+                                  transformed_human_pose)) {
+            ROS_WARN(
+                "Could not transform the human %ld pose to controller frame",
+                predicted_humans_poses.id);
+          }
+
+          PlanStartVelGoalVel plan_start_vel_goal_vel;
+          plan_start_vel_goal_vel.plan.push_back(transformed_human_pose);
+          transformed_human_plan_vel_map[predicted_humans_poses.id] =
+              plan_start_vel_goal_vel;
+
+          // update global plan of the robot
+          // find position in front of the human
+          tf::Pose tf_human_pose, tf_approach_pose;
+          tf::poseMsgToTF(transformed_human_pose.pose, tf_human_pose);
+          tf_approach_pose.setOrigin(
+              tf::Vector3(cfg_.approach.human_approach_dist, 0.0, 0.0));
+          tf_approach_pose.setRotation(
+              tf::createQuaternionFromYaw(cfg_.approach.human_approach_angle));
+          tf_approach_pose = tf_human_pose * tf_approach_pose;
+          geometry_msgs::PoseStamped approach_pose;
+          tf::poseTFToMsg(tf_approach_pose, approach_pose.pose);
+          approach_pose.header = transformed_human_pose.header;
+
+          // add approach pose to the robot plan, only within reachable distance
+          // transformed_plan.push_back(approach_pose);
+        }
+      }
+    } else {
+      ROS_WARN_THROTTLE(
+          THROTTLE_RATE,
+          "Failed to call %s service, is human prediction server running?",
+          PREDICT_SERVICE_NAME);
+    }
+    // TODO: check if plan-map is not empty
+    break;
+  }
+  default:
+    break;
+  }
   auto human_time = ros::Time::now() - human_start_time;
+
+  // update via-points container
+  auto via_start_time = ros::Time::now();
+  // overwrite/update start of the transformed plan with the actual robot
+  // position (allows using the plan as initial trajectory)
+  tf::poseTFToMsg(robot_pose, transformed_plan.front().pose);
+  updateViaPointsContainer(transformed_plan,
+                           cfg_.trajectory.global_plan_viapoint_sep);
+  auto via_time = ros::Time::now() - via_start_time;
 
   // Now perform the actual planning
   auto plan_start_time = ros::Time::now();
@@ -486,19 +559,21 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   visualization_->publishObstacles(obstacles_);
   visualization_->publishViaPoints(via_points_);
   visualization_->publishGlobalPlan(global_plan_);
-  visualization_->publishHumansPlans(transformed_human_plans);
-  std::vector<HumanPlanTrajCombined> human_plans_traj_array;
-  for (auto &human_plan_combined : transformed_human_plans) {
-    HumanPlanTrajCombined human_plan_traj_combined;
-    human_plan_traj_combined.id = human_plan_combined.id;
-    human_plan_traj_combined.plan_before = human_plan_combined.plan_before;
-    planner_->getFullHumanTrajectory(
-        human_plan_traj_combined.id,
-        human_plan_traj_combined.optimized_trajectory);
-    human_plan_traj_combined.plan_after = human_plan_combined.plan_after;
-    human_plans_traj_array.push_back(human_plan_traj_combined);
+  if (cfg_.planning_mode == 1) {
+    visualization_->publishHumansPlans(transformed_human_plans);
+    std::vector<HumanPlanTrajCombined> human_plans_traj_array;
+    for (auto &human_plan_combined : transformed_human_plans) {
+      HumanPlanTrajCombined human_plan_traj_combined;
+      human_plan_traj_combined.id = human_plan_combined.id;
+      human_plan_traj_combined.plan_before = human_plan_combined.plan_before;
+      planner_->getFullHumanTrajectory(
+          human_plan_traj_combined.id,
+          human_plan_traj_combined.optimized_trajectory);
+      human_plan_traj_combined.plan_after = human_plan_combined.plan_after;
+      human_plans_traj_array.push_back(human_plan_traj_combined);
+    }
+    visualization_->publishHumanTrajectories(human_plans_traj_array);
   }
-  visualization_->publishHumanTrajectories(human_plans_traj_array);
   auto viz_time = ros::Time::now() - viz_start_time;
 
   // Undo temporary horizon reduction
@@ -536,8 +611,8 @@ bool TebLocalPlannerROS::computeVelocityCommands(
     // now we reset everything to start again with the initialization of new
     // trajectories.
     planner_->clearPlanner();
-    ROS_WARN(
-        "TebLocalPlannerROS: trajectory is not feasible. Resetting planner...");
+    ROS_WARN("TebLocalPlannerROS: trajectory is not feasible. Resetting "
+             "planner...");
 
     return false;
   }
@@ -917,8 +992,8 @@ bool TebLocalPlannerROS::transformGlobalPlan(
     double sq_dist_threshold = dist_threshold * dist_threshold;
     double sq_dist = 1e10;
 
-    // we need to loop to a point on the plan that is within a certain distance
-    // of the robot
+    // we need to loop to a point on the plan that is within a certain
+    // distance of the robot
     while (i < (int)global_plan.size()) {
       double x_diff =
           robot_pose.getOrigin().x() - global_plan[i].pose.position.x;
@@ -1112,6 +1187,42 @@ bool TebLocalPlannerROS::transformHumanPlan(
   return true;
 }
 
+bool TebLocalPlannerROS::transformHumanPose(
+    const tf::TransformListener &tf, const std::string &global_frame,
+    geometry_msgs::PoseWithCovarianceStamped &human_pose,
+    geometry_msgs::PoseStamped &transformed_human_pose) const {
+  try {
+    // get human_pose_to_global_transform from plan frame to global_frame
+    tf::StampedTransform human_plan_to_global_transform;
+    tf.waitForTransform(global_frame, human_pose.header.frame_id, ros::Time(0),
+                        ros::Duration(0.5));
+    tf.lookupTransform(global_frame, human_pose.header.frame_id, ros::Time(0),
+                       human_plan_to_global_transform);
+
+    // transform human pose to local planning frame
+    tf::Stamped<tf::Pose> tf_pose_stamped;
+    tf::Pose tf_pose;
+    tf::poseMsgToTF(human_pose.pose.pose, tf_pose);
+    tf_pose_stamped.setData(human_plan_to_global_transform * tf_pose);
+    tf_pose_stamped.stamp_ = human_plan_to_global_transform.stamp_;
+    tf_pose_stamped.frame_id_ = global_frame;
+    tf::poseStampedTFToMsg(tf_pose_stamped, transformed_human_pose);
+  } catch (tf::LookupException &ex) {
+    ROS_ERROR("No Transform available Error: %s\n", ex.what());
+    return false;
+  } catch (tf::ConnectivityException &ex) {
+    ROS_ERROR("Connectivity Error: %s\n", ex.what());
+    return false;
+  } catch (tf::ExtrapolationException &ex) {
+    ROS_ERROR("Extrapolation Error: %s\n", ex.what());
+    ROS_ERROR("Global Frame: %s Pose Frame %s\n", global_frame.c_str(),
+              human_pose.header.frame_id.c_str());
+    return false;
+  }
+
+  return true;
+}
+
 double TebLocalPlannerROS::estimateLocalGoalOrientation(
     const std::vector<geometry_msgs::PoseStamped> &global_plan,
     const tf::Stamped<tf::Pose> &local_goal, int current_goal_idx,
@@ -1132,8 +1243,8 @@ double TebLocalPlannerROS::estimateLocalGoalOrientation(
     }
   }
 
-  // reduce number of poses taken into account if the desired number of poses is
-  // not available
+  // reduce number of poses taken into account if the desired number of poses
+  // is not available
   moving_average_length =
       std::min(moving_average_length,
                n - current_goal_idx - 1); // maybe redundant, since we have
@@ -1171,7 +1282,7 @@ void TebLocalPlannerROS::saturateVelocity(double &v, double &omega,
   // Limit translational velocity for forward driving
   if (v > 0.0) {
     if (v > max_vel_x) {
-    v = max_vel_x;
+      v = max_vel_x;
     } else if (v < min_vel_x) {
       v = min_vel_x;
     }
@@ -1186,13 +1297,13 @@ void TebLocalPlannerROS::saturateVelocity(double &v, double &omega,
   // Limit angular velocity
   if (omega > 0.0) {
     if (omega > max_vel_theta) {
-    omega = max_vel_theta;
+      omega = max_vel_theta;
     } else if (omega < min_vel_theta) {
       omega = min_vel_theta;
     }
   } else if (omega < 0.0) {
     if (omega < -max_vel_theta) {
-    omega = -max_vel_theta;
+      omega = -max_vel_theta;
     } else if (omega > -min_vel_theta) {
       omega = -min_vel_theta;
     }
@@ -1630,6 +1741,21 @@ bool TebLocalPlannerROS::optimizeStandalone(
       "\n\tvelocity extract time       " + std::to_string(vel_time.toSec()) +
       "\n\tvisualization publish time  " + std::to_string(viz_time.toSec()) +
       "\n=================================";
+  return true;
+}
+
+bool TebLocalPlannerROS::setApproachID(
+    teb_local_planner::Approach::Request &req,
+    teb_local_planner::Approach::Response &res) {
+  if (cfg_.planning_mode == 2) {
+    approach_id_ = req.human_id;
+    res.message += "Approach ID set to " + std::to_string(approach_id_);
+    res.success = true;
+  } else {
+    approach_id_ = -1;
+    res.message = "No approach ID set, planner is not running in approach mode";
+    res.success = false;
+  }
   return true;
 }
 

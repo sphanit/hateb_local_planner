@@ -49,6 +49,8 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
   nh.param("odom_topic", odom_topic, odom_topic);
   nh.param("map_frame", map_frame, map_frame);
 
+  nh.param("planning_mode", planning_mode, planning_mode);
+
   // Trajectory
   nh.param("teb_autosize", trajectory.teb_autosize, trajectory.teb_autosize);
   nh.param("dt_ref", trajectory.dt_ref, trajectory.dt_ref);
@@ -273,6 +275,12 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
   nh.param("pose_array_z_scale", visualization.pose_array_z_scale,
            visualization.pose_array_z_scale);
 
+  // approach
+  nh.param("human_approach_dist", approach.human_approach_dist,
+           approach.human_approach_dist);
+  nh.param("human_approach_angle", approach.human_approach_angle,
+           approach.human_approach_angle);
+
   checkParameters();
   checkDeprecated(nh);
 }
@@ -406,6 +414,10 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   visualization.publish_human_local_plan_fp_poses =
       cfg.publish_human_local_plan_fp_poses;
   visualization.pose_array_z_scale = cfg.pose_array_z_scale;
+
+  // approach
+  approach.human_approach_dist = cfg.human_approach_dist;
+  approach.human_approach_angle = cfg.human_approach_angle;
 
   checkParameters();
 }
