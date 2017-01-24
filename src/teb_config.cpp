@@ -276,10 +276,16 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
            visualization.pose_array_z_scale);
 
   // approach
-  nh.param("human_approach_dist", approach.human_approach_dist,
-           approach.human_approach_dist);
-  nh.param("human_approach_angle", approach.human_approach_angle,
-           approach.human_approach_angle);
+  nh.param("approach_id", approach.approach_id,
+           approach.approach_id);
+  nh.param("approach_dist", approach.approach_dist,
+           approach.approach_dist);
+  nh.param("approach_angle", approach.approach_angle,
+           approach.approach_angle);
+  nh.param("approach_dist_tolerance", approach.approach_dist_tolerance,
+           approach.approach_dist_tolerance);
+  nh.param("approach_angle_tolerance", approach.approach_angle_tolerance,
+           approach.approach_angle_tolerance);
 
   checkParameters();
   checkDeprecated(nh);
@@ -416,8 +422,11 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   visualization.pose_array_z_scale = cfg.pose_array_z_scale;
 
   // approach
-  approach.human_approach_dist = cfg.human_approach_dist;
-  approach.human_approach_angle = cfg.human_approach_angle;
+  approach.approach_id = cfg.approach_id;
+  approach.approach_dist = cfg.approach_dist;
+  approach.approach_angle = cfg.approach_angle;
+  approach.approach_dist_tolerance = cfg.approach_dist_tolerance;
+  approach.approach_angle_tolerance = cfg.approach_angle_tolerance;
 
   checkParameters();
 }

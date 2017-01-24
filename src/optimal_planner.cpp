@@ -40,6 +40,8 @@
  *          Harmish Khambhaita (harmish@laas.fr)
  *********************************************************************/
 
+#define THROTTLE_RATE 1.0 // seconds
+
 #include <teb_local_planner/optimal_planner.h>
 
 namespace teb_local_planner {
@@ -394,6 +396,21 @@ bool TebOptimalPlanner::plan(
     break;
   }
   case 2: {
+    if (initial_human_plan_vel_map->size() == 1) {
+      auto &approach_plan = initial_human_plan_vel_map->begin()->second.plan;
+      if (approach_plan.size() == 1) {
+        approach_pose_ = approach_plan.front();
+        // modify robot global plan
+      } else {
+        ROS_INFO("empty pose of the human for approaching");
+        // set approach_pose_ same as the current robot pose
+        approach_pose_ = initial_plan.front();
+      }
+    } else {
+      ROS_INFO("no or multiple humans for approaching");
+      // set approach_pose_ same as the current robot pose
+      approach_pose_ = initial_plan.front();
+    }
     break;
   }
   default:
@@ -549,6 +566,7 @@ bool TebOptimalPlanner::buildGraph() {
   }
     break;
   case 2:
+    AddVertexEdgesApproach();
     break;
   default:
     break;
@@ -612,6 +630,10 @@ void TebOptimalPlanner::AddTEBVertices() {
     }
   }
 
+  switch (cfg_->planning_mode) {
+  case 0:
+    break;
+  case 1: {
   for (auto &human_teb_kv : humans_tebs_map_) {
     auto &human_teb = human_teb_kv.second;
     for (unsigned int i = 0; i < human_teb.sizePoses(); ++i) {
@@ -622,6 +644,18 @@ void TebOptimalPlanner::AddTEBVertices() {
         optimizer_->addVertex(human_teb.TimeDiffVertex(i));
       }
     }
+  }
+    break;
+}
+  case 2: {
+    PoseSE2 approach_pose_se2(approach_pose_.pose);
+    approach_pose_vertex = new VertexPose(approach_pose_se2, true);
+    approach_pose_vertex->setId(id_counter++);
+    optimizer_->addVertex(approach_pose_vertex);
+    break;
+  }
+  default:
+    break;
   }
 }
 
@@ -854,8 +888,10 @@ void TebOptimalPlanner::AddEdgesViaPointsForHumans() {
 
     if (humans_tebs_map_.find(human_via_points_kv.first) ==
         humans_tebs_map_.end()) {
-      ROS_INFO("inconsistant data between humans_tebs_map and "
-               "humans_via_points_map");
+      ROS_WARN_THROTTLE(THROTTLE_RATE,
+                        "inconsistant data between humans_tebs_map and "
+                        "humans_via_points_map (for id %ld)",
+                        human_via_points_kv.first);
       continue;
     }
 
@@ -1228,6 +1264,25 @@ void TebOptimalPlanner::AddEdgesHumanRobotDirectional() {
       human_robot_dir_edge->setTebConfig(*cfg_);
       optimizer_->addEdge(human_robot_dir_edge);
     }
+  }
+}
+
+void TebOptimalPlanner::AddVertexEdgesApproach() {
+  if (!approach_pose_vertex) {
+    ROS_ERROR("approch pose vertex does not exist");
+    return;
+  }
+
+  Eigen::Matrix<double, 1, 1> information_approach;
+  information_approach.fill(cfg_->optim.weight_obstacle);
+
+  for (auto &teb_pose : teb_.poses()) {
+    EdgeHumanRobotSafety *approach_edge = new EdgeHumanRobotSafety;
+    approach_edge->setVertex(0, teb_pose);
+    approach_edge->setVertex(1, approach_pose_vertex);
+    approach_edge->setInformation(information_approach);
+    approach_edge->setParameters(*cfg_, robot_model_.get(), human_radius_);
+    optimizer_->addEdge(approach_edge);
   }
 }
 

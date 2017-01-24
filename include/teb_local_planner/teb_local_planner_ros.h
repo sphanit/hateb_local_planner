@@ -513,7 +513,6 @@ private:
                           teb_local_planner::Optimize::Response &res);
   bool setApproachID(teb_local_planner::Approach::Request &req,
                      teb_local_planner::Approach::Response &res);
-  int approach_id_;
 
   bool publish_predicted_human_markers_ = true;
 

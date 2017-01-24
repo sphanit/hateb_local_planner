@@ -419,7 +419,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   }
 
   if (predict_humans_client_ && predict_humans_client_.call(predict_srv)) {
-    tf::StampedTransform tf_plan_to_global;
+      tf::StampedTransform tf_human_plan_to_global;
     for (auto predicted_humans_poses :
          predict_srv.response.predicted_humans_poses) {
       // transform human plans
@@ -428,7 +428,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(
       if (!transformHumanPlan(*tf_, robot_pose, *costmap_, global_frame_,
                                 predicted_humans_poses.poses,
                                 human_plan_combined, transformed_vel,
-                                &tf_plan_to_global)) {
+                                &tf_human_plan_to_global)) {
         ROS_WARN("Could not transform the human %ld plan to the frame of the "
                  "controller",
                  predicted_humans_poses.id);
@@ -483,7 +483,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(
     if (predict_humans_client_ && predict_humans_client_.call(predict_srv)) {
       for (auto predicted_humans_poses :
            predict_srv.response.predicted_humans_poses) {
-        if (predicted_humans_poses.id == approach_id_) {
+        if (predicted_humans_poses.id == cfg_.approach.approach_id) {
           geometry_msgs::PoseStamped transformed_human_pose;
           if (!transformHumanPose(*tf_, global_frame_,
                                   predicted_humans_poses.poses.front(),
@@ -503,16 +503,48 @@ bool TebLocalPlannerROS::computeVelocityCommands(
           tf::Pose tf_human_pose, tf_approach_pose;
           tf::poseMsgToTF(transformed_human_pose.pose, tf_human_pose);
           tf_approach_pose.setOrigin(
-              tf::Vector3(cfg_.approach.human_approach_dist, 0.0, 0.0));
+              tf::Vector3(cfg_.approach.approach_dist, 0.0, 0.0));
           tf_approach_pose.setRotation(
-              tf::createQuaternionFromYaw(cfg_.approach.human_approach_angle));
+              tf::createQuaternionFromYaw(cfg_.approach.approach_angle));
           tf_approach_pose = tf_human_pose * tf_approach_pose;
           geometry_msgs::PoseStamped approach_pose;
           tf::poseTFToMsg(tf_approach_pose, approach_pose.pose);
           approach_pose.header = transformed_human_pose.header;
 
           // add approach pose to the robot plan, only within reachable distance
-          // transformed_plan.push_back(approach_pose);
+          auto &plan_goal = transformed_plan.back().pose;
+          auto &approach_goal = approach_pose.pose;
+          double lin_dist = std::abs(
+              std::hypot(plan_goal.position.x - approach_goal.position.x,
+                         plan_goal.position.y - approach_goal.position.y));
+          double ang_dist = std::abs(angles::shortest_angular_distance(
+              tf::getYaw(plan_goal.orientation),
+              tf::getYaw(approach_goal.orientation)));
+
+            // get approach pose in to the frame of global plan
+            tf::Pose tf_approach_global =
+                tf_plan_to_global.inverse() * tf_approach_pose;
+            geometry_msgs::PoseStamped approach_pose_global;
+            tf::poseTFToMsg(tf_approach_global, approach_pose_global.pose);
+            approach_pose_global.header = global_plan_.back().header;
+
+            // prune and update global plan
+            auto global_plan_it = global_plan_.begin();
+            double last_dist = std::numeric_limits<double>::infinity();
+            while (global_plan_it != global_plan_.end()) {
+              auto &p_pos = (*global_plan_it).pose.position;
+              auto &a_pos = approach_pose_global.pose.position;
+              double pa_dist = std::hypot(p_pos.x - a_pos.x, p_pos.y - a_pos.y);
+              if (pa_dist > last_dist) {
+                break;
+              }
+              last_dist = pa_dist;
+              global_plan_it++;
+            }
+            global_plan_.erase(global_plan_it, global_plan_.end());
+            global_plan_.push_back(approach_pose_global);
+            ROS_DEBUG("Global plan modified for approach behavior");
+          }
         }
       }
     } else {
@@ -1748,11 +1780,12 @@ bool TebLocalPlannerROS::setApproachID(
     teb_local_planner::Approach::Request &req,
     teb_local_planner::Approach::Response &res) {
   if (cfg_.planning_mode == 2) {
-    approach_id_ = req.human_id;
-    res.message += "Approach ID set to " + std::to_string(approach_id_);
+    cfg_.approach.approach_id = req.human_id;
+    res.message +=
+        "Approach ID set to " + std::to_string(cfg_.approach.approach_id);
     res.success = true;
   } else {
-    approach_id_ = -1;
+    cfg_.approach.approach_id = -1;
     res.message = "No approach ID set, planner is not running in approach mode";
     res.success = false;
   }

@@ -793,6 +793,8 @@ protected:
   void AddEdgesHumanRobotTTC();
   void AddEdgesHumanRobotDirectional();
 
+  void AddVertexEdgesApproach();
+
   //@}
 
   /**
@@ -814,6 +816,9 @@ protected:
   TebVisualizationPtr visualization_; //!< Instance of the visualization class
   TimedElasticBand teb_;              //!< Actual trajectory object
   std::map<uint64_t, TimedElasticBand> humans_tebs_map_;
+  geometry_msgs::PoseStamped approach_pose_;
+  VertexPose *approach_pose_vertex;
+
   RobotFootprintModelPtr robot_model_; //!< Robot model
   CircularRobotFootprintPtr human_model_;
   boost::shared_ptr<g2o::SparseOptimizer>

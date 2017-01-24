@@ -348,8 +348,11 @@ public:
   } visualization;
 
   struct Approach {
-    double human_approach_dist;
-    double human_approach_angle;
+    int approach_id;
+    double approach_dist;
+    double approach_angle;
+    double approach_dist_tolerance;
+    double approach_angle_tolerance;
   } approach;
 
   /**
@@ -517,8 +520,11 @@ public:
     visualization.pose_array_z_scale = 1.0;
 
     // approach
-    approach.human_approach_dist = 0.5;
-    approach.human_approach_angle = 3.14;
+    approach.approach_id = 1;
+    approach.approach_dist = 0.5;
+    approach.approach_angle = 3.14;
+    approach.approach_dist_tolerance = 0.2;
+    approach.approach_angle_tolerance = 0.3;
   }
 
   /**
