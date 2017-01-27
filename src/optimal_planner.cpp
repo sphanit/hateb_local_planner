@@ -318,80 +318,80 @@ bool TebOptimalPlanner::plan(
     humans_tebs_map_.clear();
     break;
   case 1: {
-  auto itr = humans_tebs_map_.begin();
-  while (itr != humans_tebs_map_.end()) {
-    if (initial_human_plan_vel_map->find(itr->first) ==
-        initial_human_plan_vel_map->end())
-      itr = humans_tebs_map_.erase(itr);
-    else
-      ++itr;
-  }
-
-  for (auto &initial_human_plan_vel_kv : *initial_human_plan_vel_map) {
-    auto &human_id = initial_human_plan_vel_kv.first;
-    auto &initial_human_plan = initial_human_plan_vel_kv.second.plan;
-
-    // erase human-teb if human plan is empty
-    if (initial_human_plan.empty()) {
-      auto itr = humans_tebs_map_.find(human_id);
-      if (itr != humans_tebs_map_.end()) {
-          ROS_DEBUG("New plan: new human plan is empty. Removing human "
-                    "trajectories.");
-        humans_tebs_map_.erase(itr);
-      }
-      continue;
+    auto itr = humans_tebs_map_.begin();
+    while (itr != humans_tebs_map_.end()) {
+      if (initial_human_plan_vel_map->find(itr->first) ==
+          initial_human_plan_vel_map->end())
+        itr = humans_tebs_map_.erase(itr);
+      else
+        ++itr;
     }
 
-    if (humans_tebs_map_.find(human_id) == humans_tebs_map_.end()) {
-      // create new human-teb for new human
-      humans_tebs_map_[human_id] = TimedElasticBand();
-      humans_tebs_map_[human_id].initTEBtoGoal(
-          initial_human_plan, cfg_->trajectory.dt_ref, true,
-          cfg_->trajectory.human_min_samples,
-          cfg_->trajectory.teb_init_skip_dist);
-    } else if (cfg_->optim.disable_warm_start) {
-      auto &human_teb = humans_tebs_map_[human_id];
-      human_teb.clearTimedElasticBand();
-        human_teb.initTEBtoGoal(initial_human_plan, cfg_->trajectory.dt_ref,
-                                true, cfg_->trajectory.human_min_samples,
-                              cfg_->trajectory.teb_init_skip_dist);
-    } else {
-      // modify human-teb for existing human
-      PoseSE2 human_start_(initial_human_plan.front().pose);
-      PoseSE2 human_goal_(initial_human_plan.back().pose);
-      auto &human_teb = humans_tebs_map_[human_id];
-      if (human_teb.sizePoses() > 0 &&
-          (human_goal_.position() - human_teb.BackPose().position()).norm() <
-              cfg_->trajectory.force_reinit_new_goal_dist)
-        human_teb.updateAndPruneTEB(human_start_, human_goal_,
-                                    cfg_->trajectory.human_min_samples);
-      else {
-        ROS_DEBUG("New goal: distance to existing goal is higher than the "
-                  "specified threshold. Reinitializing human trajectories.");
+    for (auto &initial_human_plan_vel_kv : *initial_human_plan_vel_map) {
+      auto &human_id = initial_human_plan_vel_kv.first;
+      auto &initial_human_plan = initial_human_plan_vel_kv.second.plan;
+
+      // erase human-teb if human plan is empty
+      if (initial_human_plan.empty()) {
+        auto itr = humans_tebs_map_.find(human_id);
+        if (itr != humans_tebs_map_.end()) {
+          ROS_DEBUG("New plan: new human plan is empty. Removing human "
+                    "trajectories.");
+          humans_tebs_map_.erase(itr);
+        }
+        continue;
+      }
+
+      if (humans_tebs_map_.find(human_id) == humans_tebs_map_.end()) {
+        // create new human-teb for new human
+        humans_tebs_map_[human_id] = TimedElasticBand();
+        humans_tebs_map_[human_id].initTEBtoGoal(
+            initial_human_plan, cfg_->trajectory.dt_ref, true,
+            cfg_->trajectory.human_min_samples,
+            cfg_->trajectory.teb_init_skip_dist);
+      } else if (cfg_->optim.disable_warm_start) {
+        auto &human_teb = humans_tebs_map_[human_id];
         human_teb.clearTimedElasticBand();
         human_teb.initTEBtoGoal(initial_human_plan, cfg_->trajectory.dt_ref,
                                 true, cfg_->trajectory.human_min_samples,
                                 cfg_->trajectory.teb_init_skip_dist);
+      } else {
+        // modify human-teb for existing human
+        PoseSE2 human_start_(initial_human_plan.front().pose);
+        PoseSE2 human_goal_(initial_human_plan.back().pose);
+        auto &human_teb = humans_tebs_map_[human_id];
+        if (human_teb.sizePoses() > 0 &&
+            (human_goal_.position() - human_teb.BackPose().position()).norm() <
+                cfg_->trajectory.force_reinit_new_goal_dist)
+          human_teb.updateAndPruneTEB(human_start_, human_goal_,
+                                      cfg_->trajectory.human_min_samples);
+        else {
+          ROS_DEBUG("New goal: distance to existing goal is higher than the "
+                    "specified threshold. Reinitializing human trajectories.");
+          human_teb.clearTimedElasticBand();
+          human_teb.initTEBtoGoal(initial_human_plan, cfg_->trajectory.dt_ref,
+                                  true, cfg_->trajectory.human_min_samples,
+                                  cfg_->trajectory.teb_init_skip_dist);
+        }
       }
-    }
-    // give start velocity for humans
-    std::pair<bool, Eigen::Vector2d> human_start_vel;
-    human_start_vel.first = true;
-    human_start_vel.second.coeffRef(0) =
-        initial_human_plan_vel_kv.second.start_vel.linear.x;
-    human_start_vel.second.coeffRef(1) =
-        initial_human_plan_vel_kv.second.start_vel.angular.z;
-    humans_vel_start_[human_id] = human_start_vel;
+      // give start velocity for humans
+      std::pair<bool, Eigen::Vector2d> human_start_vel;
+      human_start_vel.first = true;
+      human_start_vel.second.coeffRef(0) =
+          initial_human_plan_vel_kv.second.start_vel.linear.x;
+      human_start_vel.second.coeffRef(1) =
+          initial_human_plan_vel_kv.second.start_vel.angular.z;
+      humans_vel_start_[human_id] = human_start_vel;
 
-    // do not set goal velocity for humans
-    std::pair<bool, Eigen::Vector2d> human_goal_vel;
-    human_goal_vel.first = false;
-    // human_goal_vel.first = true;
-    // human_goal_vel.second.coeffRef(0) =
-    //     initial_human_plan_vel_kv.second.goal_vel.linear.x;
-    // human_goal_vel.second.coeffRef(1) =
-    //     initial_human_plan_vel_kv.second.goal_vel.angular.z;
-    // humans_vel_goal_[human_id] = human_goal_vel;
+      // do not set goal velocity for humans
+      std::pair<bool, Eigen::Vector2d> human_goal_vel;
+      human_goal_vel.first = false;
+      // human_goal_vel.first = true;
+      // human_goal_vel.second.coeffRef(0) =
+      //     initial_human_plan_vel_kv.second.goal_vel.linear.x;
+      // human_goal_vel.second.coeffRef(1) =
+      //     initial_human_plan_vel_kv.second.goal_vel.angular.z;
+      // humans_vel_goal_[human_id] = human_goal_vel;
     }
     break;
   }
@@ -425,17 +425,17 @@ bool TebOptimalPlanner::plan(
   auto opt_time = ros::Time::now() - opt_start_time;
 
   auto total_time = ros::Time::now() - prep_start_time;
-  ROS_INFO_STREAM_COND(total_time.toSec() > 0.1,
-                       "\nteb optimal plan times:\n"
-                           << "\ttotal plan time                "
-                           << std::to_string(total_time.toSec()) << "\n"
-                           << "\toptimizatoin preparation time  "
-                           << std::to_string(prep_time.toSec()) << "\n"
-                           << "\thuman preparation time         "
-                           << std::to_string(prep_time.toSec()) << "\n"
-                           << "\tteb optimize time              "
-                           << std::to_string(opt_time.toSec())
-                           << "\n-------------------------");
+  ROS_DEBUG_STREAM_COND(total_time.toSec() > 0.1,
+                        "\nteb optimal plan times:\n"
+                            << "\ttotal plan time                "
+                            << std::to_string(total_time.toSec()) << "\n"
+                            << "\toptimizatoin preparation time  "
+                            << std::to_string(prep_time.toSec()) << "\n"
+                            << "\thuman preparation time         "
+                            << std::to_string(prep_time.toSec()) << "\n"
+                            << "\tteb optimize time              "
+                            << std::to_string(opt_time.toSec())
+                            << "\n-------------------------");
 
   return teb_opt_result;
 }
@@ -535,7 +535,7 @@ bool TebOptimalPlanner::buildGraph() {
     AddEdgesKinematicsDiffDrive(); // we have a differential drive robot
   else
     AddEdgesKinematicsCarlike(); // we have a carlike robot since the turning
-                                 // radius is bounded from below.
+  // radius is bounded from below.
 
   switch (cfg_->planning_mode) {
   case 0:
@@ -551,19 +551,19 @@ bool TebOptimalPlanner::buildGraph() {
 
     AddEdgesTimeOptimalForHumans();
 
-  AddEdgesKinematicsDiffDriveForHumans();
+    AddEdgesKinematicsDiffDriveForHumans();
 
-  if (cfg_->optim.use_human_robot_safety_c) {
-    AddEdgesHumanRobotSafety();
-  }
+    if (cfg_->optim.use_human_robot_safety_c) {
+      AddEdgesHumanRobotSafety();
+    }
 
-  if (cfg_->optim.use_human_robot_ttc_c) {
-    AddEdgesHumanRobotTTC();
-  }
+    if (cfg_->optim.use_human_robot_ttc_c) {
+      AddEdgesHumanRobotTTC();
+    }
 
-  if (cfg_->optim.use_human_robot_dir_c) {
-    AddEdgesHumanRobotDirectional();
-  }
+    if (cfg_->optim.use_human_robot_dir_c) {
+      AddEdgesHumanRobotDirectional();
+    }
     break;
   case 2:
     AddVertexEdgesApproach();
@@ -634,19 +634,19 @@ void TebOptimalPlanner::AddTEBVertices() {
   case 0:
     break;
   case 1: {
-  for (auto &human_teb_kv : humans_tebs_map_) {
-    auto &human_teb = human_teb_kv.second;
-    for (unsigned int i = 0; i < human_teb.sizePoses(); ++i) {
-      human_teb.PoseVertex(i)->setId(id_counter++);
-      optimizer_->addVertex(human_teb.PoseVertex(i));
-      if (teb_.sizeTimeDiffs() != 0 && i < human_teb.sizeTimeDiffs()) {
-        human_teb.TimeDiffVertex(i)->setId(id_counter++);
-        optimizer_->addVertex(human_teb.TimeDiffVertex(i));
+    for (auto &human_teb_kv : humans_tebs_map_) {
+      auto &human_teb = human_teb_kv.second;
+      for (unsigned int i = 0; i < human_teb.sizePoses(); ++i) {
+        human_teb.PoseVertex(i)->setId(id_counter++);
+        optimizer_->addVertex(human_teb.PoseVertex(i));
+        if (teb_.sizeTimeDiffs() != 0 && i < human_teb.sizeTimeDiffs()) {
+          human_teb.TimeDiffVertex(i)->setId(id_counter++);
+          optimizer_->addVertex(human_teb.TimeDiffVertex(i));
+        }
       }
     }
-  }
     break;
-}
+  }
   case 2: {
     PoseSE2 approach_pose_se2(approach_pose_.pose);
     approach_pose_vertex = new VertexPose(approach_pose_se2, true);

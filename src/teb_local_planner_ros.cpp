@@ -59,13 +59,13 @@
 // pluginlib macros
 #include <pluginlib/class_list_macros.h>
 
-#include "g2o/core/sparse_optimizer.h"
 #include "g2o/core/block_solver.h"
 #include "g2o/core/factory.h"
 #include "g2o/core/optimization_algorithm_gauss_newton.h"
 #include "g2o/core/optimization_algorithm_levenberg.h"
-#include "g2o/solvers/csparse/linear_solver_csparse.h"
+#include "g2o/core/sparse_optimizer.h"
 #include "g2o/solvers/cholmod/linear_solver_cholmod.h"
+#include "g2o/solvers/csparse/linear_solver_csparse.h"
 
 // register this planner as a BaseLocalPlanner plugin
 PLUGINLIB_DECLARE_CLASS(teb_local_planner, TebLocalPlannerROS,
@@ -389,77 +389,77 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   case 0:
     break;
   case 1: {
-  hanp_prediction::HumanPosePredict predict_srv;
-  if (cfg_.human.use_external_prediction) {
-    if (cfg_.human.predict_human_behind_robot) {
-      predict_srv.request.type =
-          hanp_prediction::HumanPosePredictRequest::BEHIND_ROBOT;
+    hanp_prediction::HumanPosePredict predict_srv;
+    if (cfg_.human.use_external_prediction) {
+      if (cfg_.human.predict_human_behind_robot) {
+        predict_srv.request.type =
+            hanp_prediction::HumanPosePredictRequest::BEHIND_ROBOT;
+      } else {
+        predict_srv.request.type =
+            hanp_prediction::HumanPosePredictRequest::EXTERNAL;
+      }
     } else {
+      double traj_size = 10,
+             predict_time = 5.0; // TODO: make these values configurable
+      for (double i = 1.0; i <= traj_size; ++i) {
+        predict_srv.request.predict_times.push_back(predict_time *
+                                                    (i / traj_size));
+      }
       predict_srv.request.type =
-          hanp_prediction::HumanPosePredictRequest::EXTERNAL;
+          hanp_prediction::HumanPosePredictRequest::VELOCITY_OBSTACLE;
     }
-  } else {
-    double traj_size = 10,
-           predict_time = 5.0; // TODO: make these values configurable
-    for (double i = 1.0; i <= traj_size; ++i) {
-      predict_srv.request.predict_times.push_back(predict_time *
-                                                  (i / traj_size));
-    }
-    predict_srv.request.type =
-        hanp_prediction::HumanPosePredictRequest::VELOCITY_OBSTACLE;
-  }
 
-  std_srvs::SetBool publish_predicted_markers_srv;
+    std_srvs::SetBool publish_predicted_markers_srv;
     publish_predicted_markers_srv.request.data =
         publish_predicted_human_markers_;
-  if (!publish_predicted_markers_client_ &&
-      publish_predicted_markers_client_.call(publish_predicted_markers_srv)) {
-    ROS_WARN("Failed to call %s service, is human prediction server running?",
-             PUBLISH_MARKERS_SRV_NAME);
-  }
+    if (!publish_predicted_markers_client_ &&
+        publish_predicted_markers_client_.call(publish_predicted_markers_srv)) {
+      ROS_WARN("Failed to call %s service, is human prediction server running?",
+               PUBLISH_MARKERS_SRV_NAME);
+    }
 
-  if (predict_humans_client_ && predict_humans_client_.call(predict_srv)) {
+    if (predict_humans_client_ && predict_humans_client_.call(predict_srv)) {
       tf::StampedTransform tf_human_plan_to_global;
-    for (auto predicted_humans_poses :
-         predict_srv.response.predicted_humans_poses) {
-      // transform human plans
-      HumanPlanCombined human_plan_combined;
-      auto &transformed_vel = predicted_humans_poses.start_velocity;
-      if (!transformHumanPlan(*tf_, robot_pose, *costmap_, global_frame_,
+      for (auto predicted_humans_poses :
+           predict_srv.response.predicted_humans_poses) {
+        // transform human plans
+        HumanPlanCombined human_plan_combined;
+        auto &transformed_vel = predicted_humans_poses.start_velocity;
+        if (!transformHumanPlan(*tf_, robot_pose, *costmap_, global_frame_,
                                 predicted_humans_poses.poses,
                                 human_plan_combined, transformed_vel,
                                 &tf_human_plan_to_global)) {
-        ROS_WARN("Could not transform the human %ld plan to the frame of the "
-                 "controller",
-                 predicted_humans_poses.id);
-        continue;
-      }
+          ROS_WARN("Could not transform the human %ld plan to the frame of the "
+                   "controller",
+                   predicted_humans_poses.id);
+          continue;
+        }
 
-      human_plan_combined.id = predicted_humans_poses.id;
-      transformed_human_plans.push_back(human_plan_combined);
+        human_plan_combined.id = predicted_humans_poses.id;
+        transformed_human_plans.push_back(human_plan_combined);
 
-      PlanStartVelGoalVel plan_start_vel_goal_vel;
-      plan_start_vel_goal_vel.plan = human_plan_combined.plan_to_optimize;
-      plan_start_vel_goal_vel.start_vel = transformed_vel.twist;
-      if (human_plan_combined.plan_after.size() > 0) {
-        plan_start_vel_goal_vel.goal_vel = transformed_vel.twist;
+        PlanStartVelGoalVel plan_start_vel_goal_vel;
+        plan_start_vel_goal_vel.plan = human_plan_combined.plan_to_optimize;
+        plan_start_vel_goal_vel.start_vel = transformed_vel.twist;
+        if (human_plan_combined.plan_after.size() > 0) {
+          plan_start_vel_goal_vel.goal_vel = transformed_vel.twist;
+        }
+        transformed_human_plan_vel_map[human_plan_combined.id] =
+            plan_start_vel_goal_vel;
       }
-      transformed_human_plan_vel_map[human_plan_combined.id] =
-          plan_start_vel_goal_vel;
+    } else {
+      ROS_WARN_THROTTLE(
+          THROTTLE_RATE,
+          "Failed to call %s service, is human prediction server running?",
+          PREDICT_SERVICE_NAME);
+
+      // re-initialize the service
+      // predict_humans_client_ =
+      // nh.serviceClient<hanp_prediction::HumanPosePredict>(PREDICT_SERVICE_NAME,
+      // true);
     }
-  } else {
-    ROS_WARN_THROTTLE(
-        THROTTLE_RATE,
-        "Failed to call %s service, is human prediction server running?",
-             PREDICT_SERVICE_NAME);
-
-    // re-initialize the service
-    // predict_humans_client_ =
-    // nh.serviceClient<hanp_prediction::HumanPosePredict>(PREDICT_SERVICE_NAME,
-    // true);
-  }
-  updateHumanViaPointsContainers(transformed_human_plan_vel_map,
-                                 cfg_.trajectory.global_plan_viapoint_sep);
+    updateHumanViaPointsContainers(transformed_human_plan_vel_map,
+                                   cfg_.trajectory.global_plan_viapoint_sep);
     break;
   }
   case 2: {
@@ -511,6 +511,17 @@ bool TebLocalPlannerROS::computeVelocityCommands(
           tf::poseTFToMsg(tf_approach_pose, approach_pose.pose);
           approach_pose.header = transformed_human_pose.header;
 
+          // ROS_INFO("human pose: x=%.2f, y=%.2f, theta=%.2f, frame=%s",
+          //          transformed_human_pose.pose.position.x,
+          //          transformed_human_pose.pose.position.y,
+          //          tf::getYaw(transformed_human_pose.pose.orientation),
+          //          transformed_human_pose.header.frame_id.c_str());
+          // ROS_INFO("approach pose: x=%.2f, y=%.2f, theta=%.2f, frame=%s",
+          //          approach_pose.pose.position.x,
+          //          approach_pose.pose.position.y,
+          //          tf::getYaw(approach_pose.pose.orientation),
+          //          approach_pose.header.frame_id.c_str());
+
           // add approach pose to the robot plan, only within reachable distance
           auto &plan_goal = transformed_plan.back().pose;
           auto &approach_goal = approach_pose.pose;
@@ -520,6 +531,10 @@ bool TebLocalPlannerROS::computeVelocityCommands(
           double ang_dist = std::abs(angles::shortest_angular_distance(
               tf::getYaw(plan_goal.orientation),
               tf::getYaw(approach_goal.orientation)));
+          // ROS_INFO("lin_dist=%.2f, ang_dist=%.2f", lin_dist, ang_dist);
+          if (lin_dist > cfg_.approach.approach_dist_tolerance ||
+              ang_dist > cfg_.approach.approach_angle_tolerance) {
+            transformed_plan.push_back(approach_pose);
 
             // get approach pose in to the frame of global plan
             tf::Pose tf_approach_global =
@@ -686,7 +701,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   auto vel_time = ros::Time::now() - vel_start_time;
 
   auto total_time = ros::Time::now() - start_time;
-  ROS_INFO_STREAM_COND(
+  ROS_DEBUG_STREAM_COND(
       total_time.toSec() > 0.1,
       "\tcompute velocity times:\n"
           << "\t\ttotal time                   "
