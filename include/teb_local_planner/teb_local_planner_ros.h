@@ -399,7 +399,7 @@ protected:
   void saturateVelocity(double &v, double &omega, double max_vel_x,
                         double min_vel_x, double max_vel_theta,
                         double min_vel_theta, double max_vel_x_backwards,
-                        double min_vel_x_backwards) const;
+                        double min_vel_x_backwards);
 
   /**
    * @brief Convert translational and rotational velocities to a steering angle
@@ -518,6 +518,9 @@ private:
 
   void resetHumansPrediction();
   ros::Time last_call_time_;
+
+  ros::Time last_omega_sign_change_;
+  double last_omega_;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

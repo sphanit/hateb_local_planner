@@ -210,6 +210,11 @@ void TebLocalPlannerROS::initialize(std::string name, tf::TransformListener *tf,
     last_call_time_ =
         ros::Time::now() - ros::Duration(cfg_.human.pose_prediction_reset_time);
 
+    last_omega_sign_change_ =
+        ros::Time::now() -
+        ros::Duration(cfg_.optim.omega_chage_time_seperation);
+    last_omega_ = 0.0;
+
     // set initialized flag
     initialized_ = true;
 
@@ -1325,7 +1330,7 @@ void TebLocalPlannerROS::saturateVelocity(double &v, double &omega,
                                           double max_vel_theta,
                                           double min_vel_theta,
                                           double max_vel_x_backwards,
-                                          double min_vel_x_backwards) const {
+                                          double min_vel_x_backwards) {
   // Limit translational velocity for forward driving
   if (v > 0.0) {
     if (v > max_vel_x) {
@@ -1353,6 +1358,20 @@ void TebLocalPlannerROS::saturateVelocity(double &v, double &omega,
       omega = -max_vel_theta;
     } else if (omega > -min_vel_theta) {
       omega = -min_vel_theta;
+    }
+  }
+
+  // slow change of direction in angular velocity
+  if (cfg_.optim.disable_rapid_omega_chage) {
+    if (std::signbit(omega) != std::signbit(last_omega_)) {
+      // signs are changed
+      auto now = ros::Time::now();
+      if ((now - last_omega_sign_change_).toSec() <
+      cfg_.optim.omega_chage_time_seperation) {
+        // do not allow sign change
+        omega = std::copysign(min_vel_theta, omega);
+      }
+      last_omega_sign_change_ = now;
     }
   }
 }

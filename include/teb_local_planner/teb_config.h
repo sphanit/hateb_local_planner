@@ -267,6 +267,8 @@ public:
     bool use_human_robot_dir_c;
     bool use_human_elastic_vel;
     bool disable_warm_start;
+    bool disable_rapid_omega_chage;
+    double omega_chage_time_seperation;
   } optim;                     //!< Optimization related parameters
 
   struct HomotopyClasses {
@@ -491,6 +493,8 @@ public:
     optim.use_human_robot_dir_c = true;
     optim.use_human_elastic_vel = true;
     optim.disable_warm_start = false;
+    optim.disable_rapid_omega_chage = true;
+    optim.omega_chage_time_seperation = 1.0;
 
     // Homotopy Class Planner
 

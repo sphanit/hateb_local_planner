@@ -221,6 +221,10 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
            optim.use_human_elastic_vel);
   nh.param("disable_warm_start", optim.disable_warm_start,
            optim.disable_warm_start);
+  nh.param("disable_rapid_omega_chage", optim.disable_rapid_omega_chage,
+           optim.disable_rapid_omega_chage);
+  nh.param("omega_chage_time_seperation", optim.omega_chage_time_seperation,
+           optim.omega_chage_time_seperation);
 
   // Homotopy Class Planner
   nh.param("enable_homotopy_class_planning", hcp.enable_homotopy_class_planning,
@@ -394,6 +398,8 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   optim.use_human_robot_dir_c = cfg.use_human_robot_dir_c;
   optim.use_human_elastic_vel = cfg.use_human_elastic_vel;
   optim.disable_warm_start = cfg.disable_warm_start;
+  optim.disable_rapid_omega_chage = cfg.disable_rapid_omega_chage;
+  optim.omega_chage_time_seperation = cfg.omega_chage_time_seperation;
 
   // Homotopy Class Planner
   hcp.enable_multithreading = cfg.enable_multithreading;
