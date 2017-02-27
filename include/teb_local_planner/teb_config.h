@@ -139,7 +139,8 @@ public:
 
   struct Human {
     double radius;
-    double min_human_dist;
+    double min_human_robot_dist;
+    double min_human_human_dist;
     double max_vel_x;
     double min_vel_x;
     double nominal_vel_x;
@@ -255,10 +256,12 @@ public:
                                   //! distance from human to its via-points
     double weight_human_robot_safety; //!< Optimization weight for satisfying a minimum
                                //! seperation between human and robot
+    double weight_human_human_safety;
     double weight_human_robot_ttc;
     double weight_human_robot_dir;
     double human_robot_ttc_scale_alpha;
     bool use_human_robot_safety_c;
+    bool use_human_human_safety_c;
     bool use_human_robot_ttc_c;
     bool scale_human_robot_ttc_c;
     bool use_human_robot_dir_c;
@@ -418,7 +421,8 @@ public:
 
     // Human
     human.radius = 0.2;
-    human.min_human_dist = 0.6;
+    human.min_human_robot_dist = 0.6;
+    human.min_human_human_dist = 0.6;
     human.max_vel_x = 1.1;
     human.nominal_vel_x = 0.8;
     human.max_vel_x_backwards = 0.0;
@@ -476,10 +480,12 @@ public:
     optim.weight_viapoint = 1;
     optim.weight_human_viapoint = 1;
     optim.weight_human_robot_safety = 20;
+    optim.weight_human_human_safety = 20;
     optim.weight_human_robot_ttc = 20;
     optim.weight_human_robot_dir = 20;
     optim.human_robot_ttc_scale_alpha = 1;
     optim.use_human_robot_safety_c = true;
+    optim.use_human_human_safety_c = true;
     optim.use_human_robot_ttc_c = true;
     optim.scale_human_robot_ttc_c = true;
     optim.use_human_robot_dir_c = true;

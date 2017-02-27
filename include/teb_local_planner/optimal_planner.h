@@ -71,6 +71,7 @@
 #include <teb_local_planner/g2o_types/edge_dynamic_obstacle.h>
 #include <teb_local_planner/g2o_types/edge_via_point.h>
 #include <teb_local_planner/g2o_types/edge_human_robot_safety.h>
+#include <teb_local_planner/g2o_types/edge_human_human_safety.h>
 #include <teb_local_planner/g2o_types/edge_human_robot_ttc.h>
 #include <teb_local_planner/g2o_types/edge_human_robot_directional.h>
 
@@ -790,6 +791,7 @@ protected:
   void AddEdgesKinematicsCarlike();
 
   void AddEdgesHumanRobotSafety();
+  void AddEdgesHumanHumanSafety();
   void AddEdgesHumanRobotTTC();
   void AddEdgesHumanRobotDirectional();
 

@@ -167,6 +167,9 @@ void TebOptimalPlanner::registerG2OTypes() {
   factory->registerType(
       "EDGE_HUMAN_ROBOT_SAFETY",
       new g2o::HyperGraphElementCreator<EdgeHumanRobotSafety>);
+  factory->registerType(
+      "EDGE_HUMAN_HUMAN_SAFETY",
+      new g2o::HyperGraphElementCreator<EdgeHumanHumanSafety>);
   factory->registerType("EDGE_HUMAN_ROBOT_TTC",
                         new g2o::HyperGraphElementCreator<EdgeHumanRobotTTC>);
   factory->registerType(
@@ -555,6 +558,10 @@ bool TebOptimalPlanner::buildGraph() {
 
     if (cfg_->optim.use_human_robot_safety_c) {
       AddEdgesHumanRobotSafety();
+    }
+
+    if (cfg_->optim.use_human_human_safety_c) {
+      AddEdgesHumanHumanSafety();
     }
 
     if (cfg_->optim.use_human_robot_ttc_c) {
@@ -1214,6 +1221,30 @@ void TebOptimalPlanner::AddEdgesHumanRobotSafety() {
   }
 }
 
+void TebOptimalPlanner::AddEdgesHumanHumanSafety() {
+  //std::map<uint64_t, TimedElasticBand>::iterator oi, ii;
+  for (auto oi = humans_tebs_map_.begin(); oi != humans_tebs_map_.end();) {
+    auto &human1_teb = oi->second;
+    for (auto ii = ++oi; ii != humans_tebs_map_.end(); ii++) {
+      auto &human2_teb = ii->second;
+
+      for (unsigned int k = 0;
+           (k < human1_teb.sizePoses()) && (k < human2_teb.sizePoses()); k++) {
+        Eigen::Matrix<double, 1, 1> information_human_human;
+        information_human_human.fill(cfg_->optim.weight_human_human_safety);
+
+        EdgeHumanHumanSafety *human_human_safety_edge =
+            new EdgeHumanHumanSafety;
+        human_human_safety_edge->setVertex(0, human1_teb.PoseVertex(k));
+        human_human_safety_edge->setVertex(1, human2_teb.PoseVertex(k));
+        human_human_safety_edge->setInformation(information_human_human);
+        human_human_safety_edge->setParameters(*cfg_, human_radius_);
+        optimizer_->addEdge(human_human_safety_edge);
+      }
+    }
+  }
+}
+
 void TebOptimalPlanner::AddEdgesHumanRobotTTC() {
   Eigen::Matrix<double, 1, 1> information_human_robot_ttc;
   information_human_robot_ttc.fill(cfg_->optim.weight_human_robot_ttc);
@@ -1308,7 +1339,8 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
   double time_opt_cost = 0.0, kinematics_dd_cost = 0.0,
          kinematics_cl_cost = 0.0, vel_cost = 0.0, acc_cost = 0.0,
          obst_cost = 0.0, dyn_obst_cost = 0.0, via_cost = 0.0,
-         hr_safety_cost = 0.0, hr_ttc_cost = 0.0, hr_dir_cost = 0.0;
+         hr_safety_cost = 0.0, hh_safety_cost = 0.0, hr_ttc_cost = 0.0,
+         hr_dir_cost = 0.0;
 
   if (alternative_time_cost) {
     cost_ += teb_.getSumOfAllTimeDiffs();
@@ -1389,6 +1421,14 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
       continue;
     }
 
+    EdgeHumanHumanSafety *edge_human_human_safety =
+        dynamic_cast<EdgeHumanHumanSafety *>(*it);
+    if (edge_human_human_safety != NULL) {
+      cost_ += edge_human_human_safety->getError().squaredNorm();
+      hh_safety_cost += edge_human_human_safety->getError().squaredNorm();
+      continue;
+    }
+
     EdgeHumanRobotTTC *edge_human_robot_ttc =
         dynamic_cast<EdgeHumanRobotTTC *>(*it);
     if (edge_human_robot_ttc != NULL) {
@@ -1409,11 +1449,11 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
   ROS_DEBUG("Costs:\n\ttime_opt_cost = %.2f\n\tkinematics_dd_cost = "
             "%.2f\n\tkinematics_cl_cost = %.2f\n\tvel_cost = %.2f\n\tacc_cost "
             "= %.2f\n\tobst_cost = %.2f\n\tdyn_obst_cost = %.2f\n\tvia_cost = "
-            "%.2f\n\thr_safety_cost = %.2f\n\thr_ttc_cost = "
-            "%.2f\n\thr_dir_cost = %.2f",
+            "%.2f\n\thr_safety_cost = %.2f\n\thh_safety_cost = "
+            "%.2f\n\thr_ttc_cost = %.2f\n\thr_dir_cost = %.2f",
             time_opt_cost, kinematics_dd_cost, kinematics_cl_cost, vel_cost,
             acc_cost, obst_cost, dyn_obst_cost, via_cost, hr_safety_cost,
-            hr_ttc_cost, hr_dir_cost);
+            hh_safety_cost, hr_ttc_cost, hr_dir_cost);
 
   // delete temporary created graph
   if (!graph_exist_flag)

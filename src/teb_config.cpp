@@ -99,7 +99,10 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
            robot.cmd_angle_instead_rotvel);
 
   // Human
-  nh.param("min_human_dist", human.min_human_dist, human.min_human_dist);
+  nh.param("min_human_robot_dist", human.min_human_robot_dist,
+           human.min_human_robot_dist);
+  nh.param("min_human_human_dist", human.min_human_human_dist,
+           human.min_human_human_dist);
   nh.param("human_radius", human.radius, human.radius);
   nh.param("max_human_vel_x", human.max_vel_x, human.max_vel_x);
   nh.param("nominal_human_vel_x", human.nominal_vel_x, human.nominal_vel_x);
@@ -196,6 +199,8 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
            optim.weight_human_viapoint);
   nh.param("weight_human_robot_safety", optim.weight_human_robot_safety,
            optim.weight_human_robot_safety);
+  nh.param("weight_human_human_safety", optim.weight_human_human_safety,
+           optim.weight_human_human_safety);
   nh.param("weight_human_robot_ttc", optim.weight_human_robot_ttc,
            optim.weight_human_robot_ttc);
   nh.param("weight_human_robot_dir", optim.weight_human_robot_dir,
@@ -204,6 +209,8 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
            optim.human_robot_ttc_scale_alpha);
   nh.param("use_human_robot_safety_c", optim.use_human_robot_safety_c,
            optim.use_human_robot_safety_c);
+  nh.param("use_human_human_safety_c", optim.use_human_human_safety_c,
+           optim.use_human_human_safety_c);
   nh.param("use_human_robot_ttc_c", optim.use_human_robot_ttc_c,
            optim.use_human_robot_ttc_c);
   nh.param("scale_human_robot_ttc_c", optim.scale_human_robot_ttc_c,
@@ -276,12 +283,9 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
            visualization.pose_array_z_scale);
 
   // approach
-  nh.param("approach_id", approach.approach_id,
-           approach.approach_id);
-  nh.param("approach_dist", approach.approach_dist,
-           approach.approach_dist);
-  nh.param("approach_angle", approach.approach_angle,
-           approach.approach_angle);
+  nh.param("approach_id", approach.approach_id, approach.approach_id);
+  nh.param("approach_dist", approach.approach_dist, approach.approach_dist);
+  nh.param("approach_angle", approach.approach_angle, approach.approach_angle);
   nh.param("approach_dist_tolerance", approach.approach_dist_tolerance,
            approach.approach_dist_tolerance);
   nh.param("approach_angle_tolerance", approach.approach_angle_tolerance,
@@ -325,7 +329,8 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   robot.cmd_angle_instead_rotvel = cfg.cmd_angle_instead_rotvel;
 
   // Human
-  human.min_human_dist = cfg.min_human_dist;
+  human.min_human_robot_dist = cfg.min_human_robot_dist;
+  human.min_human_human_dist = cfg.min_human_human_dist;
   human.max_vel_x = cfg.max_human_vel_x;
   human.nominal_vel_x = cfg.nominal_human_vel_x;
   human.max_vel_x_backwards = cfg.max_human_vel_x_backwards;
@@ -378,10 +383,12 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   optim.weight_viapoint = cfg.weight_viapoint;
   optim.weight_human_viapoint = cfg.weight_human_viapoint;
   optim.weight_human_robot_safety = cfg.weight_human_robot_safety;
+  optim.weight_human_human_safety = cfg.weight_human_human_safety;
   optim.weight_human_robot_ttc = cfg.weight_human_robot_ttc;
   optim.weight_human_robot_dir = cfg.weight_human_robot_dir;
   optim.human_robot_ttc_scale_alpha = cfg.human_robot_ttc_scale_alpha;
   optim.use_human_robot_safety_c = cfg.use_human_robot_safety_c;
+  optim.use_human_human_safety_c = cfg.use_human_human_safety_c;
   optim.use_human_robot_ttc_c = cfg.use_human_robot_ttc_c;
   optim.scale_human_robot_ttc_c = cfg.scale_human_robot_ttc_c;
   optim.use_human_robot_dir_c = cfg.use_human_robot_dir_c;
