@@ -47,6 +47,7 @@
   "/human_pose_prediction/publish_prediction_markers"
 #define OPTIMIZE_SRV_NAME "optimize"
 #define APPROACH_SRV_NAME "set_approach_id"
+#define OP_COSTS_TOPIC "optimization_costs"
 #define DEFAULT_HUMAN_SEGMENT hanp_msgs::TrackedSegmentType::TORSO
 #define THROTTLE_RATE 5.0 // seconds
 
@@ -206,6 +207,9 @@ void TebLocalPlannerROS::initialize(std::string name, tf::TransformListener *tf,
         OPTIMIZE_SRV_NAME, &TebLocalPlannerROS::optimizeStandalone, this);
     approach_server_ = nh.advertiseService(
         APPROACH_SRV_NAME, &TebLocalPlannerROS::setApproachID, this);
+
+    op_costs_pub_ = nh.advertise<teb_local_planner::OptimizationCostArray>(
+        OP_COSTS_TOPIC, 1);
 
     last_call_time_ =
         ros::Time::now() - ros::Duration(cfg_.human.pose_prediction_reset_time);
@@ -594,15 +598,17 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   auto plan_start_time = ros::Time::now();
   // bool success = planner_->plan(robot_pose_, robot_goal_, robot_vel_,
   // cfg_.goal_tolerance.free_goal_vel); // straight line init
+  teb_local_planner::OptimizationCostArray op_costs;
   bool success = planner_->plan(transformed_plan, &robot_vel_twist,
                                 cfg_.goal_tolerance.free_goal_vel,
-                                &transformed_human_plan_vel_map);
+                                &transformed_human_plan_vel_map, &op_costs);
   if (!success) {
     planner_->clearPlanner(); // force reinitialization for next time
     ROS_WARN("teb_local_planner was not able to obtain a local plan for the "
              "current setting.");
     return false;
   }
+  op_costs_pub_.publish(op_costs);
   auto plan_time = ros::Time::now() - plan_start_time;
 
   // Now visualize everything
@@ -1367,7 +1373,7 @@ void TebLocalPlannerROS::saturateVelocity(double &v, double &omega,
       // signs are changed
       auto now = ros::Time::now();
       if ((now - last_omega_sign_change_).toSec() <
-      cfg_.optim.omega_chage_time_seperation) {
+          cfg_.optim.omega_chage_time_seperation) {
         // do not allow sign change
         omega = std::copysign(min_vel_theta, omega);
       }

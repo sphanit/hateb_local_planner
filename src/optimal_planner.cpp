@@ -205,12 +205,11 @@ boost::shared_ptr<g2o::SparseOptimizer> TebOptimalPlanner::initOptimizer() {
   return optimizer;
 }
 
-bool TebOptimalPlanner::optimizeTEB(unsigned int iterations_innerloop,
-                                    unsigned int iterations_outerloop,
-                                    bool compute_cost_afterwards,
-                                    double obst_cost_scale,
-                                    double viapoint_cost_scale,
-                                    bool alternative_time_cost) {
+bool TebOptimalPlanner::optimizeTEB(
+    unsigned int iterations_innerloop, unsigned int iterations_outerloop,
+    bool compute_cost_afterwards, double obst_cost_scale,
+    double viapoint_cost_scale, bool alternative_time_cost,
+    teb_local_planner::OptimizationCostArray *op_costs) {
   if (cfg_->optim.optimization_activate == false)
     return false;
   bool success = false;
@@ -243,7 +242,7 @@ bool TebOptimalPlanner::optimizeTEB(unsigned int iterations_innerloop,
             iterations_outerloop -
                 1) // compute cost vec only in the last iteration
       computeCurrentCost(obst_cost_scale, viapoint_cost_scale,
-                         alternative_time_cost);
+                         alternative_time_cost, op_costs);
 
     clearGraph();
   }
@@ -273,7 +272,8 @@ void TebOptimalPlanner::setVelocityGoal(
 bool TebOptimalPlanner::plan(
     const std::vector<geometry_msgs::PoseStamped> &initial_plan,
     const geometry_msgs::Twist *start_vel, bool free_goal_vel,
-    const HumanPlanVelMap *initial_human_plan_vel_map) {
+    const HumanPlanVelMap *initial_human_plan_vel_map,
+    teb_local_planner::OptimizationCostArray *op_costs) {
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
   auto prep_start_time = ros::Time::now();
   if (!teb_.isInit()) {
@@ -316,6 +316,9 @@ bool TebOptimalPlanner::plan(
   auto human_prep_time_start = ros::Time::now();
   humans_vel_start_.clear();
   humans_vel_goal_.clear();
+
+  double current_human_robot_min_dist = std::numeric_limits<double>::max();
+
   switch (cfg_->planning_mode) {
   case 0:
     humans_tebs_map_.clear();
@@ -330,6 +333,8 @@ bool TebOptimalPlanner::plan(
         ++itr;
     }
 
+    auto &rp = initial_plan.front().pose.position;
+
     for (auto &initial_human_plan_vel_kv : *initial_human_plan_vel_map) {
       auto &human_id = initial_human_plan_vel_kv.first;
       auto &initial_human_plan = initial_human_plan_vel_kv.second.plan;
@@ -343,6 +348,12 @@ bool TebOptimalPlanner::plan(
           humans_tebs_map_.erase(itr);
         }
         continue;
+      }
+
+      auto &hp = initial_human_plan.front().pose.position;
+      auto dist = std::hypot(rp.x - hp.x, rp.y - hp.y);
+      if (dist < current_human_robot_min_dist) {
+        current_human_robot_min_dist = dist;
       }
 
       if (humans_tebs_map_.find(human_id) == humans_tebs_map_.end()) {
@@ -424,7 +435,14 @@ bool TebOptimalPlanner::plan(
   // now optimize
   auto opt_start_time = ros::Time::now();
   bool teb_opt_result = optimizeTEB(cfg_->optim.no_inner_iterations,
-                                    cfg_->optim.no_outer_iterations, true);
+                                    cfg_->optim.no_outer_iterations, true, 1.0,
+                                    1.0, false, op_costs);
+  if (op_costs) {
+    teb_local_planner::OptimizationCost op_cost;
+    op_cost.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_MIN_DIST;
+    op_cost.cost = current_human_robot_min_dist;
+    op_costs->costs.push_back(op_cost);
+  }
   auto opt_time = ros::Time::now() - opt_start_time;
 
   auto total_time = ros::Time::now() - prep_start_time;
@@ -1222,7 +1240,6 @@ void TebOptimalPlanner::AddEdgesHumanRobotSafety() {
 }
 
 void TebOptimalPlanner::AddEdgesHumanHumanSafety() {
-  //std::map<uint64_t, TimedElasticBand>::iterator oi, ii;
   for (auto oi = humans_tebs_map_.begin(); oi != humans_tebs_map_.end();) {
     auto &human1_teb = oi->second;
     for (auto ii = ++oi; ii != humans_tebs_map_.end(); ii++) {
@@ -1317,9 +1334,10 @@ void TebOptimalPlanner::AddVertexEdgesApproach() {
   }
 }
 
-void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
-                                           double viapoint_cost_scale,
-                                           bool alternative_time_cost) {
+void TebOptimalPlanner::computeCurrentCost(
+    double obst_cost_scale, double viapoint_cost_scale,
+    bool alternative_time_cost,
+    teb_local_planner::OptimizationCostArray *op_costs) {
   // check if graph is empty/exist  -> important if function is called between
   // buildGraph and optimizeGraph/clearGraph
   bool graph_exist_flag(false);
@@ -1337,10 +1355,12 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
 
   cost_ = 0;
   double time_opt_cost = 0.0, kinematics_dd_cost = 0.0,
-         kinematics_cl_cost = 0.0, vel_cost = 0.0, acc_cost = 0.0,
-         obst_cost = 0.0, dyn_obst_cost = 0.0, via_cost = 0.0,
-         hr_safety_cost = 0.0, hh_safety_cost = 0.0, hr_ttc_cost = 0.0,
-         hr_dir_cost = 0.0;
+         kinematics_cl_cost = 0.0, robot_vel_cost = 0.0, human_vel_cost = 0.0,
+         robot_acc_cost = 0.0, human_acc_cost = 0.0, obst_cost = 0.0,
+         dyn_obst_cost = 0.0, via_cost = 0.0, hr_safety_cost = 0.0,
+         hh_safety_cost = 0.0, hr_ttc_cost = 0.0, hr_dir_cost = 0.0;
+
+  // separate time optimality costs types for human and robot
 
   if (alternative_time_cost) {
     cost_ += teb_.getSumOfAllTimeDiffs();
@@ -1380,14 +1400,32 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
     EdgeVelocity *edge_velocity = dynamic_cast<EdgeVelocity *>(*it);
     if (edge_velocity != NULL) {
       cost_ += edge_velocity->getError().squaredNorm();
-      vel_cost += edge_velocity->getError().squaredNorm();
+      robot_vel_cost += edge_velocity->getError().squaredNorm();
       continue;
     }
+
+    EdgeVelocityHuman *edge_velocity_human =
+        dynamic_cast<EdgeVelocityHuman *>(*it);
+    if (edge_velocity_human != NULL) {
+      cost_ += edge_velocity_human->getError().squaredNorm();
+      human_vel_cost += edge_velocity_human->getError().squaredNorm();
+      continue;
+    }
+
+    // TODO: add cost of start and goal accelerations
 
     EdgeAcceleration *edge_acceleration = dynamic_cast<EdgeAcceleration *>(*it);
     if (edge_acceleration != NULL) {
       cost_ += edge_acceleration->getError().squaredNorm();
-      acc_cost += edge_acceleration->getError().squaredNorm();
+      robot_acc_cost += edge_acceleration->getError().squaredNorm();
+      continue;
+    }
+
+    EdgeAccelerationHuman *edge_acceleration_human =
+        dynamic_cast<EdgeAccelerationHuman *>(*it);
+    if (edge_acceleration_human != NULL) {
+      cost_ += edge_acceleration_human->getError().squaredNorm();
+      human_acc_cost += edge_acceleration_human->getError().squaredNorm();
       continue;
     }
 
@@ -1446,14 +1484,80 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale,
     }
   }
 
+  if (op_costs) {
+    op_costs->costs.clear();
+
+    teb_local_planner::OptimizationCost optc;
+
+    optc.type = teb_local_planner::OptimizationCost::TIME_OPTIMALITY;
+    optc.cost = time_opt_cost;
+    op_costs->costs.push_back(optc);
+
+    optc.type = teb_local_planner::OptimizationCost::KINEMATIC_DD;
+    optc.cost = kinematics_dd_cost;
+    op_costs->costs.push_back(optc);
+
+    optc.type = teb_local_planner::OptimizationCost::KINEMATIC_CL;
+    optc.cost = kinematics_cl_cost;
+    op_costs->costs.push_back(optc);
+
+    optc.type = teb_local_planner::OptimizationCost::ROBOT_VEL;
+    optc.cost = robot_vel_cost;
+    op_costs->costs.push_back(optc);
+
+    optc.type = teb_local_planner::OptimizationCost::HUMAN_VEL;
+    optc.cost = human_vel_cost;
+    op_costs->costs.push_back(optc);
+
+    optc.type = teb_local_planner::OptimizationCost::ROBOT_ACC;
+    optc.cost = robot_acc_cost;
+    op_costs->costs.push_back(optc);
+
+    optc.type = teb_local_planner::OptimizationCost::HUMAN_ACC;
+    optc.cost = human_acc_cost;
+    op_costs->costs.push_back(optc);
+
+    optc.type = teb_local_planner::OptimizationCost::OBSTACLE;
+    optc.cost = obst_cost;
+    op_costs->costs.push_back(optc);
+
+    optc.type = teb_local_planner::OptimizationCost::DYNAMIC_OBSTACLE;
+    optc.cost = dyn_obst_cost;
+    op_costs->costs.push_back(optc);
+
+    optc.type = teb_local_planner::OptimizationCost::VIA_POINT;
+    optc.cost = via_cost;
+    op_costs->costs.push_back(optc);
+
+    optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_SAFETY;
+    optc.cost = hr_safety_cost;
+    op_costs->costs.push_back(optc);
+
+    optc.type = teb_local_planner::OptimizationCost::HUMAN_HUMAN_SAFETY;
+    optc.cost = hh_safety_cost;
+    op_costs->costs.push_back(optc);
+
+    optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_TTC;
+    optc.cost = hr_ttc_cost;
+    op_costs->costs.push_back(optc);
+
+    optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_DIR;
+    optc.cost = hr_dir_cost;
+    op_costs->costs.push_back(optc);
+  }
+
   ROS_DEBUG("Costs:\n\ttime_opt_cost = %.2f\n\tkinematics_dd_cost = "
-            "%.2f\n\tkinematics_cl_cost = %.2f\n\tvel_cost = %.2f\n\tacc_cost "
-            "= %.2f\n\tobst_cost = %.2f\n\tdyn_obst_cost = %.2f\n\tvia_cost = "
+            "%.2f\n\tkinematics_cl_cost = %.2f\n\trobot_vel_cost = "
+            "%.2f\n\thuman_vel_cost = %.2f\n\trobot_acc_cost = "
+            "%.2f\n\thuman_acc_cost = %.2f\n\tobst_cost = "
+            "%.2f\n\tdyn_obst_cost = %.2f\n\tvia_cost = "
             "%.2f\n\thr_safety_cost = %.2f\n\thh_safety_cost = "
-            "%.2f\n\thr_ttc_cost = %.2f\n\thr_dir_cost = %.2f",
-            time_opt_cost, kinematics_dd_cost, kinematics_cl_cost, vel_cost,
-            acc_cost, obst_cost, dyn_obst_cost, via_cost, hr_safety_cost,
-            hh_safety_cost, hr_ttc_cost, hr_dir_cost);
+            "%.2f\n\thr_ttc_cost = %.2f\n\thr_dir_cost = "
+            "%.2f\n\ttotal_tab_time = %.2f",
+            time_opt_cost, kinematics_dd_cost, kinematics_cl_cost,
+            robot_vel_cost, human_vel_cost, robot_acc_cost, human_acc_cost,
+            obst_cost, dyn_obst_cost, via_cost, hr_safety_cost, hh_safety_cost,
+            hr_ttc_cost, hr_dir_cost, teb_.getSumOfAllTimeDiffs());
 
   // delete temporary created graph
   if (!graph_exist_flag)

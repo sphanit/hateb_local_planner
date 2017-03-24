@@ -184,7 +184,8 @@ public:
   virtual bool plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan,
                     const geometry_msgs::Twist* start_vel = NULL,
                     bool free_goal_vel = false,
-                    const HumanPlanVelMap *initial_human_plan_vels =  NULL);
+                    const HumanPlanVelMap *initial_human_plan_vels =  NULL,
+                    teb_local_planner::OptimizationCostArray *op_costs = NULL);
 
   /**
    * @brief Plan a trajectory between a given start and goal pose (tf::Pose version).

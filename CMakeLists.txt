@@ -103,6 +103,8 @@ endif()
 add_message_files(
   FILES
   ObstacleMsg.msg
+  OptimizationCost.msg
+  OptimizationCostArray.msg
   TrajectoryPointMsg.msg
   TrajectoryMsg.msg
   FeedbackMsg.msg

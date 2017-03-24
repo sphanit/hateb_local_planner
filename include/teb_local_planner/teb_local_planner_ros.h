@@ -522,6 +522,8 @@ private:
   ros::Time last_omega_sign_change_;
   double last_omega_;
 
+  ros::Publisher op_costs_pub_;
+
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };

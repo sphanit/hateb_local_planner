@@ -104,7 +104,8 @@ void HomotopyClassPlanner::setVisualization(TebVisualizationPtr visualization)
 bool HomotopyClassPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan,
                                 const geometry_msgs::Twist* start_vel,
                                 bool free_goal_vel,
-                                const HumanPlanVelMap *initial_human_plan_vels)
+                                const HumanPlanVelMap *initial_human_plan_vels,
+                                teb_local_planner::OptimizationCostArray *op_costs)
 {
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
   auto start_time = ros::Time::now();
@@ -732,6 +733,8 @@ void HomotopyClassPlanner::updateAllTEBs(boost::optional<const PoseSE2&> start, 
 
 void HomotopyClassPlanner::optimizeAllTEBs(unsigned int iter_innerloop, unsigned int iter_outerloop)
 {
+  teb_local_planner::OptimizationCostArray *op_costs = NULL;
+
   // optimize TEBs in parallel since they are independend of each other
   if (cfg_->hcp.enable_multithreading)
   {
@@ -740,7 +743,7 @@ void HomotopyClassPlanner::optimizeAllTEBs(unsigned int iter_innerloop, unsigned
     {
       teb_threads.create_thread( boost::bind(&TebOptimalPlanner::optimizeTEB, it_teb->get(), iter_innerloop, iter_outerloop,
                                              true, cfg_->hcp.selection_obst_cost_scale, cfg_->hcp.selection_viapoint_cost_scale,
-                                             cfg_->hcp.selection_alternative_time_cost) );
+                                             cfg_->hcp.selection_alternative_time_cost, op_costs) );
     }
     teb_threads.join_all();
   }
@@ -749,7 +752,7 @@ void HomotopyClassPlanner::optimizeAllTEBs(unsigned int iter_innerloop, unsigned
     for (TebOptPlannerContainer::iterator it_teb = tebs_.begin(); it_teb != tebs_.end(); ++it_teb)
     {
       it_teb->get()->optimizeTEB(iter_innerloop,iter_outerloop, true, cfg_->hcp.selection_obst_cost_scale,
-                                 cfg_->hcp.selection_viapoint_cost_scale, cfg_->hcp.selection_alternative_time_cost); // compute cost as well inside optimizeTEB (last argument = true)
+                                 cfg_->hcp.selection_viapoint_cost_scale, cfg_->hcp.selection_alternative_time_cost, op_costs); // compute cost as well inside optimizeTEB (last argument = true)
     }
   }
 }

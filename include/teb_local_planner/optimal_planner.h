@@ -46,43 +46,43 @@
 #include <math.h>
 
 // teb stuff
-#include <teb_local_planner/teb_config.h>
 #include <teb_local_planner/misc.h>
-#include <teb_local_planner/timed_elastic_band.h>
 #include <teb_local_planner/planner_interface.h>
-#include <teb_local_planner/visualization.h>
 #include <teb_local_planner/robot_footprint_model.h>
+#include <teb_local_planner/teb_config.h>
+#include <teb_local_planner/timed_elastic_band.h>
+#include <teb_local_planner/visualization.h>
 
 // g2o lib stuff
-#include "g2o/core/sparse_optimizer.h"
 #include "g2o/core/block_solver.h"
 #include "g2o/core/factory.h"
 #include "g2o/core/optimization_algorithm_gauss_newton.h"
 #include "g2o/core/optimization_algorithm_levenberg.h"
-#include "g2o/solvers/csparse/linear_solver_csparse.h"
+#include "g2o/core/sparse_optimizer.h"
 #include "g2o/solvers/cholmod/linear_solver_cholmod.h"
+#include "g2o/solvers/csparse/linear_solver_csparse.h"
 
 // g2o custom edges and vertices for the TEB planner
-#include <teb_local_planner/g2o_types/edge_velocity.h>
 #include <teb_local_planner/g2o_types/edge_acceleration.h>
-#include <teb_local_planner/g2o_types/edge_kinematics.h>
-#include <teb_local_planner/g2o_types/edge_time_optimal.h>
-#include <teb_local_planner/g2o_types/edge_obstacle.h>
 #include <teb_local_planner/g2o_types/edge_dynamic_obstacle.h>
-#include <teb_local_planner/g2o_types/edge_via_point.h>
-#include <teb_local_planner/g2o_types/edge_human_robot_safety.h>
 #include <teb_local_planner/g2o_types/edge_human_human_safety.h>
-#include <teb_local_planner/g2o_types/edge_human_robot_ttc.h>
 #include <teb_local_planner/g2o_types/edge_human_robot_directional.h>
+#include <teb_local_planner/g2o_types/edge_human_robot_safety.h>
+#include <teb_local_planner/g2o_types/edge_human_robot_ttc.h>
+#include <teb_local_planner/g2o_types/edge_kinematics.h>
+#include <teb_local_planner/g2o_types/edge_obstacle.h>
+#include <teb_local_planner/g2o_types/edge_time_optimal.h>
+#include <teb_local_planner/g2o_types/edge_velocity.h>
+#include <teb_local_planner/g2o_types/edge_via_point.h>
 
 // messages
-#include <nav_msgs/Path.h>
 #include <geometry_msgs/PoseStamped.h>
-#include <tf/transform_datatypes.h>
+#include <nav_msgs/Path.h>
 #include <teb_local_planner/TrajectoryMsg.h>
+#include <tf/transform_datatypes.h>
 
-#include <nav_msgs/Odometry.h>
 #include <limits.h>
+#include <nav_msgs/Odometry.h>
 
 namespace teb_local_planner {
 
@@ -194,7 +194,8 @@ public:
   virtual bool plan(const std::vector<geometry_msgs::PoseStamped> &initial_plan,
                     const geometry_msgs::Twist *start_vel = NULL,
                     bool free_goal_vel = false,
-                    const HumanPlanVelMap *initial_human_plan_vels = NULL);
+                    const HumanPlanVelMap *initial_human_plan_vels = NULL,
+                    teb_local_planner::OptimizationCostArray *op_costs = NULL);
 
   /**
    * @brief Plan a trajectory between a given start and goal pose (tf::Pose
@@ -304,7 +305,8 @@ public:
                    bool compute_cost_afterwards = false,
                    double obst_cost_scale = 1.0,
                    double viapoint_cost_scale = 1.0,
-                   bool alternative_time_cost = false);
+                   bool alternative_time_cost = false,
+                   teb_local_planner::OptimizationCostArray *op_costs = NULL);
 
   //@}
 
@@ -504,7 +506,8 @@ public:
    */
   void computeCurrentCost(double obst_cost_scale = 1.0,
                           double viapoint_cost_scale = 1.0,
-                          bool alternative_time_cost = false);
+                          bool alternative_time_cost = false,
+                          teb_local_planner::OptimizationCostArray *op_costs = NULL);
 
   /**
    * Compute and return the cost of the current optimization graph (supports
