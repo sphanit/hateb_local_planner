@@ -42,6 +42,7 @@
 
 #define GLOBAL_PLAN_TOPIC "global_plan"
 #define LOCAL_PLAN_TOPIC "local_plan"
+#define LOCAL_TRAJ_TOPIC "local_traj"
 #define LOCAL_PLAN_POSES_TOPIC "local_plan_poses"
 #define LOCAL_PLAN_FP_POSES_TOPIC "local_plan_fp_poses"
 #define HUMAN_GLOBAL_PLANS_TOPIC "human_global_plans"
@@ -76,6 +77,7 @@ void TebVisualization::initialize(ros::NodeHandle &nh, const TebConfig &cfg) {
   // register topics
   global_plan_pub_ = nh.advertise<nav_msgs::Path>(GLOBAL_PLAN_TOPIC, 1);
   local_plan_pub_ = nh.advertise<nav_msgs::Path>(LOCAL_PLAN_TOPIC, 1);
+  local_traj_pub_ = nh.advertise<hanp_msgs::Trajectory>(LOCAL_TRAJ_TOPIC, 1);
   teb_poses_pub_ =
       nh.advertise<geometry_msgs::PoseArray>(LOCAL_PLAN_POSES_TOPIC, 1);
   teb_fp_poses_pub_ = nh.advertise<visualization_msgs::MarkerArray>(
@@ -209,6 +211,11 @@ void TebVisualization::publishLocalPlanAndPoses(
   teb_poses.header.frame_id = frame_id;
   teb_poses.header.stamp = now;
 
+  // crete trajectory msg
+  hanp_msgs::Trajectory teb_traj;
+  teb_traj.header.frame_id = frame_id;
+  teb_traj.header.stamp = now;
+
   // fill path msgs with teb configurations
   double pose_time = 0.0;
   for (unsigned int i = 0; i < teb.sizePoses(); i++) {
@@ -222,6 +229,15 @@ void TebVisualization::publishLocalPlanAndPoses(
     teb_path.poses.push_back(pose);
     pose.pose.position.z = pose_time * cfg_->visualization.pose_array_z_scale;
     teb_poses.poses.push_back(pose.pose);
+
+    hanp_msgs::TrajectoryPoint traj_point;
+    traj_point.transform.translation.x = teb.Pose(i).x();
+    traj_point.transform.translation.y = teb.Pose(i).y();
+    traj_point.transform.translation.z = 0;
+    traj_point.transform.rotation = pose.pose.orientation;
+    traj_point.time_from_start = ros::Duration(pose_time);
+    teb_traj.points.push_back(traj_point);
+
     if (i < (teb.sizePoses() - 1)) {
       pose_time += teb.TimeDiff(i);
     }
@@ -230,6 +246,7 @@ void TebVisualization::publishLocalPlanAndPoses(
   // publish robot local plans
   if (!teb_path.poses.empty() && cfg_->visualization.publish_robot_local_plan) {
     local_plan_pub_.publish(teb_path);
+    local_traj_pub_.publish(teb_traj);
   }
 
   // publish robot local plan poses and footprint
@@ -727,9 +744,11 @@ void TebVisualization::clearingTimerCB(const ros::TimerEvent &event) {
       !cfg_->visualization.publish_robot_local_plan) {
     // clear robot local plans
     nav_msgs::Path empty_path;
+    hanp_msgs::Trajectory empty_traj;
     empty_path.header.stamp = ros::Time::now();
     empty_path.header.frame_id = cfg_->map_frame;
     local_plan_pub_.publish(empty_path);
+    local_traj_pub_.publish(empty_traj);
   }
   last_publish_robot_local_plan = cfg_->visualization.publish_robot_local_plan;
 

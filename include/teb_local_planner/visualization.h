@@ -299,6 +299,7 @@ protected:
 
   ros::Publisher global_plan_pub_;         //!< Publisher for the global plan
   ros::Publisher local_plan_pub_;          //!< Publisher for the local plan
+  ros::Publisher local_traj_pub_;
   ros::Publisher humans_global_plans_pub_; //!< Publisher for the local plan
   ros::Publisher humans_local_plans_pub_;  //!< Publisher for the local plan
   ros::Publisher teb_poses_pub_,
