@@ -53,6 +53,10 @@
 #define CLEARING_TIMER_DURATION 1.0 // seconds
 #define ROBOT_FP_POSES_NS "robot_fp_poses"
 #define HUMAN_FP_POSES_NS "human_fp_poses"
+#define ROBOT_TRAJ_TIME_TOPIC "traj_time"
+#define ROBOT_PATH_TIME_TOPIC "plan_time"
+#define HUMAN_TRAJS_TIME_TOPIC "human_trajs_time"
+#define HUMAN_PATHS_TIME_TOPIC "human_plans_time"
 
 #include <teb_local_planner/FeedbackMsg.h>
 #include <teb_local_planner/optimal_planner.h>
@@ -96,6 +100,14 @@ void TebVisualization::initialize(ros::NodeHandle &nh, const TebConfig &cfg) {
       nh.advertise<visualization_msgs::Marker>("teb_markers", 1000);
   feedback_pub_ =
       nh.advertise<teb_local_planner::FeedbackMsg>("teb_feedback", 10);
+  robot_traj_time_pub_ =
+      nh.advertise<hanp_msgs::TimeToGoal>(ROBOT_TRAJ_TIME_TOPIC, 1);
+  robot_path_time_pub_ =
+      nh.advertise<hanp_msgs::TimeToGoal>(ROBOT_PATH_TIME_TOPIC, 1);
+  human_trajs_time_pub_ =
+      nh.advertise<hanp_msgs::HumanTimeToGoalArray>(HUMAN_TRAJS_TIME_TOPIC, 1);
+  human_paths_time_pub_ =
+      nh.advertise<hanp_msgs::HumanTimeToGoalArray>(HUMAN_PATHS_TIME_TOPIC, 1);
 
   last_publish_robot_global_plan =
       cfg_->visualization.publish_robot_global_plan;
@@ -288,6 +300,15 @@ void TebVisualization::publishTrajectory(
   hanp_msgs::Trajectory trajectory;
   trajectory.header.frame_id = frame_id;
   trajectory.header.stamp = now;
+
+  hanp_msgs::TimeToGoal robot_time_to_goal;
+  robot_time_to_goal.header.frame_id = frame_id;
+  robot_time_to_goal.header.stamp = now;
+
+  hanp_msgs::TimeToGoal robot_time_to_goal_full;
+  robot_time_to_goal_full.header.frame_id = frame_id;
+  robot_time_to_goal_full.header.stamp = now;
+
   for (auto &pose : plan_traj_combined.plan_before) {
     hanp_msgs::TrajectoryPoint trajectory_point;
     trajectory_point.transform.translation.x = pose.pose.position.x;
@@ -309,6 +330,14 @@ void TebVisualization::publishTrajectory(
     trajectory.points.push_back(trajectory_point);
   }
 
+  if (plan_traj_combined.optimized_trajectory.size() > 0) {
+    robot_time_to_goal.time_to_goal =
+        ros::Duration(trajectory.points.back().time_from_start);
+  } else {
+    robot_time_to_goal.time_to_goal = ros::Duration(0);
+  }
+
+  double remaining_path_dist = 0.0;
   for (auto &pose : plan_traj_combined.plan_after) {
     hanp_msgs::TrajectoryPoint trajectory_point;
     trajectory_point.transform.translation.x = pose.pose.position.x;
@@ -317,10 +346,19 @@ void TebVisualization::publishTrajectory(
     trajectory_point.transform.rotation = pose.pose.orientation;
     trajectory_point.time_from_start.fromSec(-1.0);
     trajectory.points.push_back(trajectory_point);
+
+    remaining_path_dist +=
+        std::hypot(pose.pose.position.x, pose.pose.position.y);
   }
+
+  robot_time_to_goal_full.time_to_goal =
+      robot_time_to_goal.time_to_goal +
+      ros::Duration(remaining_path_dist / cfg_->robot.max_vel_x);
 
   if(!trajectory.points.empty()) {
     local_traj_pub_.publish(trajectory);
+    robot_traj_time_pub_.publish(robot_time_to_goal);
+    robot_path_time_pub_.publish(robot_time_to_goal_full);
   }
 }
 
@@ -414,12 +452,24 @@ void TebVisualization::publishHumanTrajectories(
   hanp_trajectory_array.header.stamp = now;
   hanp_trajectory_array.header.frame_id = frame_id;
 
+  hanp_msgs::HumanTimeToGoalArray human_time_to_goal_array;
+  human_time_to_goal_array.header.stamp = now;
+  human_time_to_goal_array.header.frame_id = frame_id;
+
+  hanp_msgs::HumanTimeToGoalArray human_time_to_goal_array_full;
+  human_time_to_goal_array_full.header.stamp = now;
+  human_time_to_goal_array_full.header.frame_id = frame_id;
+
   for (auto &human_plan_traj_combined : humans_plans_traj_combined) {
     hanp_msgs::HumanTrajectory hanp_trajectory;
     hanp_trajectory.header.stamp = now;
     hanp_trajectory.header.frame_id = frame_id;
     hanp_trajectory.trajectory.header.stamp = now;
     hanp_trajectory.trajectory.header.frame_id = frame_id;
+
+    hanp_msgs::HumanTimeToGoal human_time_to_goal;
+    human_time_to_goal.header.stamp = now;
+    human_time_to_goal.header.frame_id = frame_id;
 
     for (auto &human_pose : human_plan_traj_combined.plan_before) {
       hanp_msgs::TrajectoryPoint hanp_trajectory_point;
@@ -450,6 +500,14 @@ void TebVisualization::publishHumanTrajectories(
       hanp_trajectory.trajectory.points.push_back(hanp_trajectory_point);
     }
 
+    if (human_plan_traj_combined.optimized_trajectory.size() > 0) {
+      human_time_to_goal.time_to_goal = ros::Duration(
+          hanp_trajectory.trajectory.points.back().time_from_start);
+    } else {
+      human_time_to_goal.time_to_goal = ros::Duration(0);
+    }
+
+    double remaining_path_dist = 0.0;
     for (auto human_pose : human_plan_traj_combined.plan_after) {
       hanp_msgs::TrajectoryPoint hanp_trajectory_point;
       hanp_trajectory_point.transform.translation.x =
@@ -461,16 +519,28 @@ void TebVisualization::publishHumanTrajectories(
       hanp_trajectory_point.transform.rotation = human_pose.pose.orientation;
       hanp_trajectory_point.time_from_start.fromSec(-1.0);
       hanp_trajectory.trajectory.points.push_back(hanp_trajectory_point);
+
+      remaining_path_dist +=
+          std::hypot(human_pose.pose.position.x, human_pose.pose.position.y);
     }
 
     if (!hanp_trajectory.trajectory.points.empty()) {
       hanp_trajectory.id = human_plan_traj_combined.id;
       hanp_trajectory_array.trajectories.push_back(hanp_trajectory);
+
+      human_time_to_goal.id = human_plan_traj_combined.id;
+      human_time_to_goal_array.times_to_goal.push_back(human_time_to_goal);
+
+      human_time_to_goal.time_to_goal +=
+          ros::Duration(remaining_path_dist / cfg_->human.nominal_vel_x);
+      human_time_to_goal_array_full.times_to_goal.push_back(human_time_to_goal);
     }
   }
 
   if (!hanp_trajectory_array.trajectories.empty()) {
     humans_local_trajs_pub_.publish(hanp_trajectory_array);
+    human_trajs_time_pub_.publish(human_time_to_goal_array);
+    human_paths_time_pub_.publish(human_time_to_goal_array_full);
   }
 }
 

@@ -64,7 +64,10 @@
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <hanp_msgs/HumanPathArray.h>
+#include <hanp_msgs/HumanTimeToGoal.h>
+#include <hanp_msgs/HumanTimeToGoalArray.h>
 #include <hanp_msgs/HumanTrajectoryArray.h>
+#include <hanp_msgs/TimeToGoal.h>
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
 #include <tf/transform_datatypes.h>
@@ -318,6 +321,8 @@ protected:
   ros::Publisher teb_marker_pub_; //!< Publisher for visualization markers
   ros::Publisher feedback_pub_;   //!< Publisher for the feedback message for
                                   //! analysis and debug purposes
+  ros::Publisher robot_traj_time_pub_, robot_path_time_pub_;
+  ros::Publisher human_trajs_time_pub_, human_paths_time_pub_;
 
   const TebConfig
       *cfg_; //!< Config class that stores and manages all related parameters
