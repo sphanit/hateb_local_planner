@@ -47,16 +47,16 @@
 #define LOCAL_PLAN_FP_POSES_TOPIC "local_plan_fp_poses"
 #define HUMAN_GLOBAL_PLANS_TOPIC "human_global_plans"
 #define HUMAN_LOCAL_PLANS_TOPIC "human_local_plans"
-#define HUMAN_LOCAL_PLAN_POSES_TOPIC "human_local_plan_poses"
-#define HUMAN_LOCAL_PLAN_FP_POSES_TOPIC "human_local_plan_fp_poses"
-#define GLOBAL_PLAN_TOPIC "global_plan"
+#define HUMAN_LOCAL_TRAJS_TOPIC "human_local_trajs"
+#define HUMAN_LOCAL_PLANS_POSES_TOPIC "human_local_plans_poses"
+#define HUMAN_LOCAL_PLANS_FP_POSES_TOPIC "human_local_plans_fp_poses"
 #define CLEARING_TIMER_DURATION 1.0 // seconds
 #define ROBOT_FP_POSES_NS "robot_fp_poses"
 #define HUMAN_FP_POSES_NS "human_fp_poses"
 
-#include <teb_local_planner/visualization.h>
-#include <teb_local_planner/optimal_planner.h>
 #include <teb_local_planner/FeedbackMsg.h>
+#include <teb_local_planner/optimal_planner.h>
+#include <teb_local_planner/visualization.h>
 
 namespace teb_local_planner {
 
@@ -85,11 +85,13 @@ void TebVisualization::initialize(ros::NodeHandle &nh, const TebConfig &cfg) {
   humans_global_plans_pub_ =
       nh.advertise<hanp_msgs::HumanPathArray>(HUMAN_GLOBAL_PLANS_TOPIC, 1);
   humans_local_plans_pub_ =
-      nh.advertise<hanp_msgs::HumanTrajectoryArray>(HUMAN_LOCAL_PLANS_TOPIC, 1);
+      nh.advertise<hanp_msgs::HumanPathArray>(HUMAN_LOCAL_PLANS_TOPIC, 1);
+  humans_local_trajs_pub_ =
+      nh.advertise<hanp_msgs::HumanTrajectoryArray>(HUMAN_LOCAL_TRAJS_TOPIC, 1);
   humans_tebs_poses_pub_ =
-      nh.advertise<geometry_msgs::PoseArray>(HUMAN_LOCAL_PLAN_POSES_TOPIC, 1);
+      nh.advertise<geometry_msgs::PoseArray>(HUMAN_LOCAL_PLANS_POSES_TOPIC, 1);
   humans_tebs_fp_poses_pub_ = nh.advertise<visualization_msgs::MarkerArray>(
-      HUMAN_LOCAL_PLAN_FP_POSES_TOPIC, 1);
+      HUMAN_LOCAL_PLANS_FP_POSES_TOPIC, 1);
   teb_marker_pub_ =
       nh.advertise<visualization_msgs::Marker>("teb_markers", 1000);
   feedback_pub_ =
@@ -134,7 +136,7 @@ void TebVisualization::publishLocalPlan(
   base_local_planner::publishPlan(local_plan, local_plan_pub_);
 }
 
-void TebVisualization::publishHumansPlans(
+void TebVisualization::publishHumanGlobalPlans(
     const std::vector<HumanPlanCombined> &humans_plans) const {
   if (printErrorWhenNotInitialized() ||
       !cfg_->visualization.publish_human_global_plans || humans_plans.empty()) {
@@ -211,11 +213,6 @@ void TebVisualization::publishLocalPlanAndPoses(
   teb_poses.header.frame_id = frame_id;
   teb_poses.header.stamp = now;
 
-  // crete trajectory msg
-  hanp_msgs::Trajectory teb_traj;
-  teb_traj.header.frame_id = frame_id;
-  teb_traj.header.stamp = now;
-
   // fill path msgs with teb configurations
   double pose_time = 0.0;
   for (unsigned int i = 0; i < teb.sizePoses(); i++) {
@@ -230,14 +227,6 @@ void TebVisualization::publishLocalPlanAndPoses(
     pose.pose.position.z = pose_time * cfg_->visualization.pose_array_z_scale;
     teb_poses.poses.push_back(pose.pose);
 
-    hanp_msgs::TrajectoryPoint traj_point;
-    traj_point.transform.translation.x = teb.Pose(i).x();
-    traj_point.transform.translation.y = teb.Pose(i).y();
-    traj_point.transform.translation.z = 0;
-    traj_point.transform.rotation = pose.pose.orientation;
-    traj_point.time_from_start = ros::Duration(pose_time);
-    teb_traj.points.push_back(traj_point);
-
     if (i < (teb.sizePoses() - 1)) {
       pose_time += teb.TimeDiff(i);
     }
@@ -246,7 +235,6 @@ void TebVisualization::publishLocalPlanAndPoses(
   // publish robot local plans
   if (!teb_path.poses.empty() && cfg_->visualization.publish_robot_local_plan) {
     local_plan_pub_.publish(teb_path);
-    local_traj_pub_.publish(teb_traj);
   }
 
   // publish robot local plan poses and footprint
@@ -287,11 +275,61 @@ void TebVisualization::publishLocalPlanAndPoses(
   }
 }
 
-void TebVisualization::publishHumanPlanPoses(
+void TebVisualization::publishTrajectory(
+    const PlanTrajCombined &plan_traj_combined) const {
+  if (printErrorWhenNotInitialized() ||
+      !cfg_->visualization.publish_robot_local_plan) {
+    return;
+  }
+
+  auto frame_id = cfg_->map_frame;
+  auto now = ros::Time::now();
+
+  hanp_msgs::Trajectory trajectory;
+  trajectory.header.frame_id = frame_id;
+  trajectory.header.stamp = now;
+  for (auto &pose : plan_traj_combined.plan_before) {
+    hanp_msgs::TrajectoryPoint trajectory_point;
+    trajectory_point.transform.translation.x = pose.pose.position.x;
+    trajectory_point.transform.translation.y = pose.pose.position.y;
+    trajectory_point.transform.translation.z = pose.pose.position.z;
+    trajectory_point.transform.rotation = pose.pose.orientation;
+    trajectory_point.time_from_start.fromSec(-1.0);
+    trajectory.points.push_back(trajectory_point);
+  }
+
+  for (auto &traj_point : plan_traj_combined.optimized_trajectory) {
+    hanp_msgs::TrajectoryPoint trajectory_point;
+    trajectory_point.transform.translation.x = traj_point.pose.position.x;
+    trajectory_point.transform.translation.y = traj_point.pose.position.y;
+    trajectory_point.transform.translation.z = traj_point.pose.position.z;
+    trajectory_point.transform.rotation = traj_point.pose.orientation;
+    trajectory_point.velocity = traj_point.velocity;
+    trajectory_point.time_from_start = traj_point.time_from_start;
+    trajectory.points.push_back(trajectory_point);
+  }
+
+  for (auto &pose : plan_traj_combined.plan_after) {
+    hanp_msgs::TrajectoryPoint trajectory_point;
+    trajectory_point.transform.translation.x = pose.pose.position.x;
+    trajectory_point.transform.translation.y = pose.pose.position.y;
+    trajectory_point.transform.translation.z = pose.pose.position.z;
+    trajectory_point.transform.rotation = pose.pose.orientation;
+    trajectory_point.time_from_start.fromSec(-1.0);
+    trajectory.points.push_back(trajectory_point);
+  }
+
+  if(!trajectory.points.empty()) {
+    local_traj_pub_.publish(trajectory);
+  }
+}
+
+void TebVisualization::publishHumanLocalPlansAndPoses(
     const std::map<uint64_t, TimedElasticBand> &humans_tebs_map,
     const BaseRobotFootprintModel &human_model) const {
   if (printErrorWhenNotInitialized() || humans_tebs_map.empty() ||
-      (!cfg_->visualization.publish_human_local_plan_poses &&
+      (!cfg_->visualization.publish_human_local_plans &&
+       !cfg_->visualization.publish_human_local_plan_poses &&
        !cfg_->visualization.publish_human_local_plan_fp_poses)) {
     return;
   }
@@ -383,7 +421,7 @@ void TebVisualization::publishHumanTrajectories(
     hanp_trajectory.trajectory.header.stamp = now;
     hanp_trajectory.trajectory.header.frame_id = frame_id;
 
-    for (auto human_pose : human_plan_traj_combined.plan_before) {
+    for (auto &human_pose : human_plan_traj_combined.plan_before) {
       hanp_msgs::TrajectoryPoint hanp_trajectory_point;
       hanp_trajectory_point.transform.translation.x =
           human_pose.pose.position.x;
@@ -396,7 +434,7 @@ void TebVisualization::publishHumanTrajectories(
       hanp_trajectory.trajectory.points.push_back(hanp_trajectory_point);
     }
 
-    for (auto human_traj_point :
+    for (auto &human_traj_point :
          human_plan_traj_combined.optimized_trajectory) {
       hanp_msgs::TrajectoryPoint hanp_trajectory_point;
       hanp_trajectory_point.transform.translation.x =
@@ -432,7 +470,7 @@ void TebVisualization::publishHumanTrajectories(
   }
 
   if (!hanp_trajectory_array.trajectories.empty()) {
-    humans_local_plans_pub_.publish(hanp_trajectory_array);
+    humans_local_trajs_pub_.publish(hanp_trajectory_array);
   }
 }
 

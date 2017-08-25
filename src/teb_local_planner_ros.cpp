@@ -296,17 +296,18 @@ bool TebLocalPlannerROS::computeVelocityCommands(
 
   // Transform global plan to the frame of interest (w.r.t to the local costmap)
   auto transform_start_time = ros::Time::now();
-  std::vector<geometry_msgs::PoseStamped> transformed_plan;
+  PlanCombined transformed_plan_combined;
   int goal_idx;
   tf::StampedTransform tf_plan_to_global;
-  if (!transformGlobalPlan(*tf_, global_plan_, robot_pose, *costmap_,
-                           global_frame_,
-                           cfg_.trajectory.max_global_plan_lookahead_dist,
-                           transformed_plan, &goal_idx, &tf_plan_to_global)) {
+  if (!transformGlobalPlan(
+          *tf_, global_plan_, robot_pose, *costmap_, global_frame_,
+          cfg_.trajectory.max_global_plan_lookahead_dist,
+          transformed_plan_combined, &goal_idx, &tf_plan_to_global)) {
     ROS_WARN(
         "Could not transform the global plan to the frame of the controller");
     return false;
   }
+  auto &transformed_plan = transformed_plan_combined.plan_to_optimize;
   auto transform_time = ros::Time::now() - transform_start_time;
 
   // Check if the horizon should be reduced this run
@@ -617,8 +618,15 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   visualization_->publishObstacles(obstacles_);
   visualization_->publishViaPoints(via_points_);
   visualization_->publishGlobalPlan(global_plan_);
+
+  PlanTrajCombined plan_traj_combined;
+  plan_traj_combined.plan_before = transformed_plan_combined.plan_before;
+  planner_->getFullTrajectory(plan_traj_combined.optimized_trajectory);
+  plan_traj_combined.plan_after = transformed_plan_combined.plan_after;
+  visualization_->publishTrajectory(plan_traj_combined);
+
   if (cfg_.planning_mode == 1) {
-    visualization_->publishHumansPlans(transformed_human_plans);
+    visualization_->publishHumanGlobalPlans(transformed_human_plans);
     std::vector<HumanPlanTrajCombined> human_plans_traj_array;
     for (auto &human_plan_combined : transformed_human_plans) {
       HumanPlanTrajCombined human_plan_traj_combined;
@@ -1003,15 +1011,14 @@ bool TebLocalPlannerROS::transformGlobalPlan(
     const std::vector<geometry_msgs::PoseStamped> &global_plan,
     const tf::Stamped<tf::Pose> &global_pose,
     const costmap_2d::Costmap2D &costmap, const std::string &global_frame,
-    double max_plan_length,
-    std::vector<geometry_msgs::PoseStamped> &transformed_plan,
+    double max_plan_length, PlanCombined &transformed_plan_combined,
     int *current_goal_idx, tf::StampedTransform *tf_plan_to_global) const {
   // this method is a slightly modified version of
   // base_local_planner/goal_functions.h
 
   const geometry_msgs::PoseStamped &plan_pose = global_plan[0];
 
-  transformed_plan.clear();
+  transformed_plan_combined.plan_to_optimize.clear();
 
   try {
     if (global_plan.empty()) {
@@ -1050,6 +1057,9 @@ bool TebLocalPlannerROS::transformGlobalPlan(
     double sq_dist_threshold = dist_threshold * dist_threshold;
     double sq_dist = 1e10;
 
+    tf::Stamped<tf::Pose> tf_pose;
+    geometry_msgs::PoseStamped newer_pose;
+
     // we need to loop to a point on the plan that is within a certain
     // distance of the robot
     while (i < (int)global_plan.size()) {
@@ -1065,11 +1075,17 @@ bool TebLocalPlannerROS::transformGlobalPlan(
         break;
       }
       sq_dist = new_sq_dist;
+
+      const geometry_msgs::PoseStamped &pose = global_plan[i];
+      tf::poseStampedMsgToTF(pose, tf_pose);
+      tf_pose.setData(plan_to_global_transform * tf_pose);
+      tf_pose.stamp_ = plan_to_global_transform.stamp_;
+      tf_pose.frame_id_ = global_frame;
+      tf::poseStampedTFToMsg(tf_pose, newer_pose);
+      transformed_plan_combined.plan_before.push_back(newer_pose);
+
       ++i;
     }
-
-    tf::Stamped<tf::Pose> tf_pose;
-    geometry_msgs::PoseStamped newer_pose;
 
     double plan_length =
         0; // check cumulative Euclidean distance along the plan
@@ -1084,7 +1100,7 @@ bool TebLocalPlannerROS::transformGlobalPlan(
       tf_pose.frame_id_ = global_frame;
       tf::poseStampedTFToMsg(tf_pose, newer_pose);
 
-      transformed_plan.push_back(newer_pose);
+      transformed_plan_combined.plan_to_optimize.push_back(newer_pose);
 
       double x_diff =
           robot_pose.getOrigin().x() - global_plan[i].pose.position.x;
@@ -1106,6 +1122,18 @@ bool TebLocalPlannerROS::transformGlobalPlan(
     if (current_goal_idx)
       *current_goal_idx =
           i - 1; // minus 1, since i was increased once before leaving the loop
+
+    while (i < (int)global_plan.size()) {
+      const geometry_msgs::PoseStamped &pose = global_plan[i];
+      tf::poseStampedMsgToTF(pose, tf_pose);
+      tf_pose.setData(plan_to_global_transform * tf_pose);
+      tf_pose.stamp_ = plan_to_global_transform.stamp_;
+      tf_pose.frame_id_ = global_frame;
+      tf::poseStampedTFToMsg(tf_pose, newer_pose);
+      transformed_plan_combined.plan_after.push_back(newer_pose);
+      ++i;
+    }
+
     if (tf_plan_to_global)
       *tf_plan_to_global = plan_to_global_transform;
   } catch (tf::LookupException &ex) {
@@ -1636,17 +1664,18 @@ bool TebLocalPlannerROS::optimizeStandalone(
 
   // transform global plan to the frame of local costmap
   ROS_INFO("transforming robot global plans");
-  std::vector<geometry_msgs::PoseStamped> transformed_plan;
+  PlanCombined transformed_plan_combined;
   int goal_idx;
   tf::StampedTransform tf_robot_plan_to_global;
   if (!transformGlobalPlan(
           *tf_, req.robot_plan.poses, robot_pose_tf, *costmap_, global_frame_,
-          cfg_.trajectory.max_global_plan_lookahead_dist, transformed_plan,
-          &goal_idx, &tf_robot_plan_to_global)) {
+          cfg_.trajectory.max_global_plan_lookahead_dist,
+          transformed_plan_combined, &goal_idx, &tf_robot_plan_to_global)) {
     res.success = false;
     res.message = "Could not transform the global plan to the local frame";
     return true;
   }
+  auto &transformed_plan = transformed_plan_combined.plan_to_optimize;
   ROS_INFO("transformed plan contains %ld points (out of %ld)",
            transformed_plan.size(), req.robot_plan.poses.size());
 
@@ -1753,7 +1782,14 @@ bool TebLocalPlannerROS::optimizeStandalone(
   visualization_->publishObstacles(obstacles_);
   visualization_->publishViaPoints(via_points_);
   visualization_->publishGlobalPlan(global_plan_);
-  visualization_->publishHumansPlans(transformed_human_plans);
+  visualization_->publishHumanGlobalPlans(transformed_human_plans);
+
+  PlanTrajCombined plan_traj_combined;
+  plan_traj_combined.plan_before = transformed_plan_combined.plan_before;
+  planner_->getFullTrajectory(plan_traj_combined.optimized_trajectory);
+  plan_traj_combined.plan_after = transformed_plan_combined.plan_after;
+  visualization_->publishTrajectory(plan_traj_combined);
+
   std::vector<HumanPlanTrajCombined> human_plans_traj_array;
   for (auto &human_plan_combined : transformed_human_plans) {
     HumanPlanTrajCombined human_plan_traj_combined;

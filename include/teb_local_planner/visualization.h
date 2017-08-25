@@ -44,14 +44,14 @@
 #define VISUALIZATION_H_
 
 // teb stuff
+#include <teb_local_planner/TrajectoryMsg.h>
+#include <teb_local_planner/robot_footprint_model.h>
 #include <teb_local_planner/teb_config.h>
 #include <teb_local_planner/timed_elastic_band.h>
-#include <teb_local_planner/robot_footprint_model.h>
-#include <teb_local_planner/TrajectoryMsg.h>
 
 // ros stuff
-#include <ros/publisher.h>
 #include <base_local_planner/goal_functions.h>
+#include <ros/publisher.h>
 
 // boost
 #include <boost/graph/adjacency_list.hpp>
@@ -61,18 +61,29 @@
 #include <iterator>
 
 // messages
-#include <nav_msgs/Path.h>
-#include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PoseArray.h>
-#include <tf/transform_datatypes.h>
-#include <nav_msgs/Odometry.h>
-#include <nav_msgs/Path.h>
-#include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
+#include <geometry_msgs/PoseStamped.h>
 #include <hanp_msgs/HumanPathArray.h>
 #include <hanp_msgs/HumanTrajectoryArray.h>
+#include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
+#include <tf/transform_datatypes.h>
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 
 namespace teb_local_planner {
+
+typedef struct {
+  std::vector<geometry_msgs::PoseStamped> plan_before;
+  std::vector<TrajectoryPointMsg> optimized_trajectory;
+  std::vector<geometry_msgs::PoseStamped> plan_after;
+} PlanTrajCombined;
+
+typedef struct {
+  std::vector<geometry_msgs::PoseStamped> plan_before;
+  std::vector<geometry_msgs::PoseStamped> plan_to_optimize;
+  std::vector<geometry_msgs::PoseStamped> plan_after;
+} PlanCombined;
 
 typedef struct {
   uint64_t id;
@@ -127,6 +138,8 @@ public:
    */
   void publishGlobalPlan(
       const std::vector<geometry_msgs::PoseStamped> &global_plan) const;
+  void publishHumanGlobalPlans(
+      const std::vector<HumanPlanCombined> &humans_plans) const;
 
   /**
    * @brief Publish a given local plan to the ros topic \e ../../local_plan
@@ -134,13 +147,6 @@ public:
    */
   void publishLocalPlan(
       const std::vector<geometry_msgs::PoseStamped> &local_plan) const;
-
-  /**
-   * @brief Publish a given global plan to the ros topic \e ../../global_plan
-   * @param global_plan Pose array describing the global plan
-   */
-  void
-  publishHumansPlans(const std::vector<HumanPlanCombined> &humans_plans) const;
 
   /**
    * @brief Publish Timed_Elastic_Band related stuff (local plan, pose
@@ -154,9 +160,11 @@ public:
   void
   publishLocalPlanAndPoses(const TimedElasticBand &teb,
                            const BaseRobotFootprintModel &robot_model) const;
-  void publishHumanPlanPoses(
+  void publishHumanLocalPlansAndPoses(
       const std::map<uint64_t, TimedElasticBand> &humans_tebs_map,
       const BaseRobotFootprintModel &human_model) const;
+
+  void publishTrajectory(const PlanTrajCombined &plan_traj_combined) const;
   void publishHumanTrajectories(
       const std::vector<HumanPlanTrajCombined> &humans_plans_combined) const;
 
@@ -297,11 +305,12 @@ protected:
    */
   bool printErrorWhenNotInitialized() const;
 
-  ros::Publisher global_plan_pub_;         //!< Publisher for the global plan
-  ros::Publisher local_plan_pub_;          //!< Publisher for the local plan
+  ros::Publisher global_plan_pub_; //!< Publisher for the global plan
+  ros::Publisher local_plan_pub_;  //!< Publisher for the local plan
   ros::Publisher local_traj_pub_;
   ros::Publisher humans_global_plans_pub_; //!< Publisher for the local plan
   ros::Publisher humans_local_plans_pub_;  //!< Publisher for the local plan
+  ros::Publisher humans_local_trajs_pub_;
   ros::Publisher teb_poses_pub_,
       teb_fp_poses_pub_; //!< Publisher for the trajectory pose sequence
   ros::Publisher humans_tebs_poses_pub_,

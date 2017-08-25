@@ -322,7 +322,7 @@ protected:
       const tf::Stamped<tf::Pose> &global_pose,
       const costmap_2d::Costmap2D &costmap, const std::string &global_frame,
       double max_plan_length,
-      std::vector<geometry_msgs::PoseStamped> &transformed_plan,
+      PlanCombined &transformed_plan_combined,
       int *current_goal_idx = NULL,
       tf::StampedTransform *tf_plan_to_global = NULL) const;
 
