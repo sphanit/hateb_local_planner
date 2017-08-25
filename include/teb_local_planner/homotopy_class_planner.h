@@ -436,6 +436,7 @@ public:
       return false;
   }
 
+  virtual void getFullTrajectory(std::vector<TrajectoryPointMsg> &trajectory) const;
   virtual void getFullHumanTrajectory(const uint64_t human_id, std::vector<TrajectoryPointMsg> &human_trajectory);
 
 

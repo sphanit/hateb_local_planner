@@ -866,6 +866,11 @@ void HomotopyClassPlanner::computeCurrentCost(std::vector<double>& cost, double 
   }
 }
 
+void HomotopyClassPlanner::getFullTrajectory(std::vector<TrajectoryPointMsg> &trajectory) const
+{
+  return;
+}
+
 void HomotopyClassPlanner::getFullHumanTrajectory(const uint64_t human_id, std::vector<TrajectoryPointMsg> &human_trajectory)
 {
   return;

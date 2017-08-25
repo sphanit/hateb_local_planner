@@ -594,7 +594,7 @@ public:
  * @param[out] trajectory the resulting trajectory
  */
 
-  void getFullTrajectory(std::vector<TrajectoryPointMsg> &trajectory) const;
+  virtual void getFullTrajectory(std::vector<TrajectoryPointMsg> &trajectory) const;
   virtual void
   getFullHumanTrajectory(const uint64_t human_id,
                          std::vector<TrajectoryPointMsg> &human_trajectory);
