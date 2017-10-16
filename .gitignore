@@ -3,3 +3,6 @@
 *.kdev4
 .vscode
 *.vscode
+build/*
+cmake-build-*/*
+.idea

@@ -1367,6 +1367,7 @@ void TebLocalPlannerROS::saturateVelocity(double &v, double &omega,
     }
   }
 
+
   // slow change of direction in angular velocity
   if (cfg_.optim.disable_rapid_omega_chage) {
     if (std::signbit(omega) != std::signbit(last_omega_)) {
@@ -1378,6 +1379,7 @@ void TebLocalPlannerROS::saturateVelocity(double &v, double &omega,
         omega = std::copysign(min_vel_theta, omega);
       }
       last_omega_sign_change_ = now;
+      last_omega_ = omega;
     }
   }
 }
