@@ -338,6 +338,7 @@ void TebVisualization::publishTrajectory(
   }
 
   double remaining_path_dist = 0.0;
+  const geometry_msgs::PoseStamped* previous_pose = nullptr;
   for (auto &pose : plan_traj_combined.plan_after) {
     hanp_msgs::TrajectoryPoint trajectory_point;
     trajectory_point.transform.translation.x = pose.pose.position.x;
@@ -347,8 +348,12 @@ void TebVisualization::publishTrajectory(
     trajectory_point.time_from_start.fromSec(-1.0);
     trajectory.points.push_back(trajectory_point);
 
-    remaining_path_dist +=
-        std::hypot(pose.pose.position.x, pose.pose.position.y);
+    if (previous_pose != nullptr) {
+      remaining_path_dist +=
+              std::hypot(pose.pose.position.x - previous_pose->pose.position.x,
+                         pose.pose.position.y - previous_pose->pose.position.y);
+    }
+    previous_pose = &pose;
   }
 
   robot_time_to_goal_full.time_to_goal =
@@ -508,6 +513,7 @@ void TebVisualization::publishHumanTrajectories(
     }
 
     double remaining_path_dist = 0.0;
+    const geometry_msgs::PoseStamped* previous_human_pose = nullptr;
     for (auto human_pose : human_plan_traj_combined.plan_after) {
       hanp_msgs::TrajectoryPoint hanp_trajectory_point;
       hanp_trajectory_point.transform.translation.x =
@@ -519,9 +525,12 @@ void TebVisualization::publishHumanTrajectories(
       hanp_trajectory_point.transform.rotation = human_pose.pose.orientation;
       hanp_trajectory_point.time_from_start.fromSec(-1.0);
       hanp_trajectory.trajectory.points.push_back(hanp_trajectory_point);
-
-      remaining_path_dist +=
-          std::hypot(human_pose.pose.position.x, human_pose.pose.position.y);
+      if (previous_human_pose != nullptr) {
+          remaining_path_dist +=
+                  std::hypot(human_pose.pose.position.x - previous_human_pose->pose.position.x,
+                             human_pose.pose.position.y - previous_human_pose->pose.position.y);
+        }
+        previous_human_pose = &human_pose;
     }
 
     if (!hanp_trajectory.trajectory.points.empty()) {
