@@ -1359,6 +1359,10 @@ void TebOptimalPlanner::computeCurrentCost(
          robot_acc_cost = 0.0, human_acc_cost = 0.0, obst_cost = 0.0,
          dyn_obst_cost = 0.0, via_cost = 0.0, hr_safety_cost = 0.0,
          hh_safety_cost = 0.0, hr_ttc_cost = 0.0, hr_dir_cost = 0.0;
+    std::vector<double> time_opt_cost_vector, kinematics_dd_cost_vector, kinematics_cl_cost_vector,
+            robot_vel_cost_vector, human_vel_cost_vector, robot_acc_cost_vector, human_acc_cost_vector, obst_cost_vector,
+                                             dyn_obst_cost_vector, via_cost_vector, hr_safety_cost_vector,
+                                             hh_safety_cost_vector, hr_ttc_cost_vector, hr_dir_cost_vector;
 
   // separate time optimality costs types for human and robot
 

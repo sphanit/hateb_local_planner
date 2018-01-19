@@ -510,16 +510,20 @@ bool TebLocalPlannerROS::computeVelocityCommands(
 
           // update global plan of the robot
           // find position in front of the human
-          tf::Pose tf_human_pose, tf_approach_pose;
-          tf::poseMsgToTF(transformed_human_pose.pose, tf_human_pose);
-          tf_approach_pose.setOrigin(
-              tf::Vector3(cfg_.approach.approach_dist, 0.0, 0.0));
-          tf_approach_pose.setRotation(
-              tf::createQuaternionFromYaw(cfg_.approach.approach_angle));
-          tf_approach_pose = tf_human_pose * tf_approach_pose;
-          geometry_msgs::PoseStamped approach_pose;
-          tf::poseTFToMsg(tf_approach_pose, approach_pose.pose);
-          approach_pose.header = transformed_human_pose.header;
+          tf::Pose tf_human_pose, tf_approach_pose[3];
+            geometry_msgs::PoseStamped approach_pose[3];
+            for (int i=0; i < 3; i++){
+                tf::poseMsgToTF(transformed_human_pose.pose, tf_human_pose);
+                tf_approach_pose[i].setOrigin(
+                        tf::Vector3(cfg_.approach.approach_dist + (2 - i) * 0.3, 0.0, 0.0));
+                tf_approach_pose[i].setRotation(
+                        tf::createQuaternionFromYaw(cfg_.approach.approach_angle));
+                tf_approach_pose[i] = tf_human_pose * tf_approach_pose[i];
+                tf::poseTFToMsg(tf_approach_pose[i], approach_pose[i].pose);
+                approach_pose[i].header = transformed_human_pose.header;
+            }
+
+
 
           // ROS_INFO("human pose: x=%.2f, y=%.2f, theta=%.2f, frame=%s",
           //          transformed_human_pose.pose.position.x,
@@ -534,7 +538,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(
 
           // add approach pose to the robot plan, only within reachable distance
           auto &plan_goal = transformed_plan.back().pose;
-          auto &approach_goal = approach_pose.pose;
+          auto &approach_goal = approach_pose[2].pose;
           double lin_dist = std::abs(
               std::hypot(plan_goal.position.x - approach_goal.position.x,
                          plan_goal.position.y - approach_goal.position.y));
@@ -542,23 +546,26 @@ bool TebLocalPlannerROS::computeVelocityCommands(
               tf::getYaw(plan_goal.orientation),
               tf::getYaw(approach_goal.orientation)));
           // ROS_INFO("lin_dist=%.2f, ang_dist=%.2f", lin_dist, ang_dist);
+            tf::Pose tf_approach_global[3];
+            geometry_msgs::PoseStamped approach_pose_global[3];
           if (lin_dist > cfg_.approach.approach_dist_tolerance ||
               ang_dist > cfg_.approach.approach_angle_tolerance) {
-            transformed_plan.push_back(approach_pose);
+              for (int i = 0; i < 3; i++) {
+                  transformed_plan.push_back(approach_pose[i]);
 
-            // get approach pose in to the frame of global plan
-            tf::Pose tf_approach_global =
-                tf_plan_to_global.inverse() * tf_approach_pose;
-            geometry_msgs::PoseStamped approach_pose_global;
-            tf::poseTFToMsg(tf_approach_global, approach_pose_global.pose);
-            approach_pose_global.header = global_plan_.back().header;
+                  // get approach poses in to the frame of global pla
+                  tf_approach_global[i] = tf_plan_to_global.inverse() * tf_approach_pose[i];
+
+                  tf::poseTFToMsg(tf_approach_global[i], approach_pose_global[i].pose);
+                  approach_pose_global[i].header = global_plan_.back().header;
+              }
 
             // prune and update global plan
             auto global_plan_it = global_plan_.begin();
             double last_dist = std::numeric_limits<double>::infinity();
             while (global_plan_it != global_plan_.end()) {
               auto &p_pos = (*global_plan_it).pose.position;
-              auto &a_pos = approach_pose_global.pose.position;
+              auto &a_pos = approach_pose_global[0].pose.position;
               double pa_dist = std::hypot(p_pos.x - a_pos.x, p_pos.y - a_pos.y);
               if (pa_dist > last_dist) {
                 break;
@@ -567,8 +574,10 @@ bool TebLocalPlannerROS::computeVelocityCommands(
               global_plan_it++;
             }
             global_plan_.erase(global_plan_it, global_plan_.end());
-            global_plan_.push_back(approach_pose_global);
-            ROS_DEBUG("Global plan modified for approach behavior");
+              for (int i = 0; i < 3; i++) {
+                  global_plan_.push_back(approach_pose_global[i]);
+              }
+            ROS_INFO("Global plan modified for approach behavior");
           }
         }
       }
@@ -692,6 +701,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(
         "TebLocalPlannerROS: velocity command invalid. Resetting planner...");
     return false;
   }
+
 
   // Saturate velocity, if the optimization results violates the constraints
   // (could be possible due to soft constraints).
@@ -993,7 +1003,7 @@ bool TebLocalPlannerROS::pruneGlobalPlan(
       }
       ++it;
     }
-    if (erase_end == global_plan.end())
+    if (erase_end == global_plan.end()) //|| erase_end == global_plan.end() - 1)
       return false;
 
     if (erase_end != global_plan.begin())
