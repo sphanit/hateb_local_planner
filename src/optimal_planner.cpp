@@ -589,6 +589,9 @@ bool TebOptimalPlanner::buildGraph() {
     if (cfg_->optim.use_human_robot_dir_c) {
       AddEdgesHumanRobotDirectional();
     }
+    if (cfg_->optim.use_human_robot_visi_c){
+        AddEdgesHumanRobotVisibility();
+    }
     break;
   case 2:
     AddVertexEdgesApproach();
@@ -1315,6 +1318,27 @@ void TebOptimalPlanner::AddEdgesHumanRobotDirectional() {
   }
 }
 
+void TebOptimalPlanner::AddEdgesHumanRobotVisibility() {
+    auto robot_teb_size = teb_.sizePoses();
+
+    for (auto &human_teb_kv : humans_tebs_map_) {
+        auto &human_teb = human_teb_kv.second;
+
+        for (unsigned int i = 0;
+             (i < human_teb.sizePoses()) && (i < robot_teb_size); i++) {
+            Eigen::Matrix<double, 1, 1> information_human_robot;
+            information_human_robot.fill(cfg_->optim.weight_human_robot_visibility);
+
+            EdgeHumanRobotVisibility *human_robot_visibility_edge = new EdgeHumanRobotVisibility;
+            human_robot_visibility_edge->setVertex(0, teb_.PoseVertex(i));
+            human_robot_visibility_edge->setVertex(1, human_teb.PoseVertex(i));
+            human_robot_visibility_edge->setInformation(information_human_robot);
+            human_robot_visibility_edge->setParameters(*cfg_);
+            optimizer_->addEdge(human_robot_visibility_edge);
+        }
+    }
+}
+
 void TebOptimalPlanner::AddVertexEdgesApproach() {
   if (!approach_pose_vertex) {
     ROS_ERROR("approch pose vertex does not exist");
@@ -1358,11 +1382,11 @@ void TebOptimalPlanner::computeCurrentCost(
          kinematics_cl_cost = 0.0, robot_vel_cost = 0.0, human_vel_cost = 0.0,
          robot_acc_cost = 0.0, human_acc_cost = 0.0, obst_cost = 0.0,
          dyn_obst_cost = 0.0, via_cost = 0.0, hr_safety_cost = 0.0,
-         hh_safety_cost = 0.0, hr_ttc_cost = 0.0, hr_dir_cost = 0.0;
+         hh_safety_cost = 0.0, hr_ttc_cost = 0.0, hr_dir_cost = 0.0, hr_visi_cost = 0.0;
     std::vector<double> time_opt_cost_vector, kinematics_dd_cost_vector, kinematics_cl_cost_vector,
             robot_vel_cost_vector, human_vel_cost_vector, robot_acc_cost_vector, human_acc_cost_vector, obst_cost_vector,
                                              dyn_obst_cost_vector, via_cost_vector, hr_safety_cost_vector,
-                                             hh_safety_cost_vector, hr_ttc_cost_vector, hr_dir_cost_vector;
+                                             hh_safety_cost_vector, hr_ttc_cost_vector, hr_dir_cost_vector, hr_visi_cost_vector;
 
   // separate time optimality costs types for human and robot
 
@@ -1486,6 +1510,13 @@ void TebOptimalPlanner::computeCurrentCost(
       hr_dir_cost += edge_human_robot_directional->getError().squaredNorm();
       continue;
     }
+
+    EdgeHumanRobotVisibility *edge_human_robot_visibility = dynamic_cast<EdgeHumanRobotVisibility *>(*it);
+    if (edge_human_robot_visibility != NULL) {
+        cost_ += edge_human_robot_visibility->getError().squaredNorm();
+        hr_visi_cost += edge_human_robot_visibility->getError().squaredNorm();
+        continue;
+    }
   }
 
   if (op_costs) {
@@ -1548,6 +1579,10 @@ void TebOptimalPlanner::computeCurrentCost(
     optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_DIR;
     optc.cost = hr_dir_cost;
     op_costs->costs.push_back(optc);
+
+    optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_VISIBILITY;
+    optc.cost = hr_visi_cost;
+    op_costs->costs.push_back(optc);
   }
 
   ROS_DEBUG("Costs:\n\ttime_opt_cost = %.2f\n\tkinematics_dd_cost = "
@@ -1557,11 +1592,11 @@ void TebOptimalPlanner::computeCurrentCost(
             "%.2f\n\tdyn_obst_cost = %.2f\n\tvia_cost = "
             "%.2f\n\thr_safety_cost = %.2f\n\thh_safety_cost = "
             "%.2f\n\thr_ttc_cost = %.2f\n\thr_dir_cost = "
-            "%.2f\n\ttotal_tab_time = %.2f",
+            "%.2f\n\thr_visi_cost = %.2f\n\ttotal_tab_time = %.2f",
             time_opt_cost, kinematics_dd_cost, kinematics_cl_cost,
             robot_vel_cost, human_vel_cost, robot_acc_cost, human_acc_cost,
             obst_cost, dyn_obst_cost, via_cost, hr_safety_cost, hh_safety_cost,
-            hr_ttc_cost, hr_dir_cost, teb_.getSumOfAllTimeDiffs());
+            hr_ttc_cost, hr_dir_cost, hr_visi_cost, teb_.getSumOfAllTimeDiffs());
 
   // delete temporary created graph
   if (!graph_exist_flag)

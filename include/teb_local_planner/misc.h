@@ -97,6 +97,16 @@ inline double fast_sigmoid(double x)
   return x / (1 + fabs(x));
 }
 
+inline double center_radians(double angle){
+    while (angle > M_PI){
+        angle -= 2*M_PI;
+    }
+    while (angle < -M_PI){
+        angle += 2 * M_PI;
+    }
+    return angle;
+}
+
 /**
  * @brief Calculate Euclidean distance between two 2D point datatypes
  * @param point1 object containing fields x and y

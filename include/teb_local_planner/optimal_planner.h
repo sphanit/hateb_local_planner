@@ -74,6 +74,7 @@
 #include <teb_local_planner/g2o_types/edge_time_optimal.h>
 #include <teb_local_planner/g2o_types/edge_velocity.h>
 #include <teb_local_planner/g2o_types/edge_via_point.h>
+#include <teb_local_planner/g2o_types/edge_human_robot_visibility.h>
 
 // messages
 #include <geometry_msgs/PoseStamped.h>
@@ -797,6 +798,7 @@ protected:
   void AddEdgesHumanHumanSafety();
   void AddEdgesHumanRobotTTC();
   void AddEdgesHumanRobotDirectional();
+  void AddEdgesHumanRobotVisibility();
 
   void AddVertexEdgesApproach();
 

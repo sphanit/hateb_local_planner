@@ -118,6 +118,7 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
   nh.param("ttc_threshold", human.ttc_threshold, human.ttc_threshold);
   nh.param("human_pose_prediction_reset_time", human.pose_prediction_reset_time,
            human.pose_prediction_reset_time);
+  nh.param("dir_cost_threshold", human.dir_cost_threshold, human.dir_cost_threshold);
 
   // GoalTolerance
   nh.param("xy_goal_tolerance", goal_tolerance.xy_goal_tolerance,
@@ -344,7 +345,10 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   human.use_external_prediction = cfg.use_external_prediction;
   human.predict_human_behind_robot = cfg.predict_human_behind_robot;
   human.ttc_threshold = cfg.ttc_threshold;
+  human.dir_cost_threshold = cfg.dir_cost_threshold;
+  human.visibility_cost_threshold = cfg.visibility_cost_threshold;
   human.pose_prediction_reset_time = cfg.human_pose_prediction_reset_time;
+  human.fov = cfg.fov;
 
   // GoalTolerance
   goal_tolerance.xy_goal_tolerance = cfg.xy_goal_tolerance;
@@ -390,12 +394,14 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   optim.weight_human_human_safety = cfg.weight_human_human_safety;
   optim.weight_human_robot_ttc = cfg.weight_human_robot_ttc;
   optim.weight_human_robot_dir = cfg.weight_human_robot_dir;
+  optim.weight_human_robot_visibility = cfg.weight_human_robot_visibility;
   optim.human_robot_ttc_scale_alpha = cfg.human_robot_ttc_scale_alpha;
   optim.use_human_robot_safety_c = cfg.use_human_robot_safety_c;
   optim.use_human_human_safety_c = cfg.use_human_human_safety_c;
   optim.use_human_robot_ttc_c = cfg.use_human_robot_ttc_c;
   optim.scale_human_robot_ttc_c = cfg.scale_human_robot_ttc_c;
   optim.use_human_robot_dir_c = cfg.use_human_robot_dir_c;
+  optim.use_human_robot_visi_c = cfg.use_human_robot_visi_c;
   optim.use_human_elastic_vel = cfg.use_human_elastic_vel;
   optim.disable_warm_start = cfg.disable_warm_start;
   optim.disable_rapid_omega_chage = cfg.disable_rapid_omega_chage;

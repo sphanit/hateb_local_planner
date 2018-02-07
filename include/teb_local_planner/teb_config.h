@@ -154,7 +154,9 @@ public:
     bool predict_human_behind_robot;
     double ttc_threshold;
     double dir_cost_threshold;
+    double visibility_cost_threshold;
     double pose_prediction_reset_time;
+    double fov;
   } human;
 
   //! Goal tolerance related parameters
@@ -259,12 +261,14 @@ public:
     double weight_human_human_safety;
     double weight_human_robot_ttc;
     double weight_human_robot_dir;
+    double weight_human_robot_visibility;
     double human_robot_ttc_scale_alpha;
     bool use_human_robot_safety_c;
     bool use_human_human_safety_c;
     bool use_human_robot_ttc_c;
     bool scale_human_robot_ttc_c;
     bool use_human_robot_dir_c;
+    bool use_human_robot_visi_c;
     bool use_human_elastic_vel;
     bool disable_warm_start;
     bool disable_rapid_omega_chage;
