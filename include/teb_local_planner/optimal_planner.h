@@ -69,6 +69,8 @@
 #include <teb_local_planner/g2o_types/edge_human_robot_directional.h>
 #include <teb_local_planner/g2o_types/edge_human_robot_safety.h>
 #include <teb_local_planner/g2o_types/edge_human_robot_ttc.h>
+#include <teb_local_planner/g2o_types/edge_human_robot_ttcplus.h>		      //michele
+#include <teb_local_planner/g2o_types/edge_human_robot_ttclosest.h>           //michele
 #include <teb_local_planner/g2o_types/edge_kinematics.h>
 #include <teb_local_planner/g2o_types/edge_obstacle.h>
 #include <teb_local_planner/g2o_types/edge_time_optimal.h>
@@ -346,7 +348,7 @@ public:
   /**
    * @brief Set the desired final velocity at the trajectory's goal pose to be
    * the maximum velocity limit
-   * @remarks Calling this function is not neccessary if \c free_goal_vel is set
+   * @remarks Calling this function is not necessary if \c free_goal_vel is set
    * to \c false in plan()
    */
   void setVelocityGoalFree() { vel_goal_.first = false; }
@@ -797,6 +799,8 @@ protected:
   void AddEdgesHumanRobotSafety();
   void AddEdgesHumanHumanSafety();
   void AddEdgesHumanRobotTTC();
+  void AddEdgesHumanRobotTTCplus();			//michele
+  void AddEdgesHumanRobotTTClosest();                  //michele
   void AddEdgesHumanRobotDirectional();
   void AddEdgesHumanRobotVisibility();
 

@@ -153,6 +153,9 @@ public:
     bool use_external_prediction;
     bool predict_human_behind_robot;
     double ttc_threshold;
+    double ttcplus_threshold;                                        //michele
+    double ttclosest_threshold;                                    //michele
+    double ttcplus_timer;                                          //michele
     double dir_cost_threshold;
     double visibility_cost_threshold;
     double pose_prediction_reset_time;
@@ -260,13 +263,19 @@ public:
                                //! seperation between human and robot
     double weight_human_human_safety;
     double weight_human_robot_ttc;
+    double weight_human_robot_ttcplus;				//michele
+    double weight_human_robot_ttclosest;                       //michele
     double weight_human_robot_dir;
     double weight_human_robot_visibility;
     double human_robot_ttc_scale_alpha;
+    double human_robot_ttcplus_scale_alpha;			//michele
     bool use_human_robot_safety_c;
     bool use_human_human_safety_c;
     bool use_human_robot_ttc_c;
+    bool use_human_robot_ttcplus_c;				//michele
+    bool use_human_robot_ttclosest_c;                        //michele
     bool scale_human_robot_ttc_c;
+    bool scale_human_robot_ttcplus_c;					//michele
     bool use_human_robot_dir_c;
     bool use_human_robot_visi_c;
     bool use_human_elastic_vel;
@@ -438,6 +447,9 @@ public:
     human.use_external_prediction = false;
     human.predict_human_behind_robot = false;
     human.ttc_threshold = 5.0;
+    human.ttcplus_threshold = 5.0;
+    human.ttclosest_threshold = 0.5;                           //michele
+    human.ttcplus_timer = 5;
     human.pose_prediction_reset_time = 2.0;
 
     // GoalTolerance
@@ -460,7 +472,7 @@ public:
 
     // Optimization
 
-    optim.no_inner_iterations = 5;
+    optim.no_inner_iterations = 8;
     optim.no_outer_iterations = 4;
     optim.optimization_activate = true;
     optim.optimization_verbose = false;
@@ -488,12 +500,18 @@ public:
     optim.weight_human_robot_safety = 20;
     optim.weight_human_human_safety = 20;
     optim.weight_human_robot_ttc = 20;
+    optim.weight_human_robot_ttcplus = 20;				//michele
+    optim.weight_human_robot_ttclosest = 10;                     //michele
     optim.weight_human_robot_dir = 20;
+    optim.human_robot_ttcplus_scale_alpha = 1;			//michele
     optim.human_robot_ttc_scale_alpha = 1;
-    optim.use_human_robot_safety_c = true;
+    optim.use_human_robot_safety_c = false;
     optim.use_human_human_safety_c = true;
-    optim.use_human_robot_ttc_c = true;
+    optim.use_human_robot_ttc_c = true ;
+    optim.use_human_robot_ttcplus_c = false ;			//michele
+    optim.use_human_robot_ttclosest_c = true;                   //michele
     optim.scale_human_robot_ttc_c = true;
+    optim.scale_human_robot_ttcplus_c = true;
     optim.use_human_robot_dir_c = true;
     optim.use_human_elastic_vel = true;
     optim.disable_warm_start = false;

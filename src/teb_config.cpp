@@ -116,6 +116,9 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
   nh.param("predict_human_behind_robot", human.predict_human_behind_robot,
            human.predict_human_behind_robot);
   nh.param("ttc_threshold", human.ttc_threshold, human.ttc_threshold);
+  nh.param("ttclosest_threshold", human.ttclosest_threshold, human.ttclosest_threshold);
+  nh.param("ttcplus_threshold", human.ttcplus_threshold, human.ttcplus_threshold);
+  nh.param("ttcplus_timer", human.ttcplus_timer, human.ttcplus_timer);
   nh.param("human_pose_prediction_reset_time", human.pose_prediction_reset_time,
            human.pose_prediction_reset_time);
   nh.param("dir_cost_threshold", human.dir_cost_threshold, human.dir_cost_threshold);
@@ -134,6 +137,7 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
   nh.param("use_nonlinear_obstacle_penalty",
            obstacles.use_nonlinear_obstacle_penalty,
            obstacles.use_nonlinear_obstacle_penalty);
+
   nh.param("obstacle_cost_mult", obstacles.obstacle_cost_mult,
            obstacles.obstacle_cost_mult);
 
@@ -204,18 +208,38 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
            optim.weight_human_human_safety);
   nh.param("weight_human_robot_ttc", optim.weight_human_robot_ttc,
            optim.weight_human_robot_ttc);
+  nh.param("weight_human_robot_ttclosest", optim.weight_human_robot_ttclosest,
+           optim.weight_human_robot_ttclosest);
+                      											//michele
+nh.param("weight_human_robot_ttcplus", optim.weight_human_robot_ttcplus,
+           optim.weight_human_robot_ttcplus);
+
   nh.param("weight_human_robot_dir", optim.weight_human_robot_dir,
            optim.weight_human_robot_dir);
   nh.param("human_robot_ttc_scale_alpha", optim.human_robot_ttc_scale_alpha,
            optim.human_robot_ttc_scale_alpha);
+
+nh.param("human_robot_ttcplus_scale_alpha", optim.human_robot_ttcplus_scale_alpha,					//michele
+           optim.human_robot_ttcplus_scale_alpha);
+
+
   nh.param("use_human_robot_safety_c", optim.use_human_robot_safety_c,
            optim.use_human_robot_safety_c);
   nh.param("use_human_human_safety_c", optim.use_human_human_safety_c,
            optim.use_human_human_safety_c);
   nh.param("use_human_robot_ttc_c", optim.use_human_robot_ttc_c,
            optim.use_human_robot_ttc_c);
+  nh.param("use_human_robot_ttclosest_c", optim.use_human_robot_ttclosest_c,
+           optim.use_human_robot_ttclosest_c);
+
+nh.param("use_human_robot_ttcplus_c", optim.use_human_robot_ttcplus_c,
+           optim.use_human_robot_ttcplus_c);
+
+
   nh.param("scale_human_robot_ttc_c", optim.scale_human_robot_ttc_c,
            optim.scale_human_robot_ttc_c);
+nh.param("scale_human_robot_ttcplus_c", optim.scale_human_robot_ttcplus_c,							//michele
+           optim.scale_human_robot_ttcplus_c);
   nh.param("use_human_robot_dir_c", optim.use_human_robot_dir_c,
            optim.use_human_robot_dir_c);
   nh.param("use_human_elastic_vel", optim.use_human_elastic_vel,
@@ -345,6 +369,9 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   human.use_external_prediction = cfg.use_external_prediction;
   human.predict_human_behind_robot = cfg.predict_human_behind_robot;
   human.ttc_threshold = cfg.ttc_threshold;
+  human.ttclosest_threshold = cfg.ttclosest_threshold;							//michele
+  human.ttcplus_threshold = cfg.ttcplus_threshold;
+//  human.ttcplus_timer = cfg.ttcplus_timer;
   human.dir_cost_threshold = cfg.dir_cost_threshold;
   human.visibility_cost_threshold = cfg.visibility_cost_threshold;
   human.pose_prediction_reset_time = cfg.human_pose_prediction_reset_time;
@@ -379,6 +406,7 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   optim.weight_max_human_vel_theta = cfg.weight_max_vel_theta;
   optim.weight_acc_lim_x = cfg.weight_acc_lim_x;
   optim.weight_human_acc_lim_x = cfg.weight_acc_lim_x;
+
   optim.weight_acc_lim_theta = cfg.weight_acc_lim_theta;
   optim.weight_human_acc_lim_theta = cfg.weight_acc_lim_theta;
   optim.weight_kinematics_nh = cfg.weight_kinematics_nh;
@@ -393,13 +421,19 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   optim.weight_human_robot_safety = cfg.weight_human_robot_safety;
   optim.weight_human_human_safety = cfg.weight_human_human_safety;
   optim.weight_human_robot_ttc = cfg.weight_human_robot_ttc;
+  optim.weight_human_robot_ttclosest = cfg.weight_human_robot_ttclosest;
+  optim.weight_human_robot_ttcplus = cfg.weight_human_robot_ttcplus;
   optim.weight_human_robot_dir = cfg.weight_human_robot_dir;
   optim.weight_human_robot_visibility = cfg.weight_human_robot_visibility;
   optim.human_robot_ttc_scale_alpha = cfg.human_robot_ttc_scale_alpha;
+  optim.human_robot_ttcplus_scale_alpha = cfg.human_robot_ttcplus_scale_alpha;
   optim.use_human_robot_safety_c = cfg.use_human_robot_safety_c;
   optim.use_human_human_safety_c = cfg.use_human_human_safety_c;
   optim.use_human_robot_ttc_c = cfg.use_human_robot_ttc_c;
+  optim.use_human_robot_ttcplus_c = cfg.use_human_robot_ttcplus_c;
+  optim.use_human_robot_ttclosest_c = cfg.use_human_robot_ttclosest_c;
   optim.scale_human_robot_ttc_c = cfg.scale_human_robot_ttc_c;
+  optim.scale_human_robot_ttcplus_c = cfg.scale_human_robot_ttcplus_c;
   optim.use_human_robot_dir_c = cfg.use_human_robot_dir_c;
   optim.use_human_robot_visi_c = cfg.use_human_robot_visi_c;
   optim.use_human_elastic_vel = cfg.use_human_elastic_vel;
