@@ -399,7 +399,7 @@ protected:
   void saturateVelocity(double &v, double &omega, double max_vel_x,
                         double min_vel_x, double max_vel_theta,
                         double min_vel_theta, double max_vel_x_backwards,
-                        double min_vel_x_backwards);
+                        double min_vel_x_backwards, double acc_lim_x, double acc_lim_theta);
 
   /**
    * @brief Convert translational and rotational velocities to a steering angle

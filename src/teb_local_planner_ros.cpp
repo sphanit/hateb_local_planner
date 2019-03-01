@@ -67,6 +67,7 @@
 #include "g2o/core/sparse_optimizer.h"
 #include "g2o/solvers/cholmod/linear_solver_cholmod.h"
 #include "g2o/solvers/csparse/linear_solver_csparse.h"
+#include "math.h"
 
 // register this planner as a BaseLocalPlanner plugin
 PLUGINLIB_DECLARE_CLASS(teb_local_planner, TebLocalPlannerROS,
@@ -708,7 +709,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   saturateVelocity(cmd_vel.linear.x, cmd_vel.angular.z, cfg_.robot.max_vel_x,
                    cfg_.robot.min_vel_x, cfg_.robot.max_vel_theta,
                    cfg_.robot.min_vel_theta, cfg_.robot.max_vel_x_backwards,
-                   cfg_.robot.min_vel_x_backwards);
+                   cfg_.robot.min_vel_x_backwards,cfg_.robot.acc_lim_x , cfg_.robot.acc_lim_theta);
 
   // convert rot-vel to steering angle if desired (carlike robot).
   // The min_turning_radius is allowed to be slighly smaller since it is a
@@ -857,7 +858,7 @@ void TebLocalPlannerROS::updateObstacleContainerWithCustomObstacles() {
 
     for (std::vector<geometry_msgs::PolygonStamped>::const_iterator obst_it =
              custom_obstacle_msg_.obstacles.begin();
-         obst_it != custom_obstacle_msg_.obstacles.end(); ++obst_it) {
+         obst_it != custom_obstacle_msg_.obstacles.end() ; ++obst_it) {
       if (obst_it->polygon.points.size() == 1) // point
       {
         Eigen::Vector3d pos(obst_it->polygon.points.front().x,
@@ -1231,7 +1232,7 @@ bool TebLocalPlannerROS::transformHumanPlan(
 
     // now get last point of human plan withing threshold distance from robot
     for (int i = (transformed_human_plan.size() - 1); i >= 0; i--) {
-      x_diff = robot_pose.getOrigin().x() -
+      x_diff = robot_pose.getOrigin().x()  -
                transformed_human_plan[i].pose.position.x;
       y_diff = robot_pose.getOrigin().y() -
                transformed_human_plan[i].pose.position.y;
@@ -1369,42 +1370,92 @@ double TebLocalPlannerROS::estimateLocalGoalOrientation(
   return average_angles(candidates);
 }
 
+double v_old;
+double omega_old;
+ros::Time now = ros::Time::now();
+ros::Time old_time ;
+
 void TebLocalPlannerROS::saturateVelocity(double &v, double &omega,
                                           double max_vel_x, double min_vel_x,
                                           double max_vel_theta,
                                           double min_vel_theta,
                                           double max_vel_x_backwards,
-                                          double min_vel_x_backwards) {
+                                          double min_vel_x_backwards, double acc_lim_x, double acc_lim_theta) {
+
+
+	ros::Duration dt = now - old_time ;
+	old_time = now ;
+
+
   // Limit translational velocity for forward driving
   if (v > 0.0) {
     if (v > max_vel_x) {
-      v = max_vel_x;
+    	//std::cout<<"saturation ,"<<v<<"        ,";
+    	 v = max_vel_x;
+    	 if((sqrt(pow(v_old - max_vel_x, 2))/dt.toSec()) > acc_lim_x){
+    		v = v_old + acc_lim_x*dt.toSec() ;
+    	}
+
     } else if (v < min_vel_x) {
-      v = min_vel_x;
+    	//std::cout<<"saturation ,"<<v<<"        ,";
+         v = min_vel_x;
+         if((sqrt(pow(min_vel_x - v_old,2))/dt.toSec()) > acc_lim_x){
+         v = v_old + acc_lim_x*dt.toSec() ;
+          	}
     }
   } else if (v < 0.0) {
-    if (v < -max_vel_x_backwards) {
-      v = -max_vel_x_backwards;
-    } else if (v > -min_vel_x_backwards) {
-      v = -min_vel_x_backwards;
-    }
-  }
+	     v= -v ;
+	     if(v > max_vel_x) {
+	    	//std::cout<<"saturation ,"<<v<<"        ,";
+	      v = max_vel_x;
+	      if((sqrt(pow(v_old - max_vel_x,2))/dt.toSec()) > acc_lim_x){
+	      v = v_old + acc_lim_x*dt.toSec() ;
+	    	     	}
 
+	    } else if (v < min_vel_x) {
+	    	//std::cout<<"saturation ,"<<v<<"        ,";
+	      v = min_vel_x;
+	      if((sqrt(pow(min_vel_x - v_old,2))/dt.toSec()) > acc_lim_x){
+	      v = v_old + acc_lim_x*dt.toSec() ;
+	                	}
+	    }
+    v=-v;
+  }
+v_old = v ;
+  std::cout<<" omega old avant saturation :"<<omega_old<<std::endl ;
+  std::cout<<" omega avant saturation :"<<omega<<std::endl ;
   // Limit angular velocity
   if (omega > 0.0) {
     if (omega > max_vel_theta) {
+      //double om = omega;
       omega = max_vel_theta;
+      if((sqrt(pow(omega_old - max_vel_theta , 2))/dt.toSec()) > acc_lim_theta){
+          		omega = omega_old + acc_lim_theta*dt.toSec() ;
+          	}
     } else if (omega < min_vel_theta) {
       omega = min_vel_theta;
+      if((sqrt(pow(min_vel_theta - omega_old , 2))/dt.toSec()) > acc_lim_theta){
+             omega = omega_old + acc_lim_theta*dt.toSec() ;
+                	}
     }
   } else if (omega < 0.0) {
-    if (omega < -max_vel_theta) {
-      omega = -max_vel_theta;
-    } else if (omega > -min_vel_theta) {
-      omega = -min_vel_theta;
-    }
+	  omega = - omega ;
+	  if (omega > max_vel_theta) {
+	      omega = max_vel_theta;
+	      if((sqrt(pow(omega_old - max_vel_theta , 2))/dt.toSec()) > acc_lim_theta){
+	                		omega = omega_old + acc_lim_theta*dt.toSec() ;
+	                	}
+	    } else if (omega < min_vel_theta) {
+	      omega = min_vel_theta;
+	      if((sqrt(pow(min_vel_theta - omega_old,2))/dt.toSec()) > acc_lim_theta){
+	                   omega = omega_old + acc_lim_theta*dt.toSec() ;
+	                      	}
+	    }
+  omega = - omega;
   }
 
+omega_old = omega;
+std::cout<<" omega apres saturation :"<<omega<<std::endl<<std::endl;
 
   // slow change of direction in angular velocity
   if (cfg_.optim.disable_rapid_omega_chage) {
@@ -1844,7 +1895,7 @@ bool TebLocalPlannerROS::optimizeStandalone(
   saturateVelocity(cmd_vel.linear.x, cmd_vel.angular.z, cfg_.robot.max_vel_x,
                    cfg_.robot.min_vel_x, cfg_.robot.max_vel_theta,
                    cfg_.robot.min_vel_theta, cfg_.robot.max_vel_x_backwards,
-                   cfg_.robot.min_vel_x_backwards);
+                   cfg_.robot.min_vel_x_backwards, cfg_.robot.acc_lim_x, cfg_.robot.acc_lim_theta );
   auto vel_time = ros::Time::now() - vel_start_time;
 
   auto total_time = ros::Time::now() - start_time;
