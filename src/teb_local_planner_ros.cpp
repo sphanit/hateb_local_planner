@@ -257,7 +257,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   auto start_time = ros::Time::now();
   if ((start_time - last_call_time_).toSec() >
       cfg_.human.pose_prediction_reset_time) {
-    resetHumansPrediction();
+    //resetHumansPrediction();
   }
   last_call_time_ = start_time;
 
