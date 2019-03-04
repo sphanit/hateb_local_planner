@@ -1386,7 +1386,8 @@ void TebLocalPlannerROS::saturateVelocity(double &v, double &omega,
 	ros::Duration dt = now - old_time ;
 	old_time = now ;
 
-
+	std::cout<<" v old :"<<v_old<<std::endl ;
+	  std::cout<<" v avant saturation :"<<v<<std::endl ;
   // Limit translational velocity for forward driving
   if (v > 0.0) {
     if (v > max_vel_x) {
@@ -1396,34 +1397,36 @@ void TebLocalPlannerROS::saturateVelocity(double &v, double &omega,
     		v = v_old + acc_lim_x*dt.toSec() ;
     	}
 
-    } else if (v < min_vel_x) {
+    } else if (v == min_vel_x) {
     	//std::cout<<"saturation ,"<<v<<"        ,";
-         v = min_vel_x;
+         //v = min_vel_x;
          if((sqrt(pow(min_vel_x - v_old,2))/dt.toSec()) > acc_lim_x){
-         v = v_old + acc_lim_x*dt.toSec() ;
+         v = v_old - acc_lim_x*dt.toSec() ;
           	}
     }
   } else if (v < 0.0) {
-	     v= -v ;
-	     if(v > max_vel_x) {
+
+	     if(v < - max_vel_x_backwards) {
 	    	//std::cout<<"saturation ,"<<v<<"        ,";
-	      v = max_vel_x;
-	      if((sqrt(pow(v_old - max_vel_x,2))/dt.toSec()) > acc_lim_x){
-	      v = v_old + acc_lim_x*dt.toSec() ;
+	      v = -max_vel_x_backwards;
+	      if((sqrt(pow(v_old - max_vel_x_backwards,2))/dt.toSec()) > acc_lim_x){
+	      v = v_old - acc_lim_x*dt.toSec() ;
 	    	     	}
 
-	    } else if (v < min_vel_x) {
+	    } else if (v == min_vel_x_backwards) {
 	    	//std::cout<<"saturation ,"<<v<<"        ,";
-	      v = min_vel_x;
-	      if((sqrt(pow(min_vel_x - v_old,2))/dt.toSec()) > acc_lim_x){
-	      v = v_old + acc_lim_x*dt.toSec() ;
+	     //v = - min_vel_x_backwards;
+	      if((sqrt(pow(- min_vel_x_backwards - v_old,2))/dt.toSec()) > acc_lim_x){
+	      v = v_old - acc_lim_x*dt.toSec() ;
 	                	}
 	    }
-    v=-v;
+
   }
 v_old = v ;
-  std::cout<<" omega old avant saturation :"<<omega_old<<std::endl ;
-  std::cout<<" omega avant saturation :"<<omega<<std::endl ;
+std::cout<<" v apres saturation :"<<v<<std::endl<<std::endl;
+
+std::cout<<" omega old :"<<omega_old<<std::endl ;
+std::cout<<" omega avant saturation :"<<omega<<std::endl ;
   // Limit angular velocity
   if (omega > 0.0) {
     if (omega > max_vel_theta) {
@@ -1439,19 +1442,19 @@ v_old = v ;
                 	}
     }
   } else if (omega < 0.0) {
-	  omega = - omega ;
-	  if (omega > max_vel_theta) {
-	      omega = max_vel_theta;
+
+	  if (omega < -max_vel_theta) {
+	      omega = -max_vel_theta;
 	      if((sqrt(pow(omega_old - max_vel_theta , 2))/dt.toSec()) > acc_lim_theta){
-	                		omega = omega_old + acc_lim_theta*dt.toSec() ;
+	                		omega = omega_old - acc_lim_theta*dt.toSec() ;
 	                	}
-	    } else if (omega < min_vel_theta) {
-	      omega = min_vel_theta;
+	    } else if (omega < -min_vel_theta) {
+	      omega = -min_vel_theta;
 	      if((sqrt(pow(min_vel_theta - omega_old,2))/dt.toSec()) > acc_lim_theta){
-	                   omega = omega_old + acc_lim_theta*dt.toSec() ;
+	                   omega = omega_old - acc_lim_theta*dt.toSec() ;
 	                      	}
 	    }
-  omega = - omega;
+
   }
 
 omega_old = omega;
