@@ -303,6 +303,8 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle &nh) {
 void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig &cfg) {
   boost::mutex::scoped_lock l(config_mutex_);
 
+  planning_mode = cfg.planning_mode;
+
   // Trajectory
   trajectory.teb_autosize = cfg.teb_autosize;
   trajectory.dt_ref = cfg.dt_ref;
