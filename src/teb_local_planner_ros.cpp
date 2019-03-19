@@ -69,8 +69,7 @@
 #include "g2o/solvers/csparse/linear_solver_csparse.h"
 
 // register this planner as a BaseLocalPlanner plugin
-PLUGINLIB_DECLARE_CLASS(teb_local_planner, TebLocalPlannerROS,
-                        teb_local_planner::TebLocalPlannerROS,
+PLUGINLIB_EXPORT_CLASS(teb_local_planner::TebLocalPlannerROS,
                         nav_core::BaseLocalPlanner)
 
 namespace teb_local_planner {
