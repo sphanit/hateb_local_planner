@@ -248,7 +248,7 @@ public:
    * @return \c true if planning was successful, \c false otherwise
    */
   virtual bool plan(const PoseSE2 &start, const PoseSE2 &goal,
-                    const Eigen::Vector2d &start_vel,
+                    const geometry_msgs::Twist *start_vel,
                     bool free_goal_vel = false, double pre_plan_time = 0.0);
 
   /**
@@ -316,16 +316,6 @@ public:
 
   /**
    * @brief Set the initial velocity at the trajectory's start pose (e.g. the
-   * robot's velocity).
-   * @remarks Calling this function is not neccessary if the initial velocity is
-   * passed via the plan() method
-   * @param vel_start 2D vector containing the translational and angular
-   * velocity
-   */
-  void setVelocityStart(const Eigen::Ref<const Eigen::Vector2d> &vel_start);
-
-  /**
-   * @brief Set the initial velocity at the trajectory's start pose (e.g. the
    * robot's velocity) [twist overload].
    * @remarks Calling this function is not neccessary if the initial velocity is
    * passed via the plan() method
@@ -338,10 +328,10 @@ public:
    * @brief Set the desired final velocity at the trajectory's goal pose.
    * @remarks Call this function only if a non-zero velocity is desired and if
    * \c free_goal_vel is set to \c false in plan()
-   * @param vel_goal 2D vector containing the translational and angular final
+   * @param vel_goal twist message containing the translational and angular final
    * velocity
    */
-  void setVelocityGoal(const Eigen::Ref<const Eigen::Vector2d> &vel_goal);
+  void setVelocityGoal(const geometry_msgs::Twist &vel_goal);
 
   /**
    * @brief Set the desired final velocity at the trajectory's goal pose to be
@@ -830,9 +820,9 @@ protected:
   CircularRobotFootprintPtr human_model_;
   boost::shared_ptr<g2o::SparseOptimizer>
       optimizer_; //!< g2o optimizer for trajectory optimization
-  std::pair<bool, Eigen::Vector2d>
+  std::pair<bool, geometry_msgs::Twist>
       vel_start_; //!< Store the initial velocity at the start pose
-  std::pair<bool, Eigen::Vector2d>
+  std::pair<bool, geometry_msgs::Twist>
       vel_goal_; //!< Store the final velocity at the goal pose
   std::map<uint64_t, std::pair<bool, Eigen::Vector2d>> humans_vel_start_,
       humans_vel_goal_;
