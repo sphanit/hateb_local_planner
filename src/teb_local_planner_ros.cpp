@@ -69,14 +69,13 @@
 #include "g2o/solvers/csparse/linear_solver_csparse.h"
 
 // register this planner as a BaseLocalPlanner plugin
-PLUGINLIB_DECLARE_CLASS(teb_local_planner, TebLocalPlannerROS,
-                        teb_local_planner::TebLocalPlannerROS,
+PLUGINLIB_EXPORT_CLASS(teb_local_planner::TebLocalPlannerROS,
                         nav_core::BaseLocalPlanner)
 
 namespace teb_local_planner {
 
 TebLocalPlannerROS::TebLocalPlannerROS()
-    : costmap_ros_(NULL), tf_(NULL), costmap_model_(NULL),
+    : costmap_ros_(NULL), tf2_(NULL), costmap_model_(NULL),
       costmap_converter_loader_("costmap_converter",
                                 "costmap_converter::BaseCostmapToPolygons"),
       dynamic_recfg_(NULL), goal_reached_(false), horizon_reduced_(false),
@@ -89,7 +88,7 @@ void TebLocalPlannerROS::reconfigureCB(TebLocalPlannerReconfigureConfig &config,
   cfg_.reconfigure(config);
 }
 
-void TebLocalPlannerROS::initialize(std::string name, tf::TransformListener *tf,
+void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer *tf2,
                                     costmap_2d::Costmap2DROS *costmap_ros) {
   // check if the plugin is already initialized
   if (!initialized_) {
@@ -131,7 +130,7 @@ void TebLocalPlannerROS::initialize(std::string name, tf::TransformListener *tf,
     }
 
     // init other variables
-    tf_ = tf;
+    tf2_ = tf2;
     costmap_ros_ = costmap_ros;
     costmap_ =
         costmap_ros_->getCostmap(); // locking should be done in MoveBase.
@@ -274,16 +273,18 @@ bool TebLocalPlannerROS::computeVelocityCommands(
 
   // Get robot pose
   auto pose_get_start_time = ros::Time::now();
-  tf::Stamped<tf::Pose> robot_pose;
+  geometry_msgs::PoseStamped robot_pose;
   costmap_ros_->getRobotPose(robot_pose);
-  robot_pose_ = PoseSE2(robot_pose);
+  robot_pose_ = PoseSE2(robot_pose.pose);
   auto pose_get_time = ros::Time::now() - pose_get_start_time;
 
   // Get robot velocity
   auto vel_get_start_time = ros::Time::now();
-  tf::Stamped<tf::Pose> robot_vel_tf;
+  geometry_msgs::PoseStamped robot_vel_tf;
   odom_helper_.getRobotVel(robot_vel_tf);
-  robot_vel_ = tfPoseToEigenVector2dTransRot(robot_vel_tf);
+  tf::Pose robot_vel_tf_pose;
+  tf::poseMsgToTF(robot_vel_tf.pose,robot_vel_tf_pose);
+  robot_vel_ = tfPoseToEigenVector2dTransRot(robot_vel_tf_pose);
   geometry_msgs::Twist robot_vel_twist;
   robot_vel_twist.linear.x = robot_vel_[0];
   robot_vel_twist.angular.z = robot_vel_[1];
@@ -291,7 +292,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(
 
   // prune global plan to cut off parts of the past (spatially before the robot)
   auto prune_start_time = ros::Time::now();
-  pruneGlobalPlan(*tf_, robot_pose, global_plan_);
+  pruneGlobalPlan(*tf2_, robot_pose, global_plan_);
   auto prune_time = ros::Time::now() - prune_start_time;
 
   // Transform global plan to the frame of interest (w.r.t to the local costmap)
@@ -299,7 +300,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   std::vector<geometry_msgs::PoseStamped> transformed_plan;
   int goal_idx;
   tf::StampedTransform tf_plan_to_global;
-  if (!transformGlobalPlan(*tf_, global_plan_, robot_pose, *costmap_,
+  if (!transformGlobalPlan(*tf2_, global_plan_, robot_pose, *costmap_,
                            global_frame_,
                            cfg_.trajectory.max_global_plan_lookahead_dist,
                            transformed_plan, &goal_idx, &tf_plan_to_global)) {
@@ -434,7 +435,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(
         // transform human plans
         HumanPlanCombined human_plan_combined;
         auto &transformed_vel = predicted_humans_poses.start_velocity;
-        if (!transformHumanPlan(*tf_, robot_pose, *costmap_, global_frame_,
+        if (!transformHumanPlan(*tf2_, robot_pose, *costmap_, global_frame_,
                                 predicted_humans_poses.poses,
                                 human_plan_combined, transformed_vel,
                                 &tf_human_plan_to_global)) {
@@ -494,7 +495,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(
            predict_srv.response.predicted_humans_poses) {
         if (predicted_humans_poses.id == cfg_.approach.approach_id) {
           geometry_msgs::PoseStamped transformed_human_pose;
-          if (!transformHumanPose(*tf_, global_frame_,
+          if (!transformHumanPose(*tf2_, global_frame_,
                                   predicted_humans_poses.poses.front(),
                                   transformed_human_pose)) {
             ROS_WARN(
@@ -824,11 +825,11 @@ void TebLocalPlannerROS::updateObstacleContainerWithCustomObstacles() {
     Eigen::Affine3d obstacle_to_map_eig;
     try {
       tf::StampedTransform obstacle_to_map;
-      tf_->waitForTransform(global_frame_, ros::Time(0),
+      tf2_->waitForTransform(global_frame_, ros::Time(0),
                             custom_obstacle_msg_.header.frame_id, ros::Time(0),
                             custom_obstacle_msg_.header.frame_id,
                             ros::Duration(0.5));
-      tf_->lookupTransform(
+      tf2_->lookupTransform(
           global_frame_, ros::Time(0), custom_obstacle_msg_.header.frame_id,
           ros::Time(0), custom_obstacle_msg_.header.frame_id, obstacle_to_map);
       tf::transformTFToEigen(obstacle_to_map, obstacle_to_map_eig);
@@ -954,7 +955,7 @@ TebLocalPlannerROS::tfPoseToEigenVector2dTransRot(const tf::Pose &tf_vel) {
 }
 
 bool TebLocalPlannerROS::pruneGlobalPlan(
-    const tf::TransformListener &tf, const tf::Stamped<tf::Pose> &global_pose,
+    const tf2_ros::Buffer &tf2, const geometry_msgs::PoseStamped &global_pose,
     std::vector<geometry_msgs::PoseStamped> &global_plan,
     double dist_behind_robot) {
   if (global_plan.empty())
@@ -1642,7 +1643,7 @@ bool TebLocalPlannerROS::optimizeStandalone(
   int goal_idx;
   tf::StampedTransform tf_robot_plan_to_global;
   if (!transformGlobalPlan(
-          *tf_, req.robot_plan.poses, robot_pose_tf, *costmap_, global_frame_,
+          *tf2_, req.robot_plan.poses, robot_pose_tf, *costmap_, global_frame_,
           cfg_.trajectory.max_global_plan_lookahead_dist, transformed_plan,
           &goal_idx, &tf_robot_plan_to_global)) {
     res.success = false;
@@ -1697,7 +1698,7 @@ bool TebLocalPlannerROS::optimizeStandalone(
       human_path_cov.push_back(human_pos_cov);
     }
     ROS_INFO("transforming human %ld plan", human_path.id);
-    if (!transformHumanPlan(*tf_, robot_pose_tf, *costmap_, global_frame_,
+    if (!transformHumanPlan(*tf2_, robot_pose_tf, *costmap_, global_frame_,
                             human_path_cov, human_plan_combined,
                             transformed_vel, &tf_human_plan_to_global)) {
       res.success = false;

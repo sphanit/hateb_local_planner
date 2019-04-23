@@ -116,7 +116,7 @@ public:
     * @param tf Pointer to a transform listener
     * @param costmap_ros Cost map representing occupied and free space
     */
-  void initialize(std::string name, tf::TransformListener *tf,
+  void initialize(std::string name, tf2_ros::Buffer *tf2,
                   costmap_2d::Costmap2DROS *costmap_ros);
 
   /**
@@ -287,8 +287,8 @@ protected:
    * @return \c true if the plan is pruned, \c false in case of a transform
    * exception or if no pose cannot be found inside the threshold
    */
-  bool pruneGlobalPlan(const tf::TransformListener &tf,
-                       const tf::Stamped<tf::Pose> &global_pose,
+  bool pruneGlobalPlan(const tf2_ros::Buffer &tf2,
+                       const geometry_msgs::PoseStamped &global_pose,
                        std::vector<geometry_msgs::PoseStamped> &global_plan,
                        double dist_behind_robot = 1);
 
@@ -439,7 +439,7 @@ private:
                                           //!navigation stack
   costmap_2d::Costmap2D *costmap_; //!< Pointer to the 2d costmap (obtained from
                                    //!the costmap ros wrapper)
-  tf::TransformListener *tf_;      //!< pointer to Transform Listener
+  tf2_ros::Buffer *tf2_;      //!< pointer to Transform Listener
 
   // internal objects (memory management owned)
   PlannerInterfacePtr
