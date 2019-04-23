@@ -543,7 +543,7 @@ public:
    * @param vel_start 2D vector containing the translational and rotational
    * velocity
    */
-  void setInitialVelocity(const Eigen::Vector2d &vel_start) {
+  void setInitialVelocity(const geometry_msgs::Twist & 	vel_start) {
     _measurement = &vel_start;
   }
 

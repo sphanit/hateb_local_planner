@@ -195,12 +195,14 @@ boost::shared_ptr<g2o::SparseOptimizer> TebOptimalPlanner::initOptimizer() {
   // allocating the optimizer
   boost::shared_ptr<g2o::SparseOptimizer> optimizer =
       boost::make_shared<g2o::SparseOptimizer>();
-  TEBLinearSolver *linearSolver =
-      new TEBLinearSolver(); // see typedef in optimization.h
+
+  std::unique_ptr<TEBLinearSolver> linearSolver(new TEBLinearSolver());
+  // TEBLinearSolver *linearSolver =
+       // new TEBLinearSolver(); // see typedef in optimization.h
   linearSolver->setBlockOrdering(true);
-  TEBBlockSolver *blockSolver = new TEBBlockSolver(linearSolver);
-  g2o::OptimizationAlgorithmLevenberg *solver =
-      new g2o::OptimizationAlgorithmLevenberg(blockSolver);
+
+  std::unique_ptr<TEBBlockSolver> blockSolver(new TEBBlockSolver(std::move(linearSolver)));
+  g2o::OptimizationAlgorithmLevenberg *solver = new g2o::OptimizationAlgorithmLevenberg(std::move(blockSolver));
 
   optimizer->setAlgorithm(solver);
 
@@ -1009,7 +1011,7 @@ void TebOptimalPlanner::AddEdgesAcceleration() {
 
   // check if an initial velocity should be taken into account
   if (vel_start_.first) {
-    EdgeAccelerationStart *acceleration_edge = new EdgeAccelerationStart;
+    std::unique_ptr<EdgeAccelerationStart> acceleration_edge(new EdgeAccelerationStart);
     acceleration_edge->setVertex(0, teb_.PoseVertex(0));
     acceleration_edge->setVertex(1, teb_.PoseVertex(1));
     acceleration_edge->setVertex(2, teb_.TimeDiffVertex(0));
@@ -1021,7 +1023,7 @@ void TebOptimalPlanner::AddEdgesAcceleration() {
 
   // now add the usual acceleration edge for each tuple of three teb poses
   for (std::size_t i = 0; i < NoBandpts - 2; ++i) {
-    EdgeAcceleration *acceleration_edge = new EdgeAcceleration;
+    std::unique_ptr<EdgeAcceleration> acceleration_edge(new EdgeAcceleration);
     acceleration_edge->setVertex(0, teb_.PoseVertex(i));
     acceleration_edge->setVertex(1, teb_.PoseVertex(i + 1));
     acceleration_edge->setVertex(2, teb_.PoseVertex(i + 2));
