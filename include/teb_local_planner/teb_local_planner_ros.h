@@ -76,6 +76,12 @@
 #include <tf/tf.h>
 #include <tf/transform_listener.h>
 #include <tf/transform_datatypes.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2/impl/utils.h>
+#include <tf2/convert.h>
+#include <tf2_eigen/tf2_eigen.h>
+#include <eigen_conversions/eigen_msg.h>
 
 // costmap
 #include <costmap_2d/costmap_2d_ros.h>
@@ -116,7 +122,7 @@ public:
     * @param tf Pointer to a transform listener
     * @param costmap_ros Cost map representing occupied and free space
     */
-  void initialize(std::string name, tf::TransformListener *tf,
+  void initialize(std::string name, tf2_ros::Buffer *tf2,
                   costmap_2d::Costmap2DROS *costmap_ros);
 
   /**
@@ -287,8 +293,8 @@ protected:
    * @return \c true if the plan is pruned, \c false in case of a transform
    * exception or if no pose cannot be found inside the threshold
    */
-  bool pruneGlobalPlan(const tf::TransformListener &tf,
-                       const tf::Stamped<tf::Pose> &global_pose,
+  bool pruneGlobalPlan(const tf2_ros::Buffer &tf2,
+                       const tf2::Stamped<tf2::Transform> &global_pose,
                        std::vector<geometry_msgs::PoseStamped> &global_plan,
                        double dist_behind_robot = 1);
 
@@ -317,14 +323,14 @@ protected:
     * @return \c true if the global plan is transformed, \c false otherwise
     */
   bool transformGlobalPlan(
-      const tf::TransformListener &tf,
+      const tf2_ros::Buffer &tf2,
       const std::vector<geometry_msgs::PoseStamped> &global_plan,
-      const tf::Stamped<tf::Pose> &global_pose,
+      const tf2::Stamped<tf2::Transform> &global_pose,
       const costmap_2d::Costmap2D &costmap, const std::string &global_frame,
       double max_plan_length,
       PlanCombined &transformed_plan_combined,
       int *current_goal_idx = NULL,
-      tf::StampedTransform *tf_plan_to_global = NULL) const;
+      tf2::Stamped<tf2::Transform> *tf_plan_to_global = NULL) const;
 
   /**
     * @brief  Transforms the human plan from the tracker frame to the local
@@ -342,14 +348,14 @@ protected:
     * @return \c true if the global plan is transformed, \c false otherwise
     */
   bool transformHumanPlan(
-      const tf::TransformListener &tf, const tf::Stamped<tf::Pose> &robot_pose,
+      const tf2_ros::Buffer &tf2, const geometry_msgs::PoseStamped &robot_pose,
       const costmap_2d::Costmap2D &costmap, const std::string &global_frame,
       const std::vector<geometry_msgs::PoseWithCovarianceStamped> &human_plan,
       HumanPlanCombined &transformed_human_plan_combined,
       geometry_msgs::TwistStamped &transformed_human_twist,
-      tf::StampedTransform *tf_human_plan_to_global = NULL) const;
+      tf2::Stamped<tf2::Transform> *tf_human_plan_to_global = NULL) const;
   bool
-  transformHumanPose(const tf::TransformListener &tf,
+  transformHumanPose(const tf2_ros::Buffer &tf2,
                      const std::string &global_frame,
                      geometry_msgs::PoseWithCovarianceStamped &human_pose,
                      geometry_msgs::PoseStamped &transformed_human_pose) const;
@@ -377,8 +383,8 @@ protected:
     */
   double estimateLocalGoalOrientation(
       const std::vector<geometry_msgs::PoseStamped> &global_plan,
-      const tf::Stamped<tf::Pose> &local_goal, int current_goal_idx,
-      const tf::StampedTransform &tf_plan_to_global,
+      const tf2::Stamped<tf2::Transform> &local_goal, int current_goal_idx,
+      const tf2::Stamped<tf2::Transform> &tf_plan_to_global,
       int moving_average_length = 3) const;
 
   /**
@@ -430,6 +436,19 @@ protected:
   // transformHumanPoses(hanp_prediction::PredictedPoses&, std::string
   // frame_id);
 
+
+  int getLatestCommonTime(const std::string &source_frame, const std::string &target_frame, ros::Time& time, std::string* error_string) const;
+
+  void lookupTwist(const std::string& tracking_frame, const std::string& observation_frame,
+                                const ros::Time& time, const ros::Duration& averaging_interval,
+                                geometry_msgs::Twist& twist) const;
+
+  void lookupTwist(const std::string& tracking_frame, const std::string& observation_frame, const std::string& reference_frame,
+                   const tf2::Vector3 & reference_point, const std::string& reference_point_frame,
+                   const ros::Time& time, const ros::Duration& averaging_interval,
+                   geometry_msgs::Twist& twist) const;
+
+
 private:
   // Definition of member variables
 
@@ -439,7 +458,7 @@ private:
                                           //!navigation stack
   costmap_2d::Costmap2D *costmap_; //!< Pointer to the 2d costmap (obtained from
                                    //!the costmap ros wrapper)
-  tf::TransformListener *tf_;      //!< pointer to Transform Listener
+  tf2_ros::Buffer *tf2_;      //!< pointer to Transform Listener
 
   // internal objects (memory management owned)
   PlannerInterfacePtr
