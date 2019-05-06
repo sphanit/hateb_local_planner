@@ -48,6 +48,7 @@
 #define OPTIMIZE_SRV_NAME "optimize"
 #define APPROACH_SRV_NAME "set_approach_id"
 #define OP_COSTS_TOPIC "optimization_costs"
+#define ROB_POS_TOPIC "Robot_Pose"
 #define DEFAULT_HUMAN_SEGMENT hanp_msgs::TrackedSegmentType::TORSO
 #define THROTTLE_RATE 5.0 // seconds
 
@@ -210,6 +211,9 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer *tf2,
     op_costs_pub_ = nh.advertise<teb_local_planner::OptimizationCostArray>(
         OP_COSTS_TOPIC, 1);
 
+    robot_pose_pub_ = nh.advertise<geometry_msgs::Pose>(
+        ROB_POS_TOPIC, 1);
+
     last_call_time_ =
         ros::Time::now() - ros::Duration(cfg_.human.pose_prediction_reset_time);
 
@@ -277,6 +281,9 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   geometry_msgs::PoseStamped robot_pose;
   costmap_ros_->getRobotPose(robot_pose);
   robot_pose_ = PoseSE2(robot_pose.pose);
+  geometry_msgs::Pose robot_pos_msg;
+  robot_pose_.toPoseMsg(robot_pos_msg);  
+  robot_pose_pub_.publish(robot_pos_msg);
   auto pose_get_time = ros::Time::now() - pose_get_start_time;
 
   // Get robot velocity
