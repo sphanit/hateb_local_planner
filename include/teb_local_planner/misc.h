@@ -53,19 +53,19 @@ namespace teb_local_planner
 
 
 
-/** 
+/**
  * @brief Check whether two variables (double) are close to each other
  * @param a the first value to compare
  * @param b the second value to compare
  * @param epsilon precision threshold
  * @return \c true if |a-b| < epsilon, false otherwise
  */
-inline bool is_close(double a, double b, double epsilon = 1e-4) 
-{ 
-  return std::fabs(a - b) < epsilon; 
+inline bool is_close(double a, double b, double epsilon = 1e-4)
+{
+  return std::fabs(a - b) < epsilon;
 }
 
-/** 
+/**
  * @brief Return the average angle of an arbitrary number of given angles [rad]
  * @param angles vector containing all angles
  * @return average / mean angle, that is normalized to [-pi, pi]
@@ -120,26 +120,39 @@ inline double distance_points2d(const P1& point1, const P2& point2)
   return std::sqrt( std::pow(point2.x-point1.x,2) + std::pow(point2.y-point1.y,2) );
 }
 
-/** 
+/**
+ * @brief Calculate the 2d cross product (returns length of the resulting vector along the z-axis in 3d)
+ * @param v1 object containing public methods x() and y()
+ * @param v2 object containing fields x() and y()
+ * @return magnitude that would result in the 3D case (along the z-axis)
+*/
+template <typename V1, typename V2>
+inline double cross2d(const V1& v1, const V2& v2)
+{
+     return v1.x()*v2.y() - v2.x()*v1.y();
+}
+
+
+/**
  * @brief Helper function that returns the const reference to a value defined by either its raw pointer type or const reference.
- * 
+ *
  * Return a constant reference for boths input variants (pointer or reference).
  * @remarks Makes only sense in combination with the overload getConstReference(const T& val).
  * @param ptr pointer of type T
- * @tparam T arbitrary type 
+ * @tparam T arbitrary type
  * @return  If \c T is a pointer, return const *T (leading to const T&), otherwise const T& with out pointer-to-ref conversion
  */
 template<typename T>
 inline const T& get_const_reference(const T* ptr) {return *ptr;}
 
-/** 
+/**
  * @brief Helper function that returns the const reference to a value defined by either its raw pointer type or const reference.
- * 
+ *
  * Return a constant reference for boths input variants (pointer or reference).
  * @remarks Makes only sense in combination with the overload getConstReference(const T* val).
  * @param val
  * @param dummy SFINAE helper variable
- * @tparam T arbitrary type 
+ * @tparam T arbitrary type
  * @return  If \c T is a pointer, return const *T (leading to const T&), otherwise const T& with out pointer-to-ref conversion
  */
 template<typename T>

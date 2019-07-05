@@ -119,18 +119,18 @@ public:
   /**
    * @brief Constructor that initializes the class and registers topics
    * @param nh local ros::NodeHandle
-   * @param cfg const reference to the TebConfig class for parameters
+   * @param visualization_frame frame in which objects are defined
    */
-  TebVisualization(ros::NodeHandle &nh, const TebConfig &cfg);
+  TebVisualization(ros::NodeHandle& nh, const std::string& visualization_frame);
 
   /**
    * @brief Initializes the class and registers topics.
    *
    * Call this function if only the default constructor has been called before.
    * @param nh local ros::NodeHandle
-   * @param cfg const reference to the TebConfig class for parameters
+   * @param visualization_frame frame in which objects are defined
    */
-  void initialize(ros::NodeHandle &nh, const TebConfig &cfg);
+  void initialize(ros::NodeHandle& nh, const std::string& visualization_frame);
 
   /** @name Publish to topics */
   //@{
@@ -324,8 +324,7 @@ protected:
   ros::Publisher robot_traj_time_pub_, robot_path_time_pub_;
   ros::Publisher human_trajs_time_pub_, human_paths_time_pub_;
 
-  const TebConfig
-      *cfg_; //!< Config class that stores and manages all related parameters
+  std::string visualization_frame_ = "map"; // coordinate frame in which everything should be visualized by default
 
   bool initialized_; //!< Keeps track about the correct initialization of this
                      //! class

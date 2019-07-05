@@ -147,7 +147,7 @@ generate_dynamic_reconfigure_options(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  INCLUDE_DIRS include
+  INCLUDE_DIRS include ${EXTERNAL_INCLUDE_DIRS}
   LIBRARIES teb_local_planner ${EXTERNAL_LIBS}
   CATKIN_DEPENDS
 	base_local_planner
@@ -167,7 +167,7 @@ catkin_package(
 	tf
 	tf_conversions
 	visualization_msgs
-  DEPENDS Eigen3 SuiteSparse G2O
+  DEPENDS Eigen3 SuiteSparse SUITESPARSE G2O
 )
 
 ###########

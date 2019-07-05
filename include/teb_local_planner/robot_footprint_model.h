@@ -102,6 +102,12 @@ public:
   }
   virtual void visualizeRobot(const geometry_msgs::Pose& current_pose, std::vector<visualization_msgs::Marker>& markers ) const {}
 
+  /**
+   * @brief Compute the inscribed radius of the footprint model
+   * @return inscribed radius
+   */
+  virtual double getInscribedRadius() = 0;
+
   virtual double getCircumscribedRadius() const = 0;
 
 public:
@@ -148,6 +154,12 @@ public:
   {
     return obstacle->getMinimumDistance(current_pose.position());
   }
+
+  /**
+   * @brief Compute the inscribed radius of the footprint model
+   * @return inscribed radius
+   */
+  virtual double getInscribedRadius() {return 0.0;}
 
   virtual double getCircumscribedRadius() const {
     return 0.0;
@@ -214,6 +226,12 @@ public:
     marker.color.g = 0.8;
     marker.color.b = 0.0;
   }
+
+  /**
+   * @brief Compute the inscribed radius of the footprint model
+   * @return inscribed radius
+   */
+  virtual double getInscribedRadius() {return radius_;}
 
   virtual double getCircumscribedRadius() const {
       return radius_;
@@ -315,6 +333,17 @@ public:
 //       marker2.scale.z = 0.05;
       marker2.color = color;
     }
+  }
+
+  /**
+   * @brief Compute the inscribed radius of the footprint model
+   * @return inscribed radius
+   */
+  virtual double getInscribedRadius()
+  {
+      double min_longitudinal = std::min(rear_offset_ + rear_radius_, front_offset_ + front_radius_);
+      double min_lateral = std::min(rear_radius_, front_radius_);
+      return std::min(min_longitudinal, min_lateral);
   }
 
   virtual double getCircumscribedRadius() const {
@@ -445,6 +474,15 @@ public:
     marker.color = color;
   }
 
+  /**
+ * @brief Compute the inscribed radius of the footprint model
+ * @return inscribed radius
+ */
+  virtual double getInscribedRadius()
+  {
+    return 0.0; // lateral distance = 0.0
+  }
+
   virtual double getCircumscribedRadius() const {
     return std::max(std::hypot(line_start_.x(), line_start_.y()),
                     std::hypot(line_end_.x(), line_end_.y()));
@@ -551,6 +589,32 @@ public:
     marker.scale.x = 0.025;
     marker.color = color;
 
+  }
+
+  /**
+   * @brief Compute the inscribed radius of the footprint model
+   * @return inscribed radius
+   */
+  virtual double getInscribedRadius()
+  {
+       double min_dist = std::numeric_limits<double>::max();
+       Eigen::Vector2d center(0.0, 0.0);
+
+        if (vertices_.size() <= 2)
+          return 0.0;
+
+        for (int i = 0; i < (int)vertices_.size() - 1; ++i)
+       {
+          // compute distance from the robot center point to the first vertex
+          double vertex_dist = vertices_[i].norm();
+          double edge_dist = distance_point_to_segment_2d(center, vertices_[i], vertices_[i+1]);
+          min_dist = std::min(min_dist, std::min(vertex_dist, edge_dist));
+       }
+
+        // we also need to check the last vertex and the first vertex
+       double vertex_dist = vertices_.back().norm();
+       double edge_dist = distance_point_to_segment_2d(center, vertices_.back(), vertices_.front());
+       return std::min(min_dist, std::min(vertex_dist, edge_dist));
   }
 
   virtual double getCircumscribedRadius() const {

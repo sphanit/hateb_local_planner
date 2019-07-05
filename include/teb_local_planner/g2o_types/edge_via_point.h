@@ -32,7 +32,7 @@
  *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * Notes:
  * The following class is derived from a class defined by the
  * g2o-framework. g2o is licensed under the terms of the BSD License.
@@ -44,7 +44,7 @@
 #define EDGE_VIA_POINT_H_
 
 #include <teb_local_planner/g2o_types/vertex_pose.h>
-#include <teb_local_planner/teb_config.h>
+#include <teb_local_planner/g2o_types/base_teb_edges.h>
 
 #include "g2o/core/base_unary_edge.h"
 
@@ -55,42 +55,29 @@ namespace teb_local_planner
 /**
  * @class EdgeViaPoint
  * @brief Edge defining the cost function for pushing a configuration towards a via point
- * 
+ *
  * The edge depends on a single vertex \f$ \mathbf{s}_i \f$ and minimizes: \n
  * \f$ \min  dist2point \cdot weight \f$. \n
  * \e dist2point denotes the distance to the via point. \n
  * \e weight can be set using setInformation(). \n
  * @see TebOptimalPlanner::AddEdgesViaPoints
  * @remarks Do not forget to call setTebConfig() and setViaPoint()
- */     
-class EdgeViaPoint : public g2o::BaseUnaryEdge<1, const Eigen::Vector2d*, VertexPose>
+ */
+class EdgeViaPoint : public BaseTebUnaryEdge<1, const Eigen::Vector2d*, VertexPose>
 {
 public:
-    
+
   /**
    * @brief Construct edge.
-   */    
-  EdgeViaPoint() 
+   */
+  EdgeViaPoint()
   {
     _measurement = NULL;
-    _vertices[0] = NULL;
-  }
- 
-  /**
-   * @brief Destruct edge.
-   * 
-   * We need to erase vertices manually, since we want to keep them even if TebOptimalPlanner::clearGraph() is called.
-   * This is necessary since the vertices are managed by the Timed_Elastic_Band class.
-   */   
-  virtual ~EdgeViaPoint() 
-  {
-    if(_vertices[0]) 
-      _vertices[0]->edges().erase(this);
   }
 
   /**
    * @brief Actual cost function
-   */    
+   */
   void computeError()
   {
     ROS_ASSERT_MSG(cfg_ && _measurement, "You must call setTebConfig(), setViaPoint() on EdgeViaPoint()");
@@ -101,77 +88,32 @@ public:
     ROS_ASSERT_MSG(std::isfinite(_error[0]), "EdgeViaPoint::computeError() _error[0]=%f\n",_error[0]);
   }
 
-  
   /**
-   * @brief Compute and return error / cost value.
-   * 
-   * This method is called by TebOptimalPlanner::computeCurrentCost to obtain the current cost.
-   * @return 1D Cost / error vector
-   */   
-  ErrorVector& getError()
-  {
-    computeError();
-    return _error;
-  }
-  
-  /**
-   * @brief Read values from input stream
-   */    
-  virtual bool read(std::istream& is)
-  {
-  // is >> _measurement[0] >> _measurement[1];
-    return true;
-  }
-
-  /**
-   * @brief Write values to an output stream
-   */ 
-  virtual bool write(std::ostream& os) const
-  {
-  // os << information()(0,0) << " Error: " << _error[0] << ", Measurement X: " << _measurement[0] << ", Measurement Y: " << _measurement[1];
-    return os.good();
-  }
-  
-  /**
-   * @brief Set pointer to associated via point for the underlying cost function 
+   * @brief Set pointer to associated via point for the underlying cost function
    * @param via_point 2D position vector containing the position of the via point
-   */ 
+   */
   void setViaPoint(const Eigen::Vector2d* via_point)
   {
     _measurement = via_point;
-  }
-    
-    
-  /**
-   * @brief Assign the TebConfig class for parameters.
-   * @param cfg TebConfig class
-   */   
-  void setTebConfig(const TebConfig& cfg)
-  {
-      cfg_ = &cfg;
   }
 
   /**
    * @brief Set all parameters at once
    * @param cfg TebConfig class
    * @param via_point 2D position vector containing the position of the via point
-   */ 
+   */
   void setParameters(const TebConfig& cfg, const Eigen::Vector2d* via_point)
   {
     cfg_ = &cfg;
     _measurement = via_point;
   }
-  
-protected:
 
-  const TebConfig* cfg_; //!< Store TebConfig class for parameters
-  
-public: 	
+public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 };
-  
-    
+
+
 
 } // end namespace
 

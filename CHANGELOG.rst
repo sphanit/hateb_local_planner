@@ -1,6 +1,82 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package teb_local_planner
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+0.4.5 (2018-08-14)
+------------------
+* bugfix in calculateHSignature. Fixes `#90 <https://github.com/rst-tu-dortmund/teb_local_planner/issues/90>`_.
+* fixed centroid computation in a special case of polygon-obstacles
+* Contributors: Christoph Rösmann
+
+ 0.4.4 (2016-12-23)
+------------------
+* Indigo - Kinetic Synchronization: stable features and changes of kinetic (0.6.5/0.6.6) are now available in indigo, e.g.
+  * Support for omnidirectional drives
+  * Changed inner velocity storage object to geometry_msgs::Twist to also account for the strafing velocity (and later acceleration). This change caused some function prototype modifications.
+  * Limiting y-acceleration (strafing acceleration) is now supported if holonomic mode is enabled (vel_max_y > 0)
+  * Increased bounds of many variables in dynamic_reconfigure. Resolves #14.
+  * HomotopyClassPlanner public interface extended
+  * Removed TebConfig dependency in TebVisualization
+  * Added intermediate edge layer for unary, binary and multi edges in order to reduce code redundancy.
+  * Added an option to compute the actual arc length
+  instead of using the Euclidean distance approximation.
+  The actual arc length is then used for computing velocities, accelerations
+  and the turning radius.
+  * New default obstacle association strategy.
+  During optimization graph creation, for each pose of the trajectory a
+  relevance detection is performed before considering the obstacle
+  during optimization. New parameters are introduced. The
+  old strategy is kept as 'legacy' strategy (see parameters).
+  * update of default parameters for 'costmap_obstacles_behind_robot_dist'
+  * Added a warning if the optim footprint + min_obstacle_dist is smaller than the costmap footprint.
+  Validation is performed by only comparing the inscribed radii of the footprints.
+  * Weight adaptation added for obstacles edges.
+  Added parameter 'weight_adapt_factor'.
+  Obstacle weights are scaled repeatedly scaled by this factor in each outer TEB iteration.
+  Increasing weights iteratively instead of setting a huge value a-priori leads to better numerical conditions.
+  * Changed HSignature to a generic equivalence class
+  * A new parameter is introduced to prefer the equivalence class of the initial plan
+  * Fixed some bugs related to the deletion of candidates and
+  for keeping the equivalence class of the initial plan.
+  * The trajectory is now initialized backwards for goals close to and behind the robot.
+  Parameter 'allow_init_with_backwards_motion' added.
+  * Horizon reduction for resolving infeasible trajectories is not activated anymore if the global goal is already selected
+  (to avoid oscillations due to changing final orientations)
+  * fixed wrong matrix assignment that caused a crash of the planner
+  * max_samples parameter added
+  * global plan orientations are now taken for TEB initialization if lobal_plan_overwrite_orientation==true
+  * Further fixes (thanks to Matthias FÜller and Daniel Neumann for providing patches)
+
+
+ 0.4.3 (2016-08-17)
+------------------
+* Changed the f0 function for calculating the H-Signature.
+  The new one seems to be more robust for a much larger number of obstacles
+  after some testing.
+* HomotopyClassPlanner: vertex collision check removed since collisions will be determined in the edge collision check again
+* Fixed distance calculation polygon-to-polygon-obstacle
+* Enlarged upper bounds on goal position and orientation tolerances in *dynamic_reconfigure*. Fixes #13.
+
+
+ 0.4.2 (2016-06-15)
+------------------
+* Fixed bug causing the goal to disappear in case the robot arrives with non-zero orientation error.
+* Inflation mode for obstacles added (disabled by default).
+* The homotopy class of the global plan is now always forced to be initialized as trajectory.
+* The initial velocity of the robot is now taken into account correctly for
+  all candidate trajectories.
+* Removed a check in which the last remaining candidate trajectory was rejected if it was close to an obstacle.
+  This fix addresses issue `#7 <https://github.com/rst-tu-dortmund/teb_local_planner/issues/7>`_
+
+ 0.4.1 (2016-05-20)
+------------------
+* Wrong parameter namespace for *costmap_converter* plugins fixed
+* Compiler warnings fixed
+* Workaround for compilation issues that are caused by a bug in boost 1.58
+  concerning the graph library (missing move constructor/assignment operator
+  in boost source).
+* Using *tf*-listener from *move_base* instead of an isolated one
+* Via-point support improved
+
 
 0.4.1 (2016-05-20)
 ------------------
@@ -46,10 +122,10 @@ Changelog for package teb_local_planner
   is now computed using the logical conjunction of both local costmap size and 'max_global_plan_lookahead_dist'.
 * Bug fixes:
   * Fixed a compilation issue on ARM architectures
-  * If custom obstacles are used, the container with old obstacles is now cleared properly. 
-* Parameter cleanup: 
+  * If custom obstacles are used, the container with old obstacles is now cleared properly.
+* Parameter cleanup:
   * "weight_X_obstacle" parameters combined to single parameter "weight_obstacle".
-  * "X_obstacle_poses_affected" parameters combined to single parameter "obstacle_poses_affected". 
+  * "X_obstacle_poses_affected" parameters combined to single parameter "obstacle_poses_affected".
   * Deprecated parameter 'costmap_emergency_stop_dist' removed.
 * Code cleanup
 
@@ -71,7 +147,7 @@ Changelog for package teb_local_planner
 
 0.2.2 (2016-01-11)
 ------------------
-* Carlike robots (ackermann steering) are supported from now on (at least experimentally) 
+* Carlike robots (ackermann steering) are supported from now on (at least experimentally)
   by specifying a minimum bound on the turning radius.
   Currently, the output of the planner in carlike mode is still (v,omega).
   Since I don't have any real carlike robot, I would be really happy if someone could provide me with
@@ -86,7 +162,7 @@ Changelog for package teb_local_planner
   Additionally, the change in acceleration is now computed correctly if the robot switches directions.
 * The global plan is now pruned such that already passed posses are cut off
   (relevant for global planners with *planning_rate=0*).
-* Fixed issue#1: If a global planner with *planning_rate=0* was used, 
+* Fixed issue#1: If a global planner with *planning_rate=0* was used,
   a TF timing/extrapolation issue appeared after some time.
 * The planner resets now properly if the velocity command cannot be computed due to invalid optimization results.
 
@@ -102,7 +178,7 @@ Changelog for package teb_local_planner
 0.2.0 (2015-12-23)
 ------------------
 * The teb_local_planner supports costmap_converter plugins (pluginlib) from now on. Those plugins convert occupied costmap2d cells into polygon shapes.
-  The costmap_converter is disabled by default, since the extension still needs to be tested (parameter choices, computation time advantages, etc.). 
+  The costmap_converter is disabled by default, since the extension still needs to be tested (parameter choices, computation time advantages, etc.).
   A tutorial will explain how to activate the converter using the ros-param server.
 
 0.1.11 (2015-12-12)

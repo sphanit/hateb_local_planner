@@ -421,48 +421,48 @@ public:
 
 
   // implements getCentroid() of the base class
-  virtual const Eigen::Vector2d& getCentroid() const    
+  virtual const Eigen::Vector2d& getCentroid() const
   {
     return centroid_;
   }
-  
+
   // implements getCentroidCplx() of the base class
-  virtual std::complex<double> getCentroidCplx() const  
+  virtual std::complex<double> getCentroidCplx() const
   {
     return std::complex<double>(centroid_.x(), centroid_.y());
   }
-  
+
   // Access or modify line
   const Eigen::Vector2d& start() const {return start_;}
   void setStart(const Eigen::Ref<const Eigen::Vector2d>& start) {start_ = start; calcCentroid();}
   const Eigen::Vector2d& end() const {return end_;}
   void setEnd(const Eigen::Ref<const Eigen::Vector2d>& end) {end_ = end; calcCentroid();}
-  
+
   // implements toPolygonMsg() of the base class
   virtual void toPolygonMsg(geometry_msgs::Polygon& polygon)
   {
     polygon.points.resize(2);
     polygon.points.front().x = start_.x();
     polygon.points.front().y = start_.y();
-    
+
     polygon.points.back().x = end_.x();
     polygon.points.back().y = end_.y();
     polygon.points.back().z = polygon.points.front().z = 0;
   }
-  
+
 protected:
   void calcCentroid()	{	centroid_ = 0.5*(start_ + end_); }
-  
+
 private:
 	Eigen::Vector2d start_;
 	Eigen::Vector2d end_;
-	
+
   Eigen::Vector2d centroid_;
 
-public:	
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW  
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
-  
+
 
 /**
  * @class PolygonObstacle
@@ -474,7 +474,7 @@ public:
 class PolygonObstacle : public Obstacle
 {
 public:
-    
+
   /**
     * @brief Default constructor of the polygon obstacle class
     */
@@ -482,32 +482,39 @@ public:
   {
     centroid_.setConstant(NAN);
   }
-  
-  
+
+  /**
+   * @brief Construct polygon obstacle with a list of vertices
+   */
+  PolygonObstacle(const Point2dContainer& vertices) : Obstacle(), vertices_(vertices)
+  {
+    finalizePolygon();
+  }
+
   /* FIXME Not working at the moment due to the aligned allocator version of std::vector
     * And it is C++11 code that is disabled atm to ensure compliance with ROS indigo/jade
   template <typename... Vector2dType>
   PolygonObstacle(const Vector2dType&... vertices) : _vertices({vertices...})
-  { 
+  {
     calcCentroid();
     _finalized = true;
   }
   */
 
-  
+
   // implements checkCollision() of the base class
   virtual bool checkCollision(const Eigen::Vector2d& point, double min_dist) const
   {
       // line case
       if (noVertices()==2)
         return getMinimumDistance(point) <= min_dist;
-    
+
       // check if point is in the interior of the polygon
       // point in polygon test - raycasting (http://www.ecse.rpi.edu/Homepages/wrf/Research/Short_Notes/pnpoly.html)
-      // using the following algorithm we may obtain false negatives on edge-cases, but that's ok for our purposes	
-      size_t i, j;
+      // using the following algorithm we may obtain false negatives on edge-cases, but that's ok for our purposes
+      int i, j;
       bool c = false;
-      for (i = 0, j = noVertices()-1; i < noVertices(); j = i++) 
+      for (i = 0, j = noVertices()-1; i < noVertices(); j = i++)
       {
         if ( ((vertices_.at(i).y()>point.y()) != (vertices_.at(j).y()>point.y())) &&
               (point.x() < (vertices_.at(j).x()-vertices_.at(i).x()) * (point.y()-vertices_.at(i).y()) / (vertices_.at(j).y()-vertices_.at(i).y()) + vertices_.at(i).x()) )
@@ -519,7 +526,7 @@ public:
       // Let us check the minium distance as well
       return min_dist == 0 ? false : getMinimumDistance(point) < min_dist;
   }
-  
+
 
   /**
     * @brief Check if a given line segment between two points intersects with the obstacle (and additionally keeps a safty distance \c min_dist)
@@ -537,7 +544,7 @@ public:
   {
     return distance_point_to_polygon_2d(position, vertices_);
   }
-  
+
   // implements getMinimumDistance() of the base class
   virtual double getMinimumDistance(const Eigen::Vector2d& line_start, const Eigen::Vector2d& line_end) const
   {
@@ -547,37 +554,37 @@ public:
   // implements getMinimumDistance() of the base class
   virtual double getMinimumDistance(const Point2dContainer& polygon) const
   {
-    return distance_polygon_to_polygon_2d(polygon, polygon);
+    return distance_polygon_to_polygon_2d(polygon, vertices_);
   }
-  
+
   // implements getMinimumDistanceVec() of the base class
   virtual Eigen::Vector2d getClosestPoint(const Eigen::Vector2d& position) const;
-  
+
   // implements getCentroid() of the base class
   virtual const Eigen::Vector2d& getCentroid() const
   {
     assert(finalized_ && "Finalize the polygon after all vertices are added.");
     return centroid_;
   }
-  
+
   // implements getCentroidCplx() of the base class
   virtual std::complex<double> getCentroidCplx() const
   {
     assert(finalized_ && "Finalize the polygon after all vertices are added.");
     return std::complex<double>(centroid_.coeffRef(0), centroid_.coeffRef(1));
   }
-  
+
   // implements toPolygonMsg() of the base class
   virtual void toPolygonMsg(geometry_msgs::Polygon& polygon);
-  
-  
+
+
   /** @name Define the polygon */
-  ///@{       
-  
+  ///@{
+
   // Access or modify polygon
   const Point2dContainer& vertices() const {return vertices_;} //!< Access vertices container (read-only)
   Point2dContainer& vertices() {return vertices_;} //!< Access vertices container
-  
+
   /**
     * @brief Add a vertex to the polygon (edge-point)
     * @remarks You do not need to close the polygon (do not repeat the first vertex)
@@ -589,20 +596,20 @@ public:
     vertices_.push_back(vertex);
     finalized_ = false;
   }
-  
+
   /**
     * @brief Add a vertex to the polygon (edge-point)
     * @remarks You do not need to close the polygon (do not repeat the first vertex)
     * @warning Do not forget to call finalizePolygon() after adding all vertices
     * @param x x-coordinate of the new vertex
     * @param y y-coordinate of the new vertex
-    */  
+    */
   void pushBackVertex(double x, double y)
   {
     vertices_.push_back(Eigen::Vector2d(x,y));
     finalized_ = false;
   }
-  
+
   /**
     * @brief Call finalizePolygon after the polygon is created with the help of pushBackVertex() methods
     */
@@ -612,36 +619,36 @@ public:
     calcCentroid();
     finalized_ = true;
   }
-  
+
   /**
     * @brief Clear all vertices (Afterwards the polygon is not valid anymore)
     */
   void clearVertices() {vertices_.clear(); finalized_ = false;}
-  
+
   /**
     * @brief Get the number of vertices defining the polygon (the first vertex is counted once)
     */
-  size_t noVertices() const {return vertices_.size();}
-  
-  
+  int noVertices() const {return vertices_.size();}
+
+
   ///@}
-      
+
 protected:
-  
+
   void fixPolygonClosure(); //!< Check if the current polygon contains the first vertex twice (as start and end) and in that case erase the last redundant one.
 
   void calcCentroid(); //!< Compute the centroid of the polygon (called inside finalizePolygon())
 
-  
+
   Point2dContainer vertices_; //!< Store vertices defining the polygon (@see pushBackVertex)
   Eigen::Vector2d centroid_; //!< Store the centroid coordinates of the polygon (@see calcCentroid)
-  
+
   bool finalized_; //!< Flat that keeps track if the polygon was finalized after adding all vertices
 
-  
-  	
-public:	
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW  
+
+
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 
