@@ -97,8 +97,7 @@ typedef g2o::LinearSolverCholmod<TEBBlockSolver::PoseMatrixType>
     TEBLinearSolver;
 
 //! Typedef for a container storing via-points
-typedef std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
-    ViaPointContainer;
+typedef std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>> ViaPointContainer;
 
 /**
  * @class TebOptimalPlanner
@@ -302,8 +301,7 @@ public:
                    bool compute_cost_afterwards = false,
                    double obst_cost_scale = 1.0,
                    double viapoint_cost_scale = 1.0,
-                   bool alternative_time_cost = false,
-                   teb_local_planner::OptimizationCostArray *op_costs = NULL);
+                   bool alternative_time_cost = false);
 
   //@}
 

@@ -121,7 +121,7 @@ public:
    * @param nh local ros::NodeHandle
    * @param visualization_frame frame in which objects are defined
    */
-  TebVisualization(ros::NodeHandle& nh, const std::string& visualization_frame);
+  TebVisualization(ros::NodeHandle& nh, const std::string& visualization_frame, const TebConfig& cfg);
 
   /**
    * @brief Initializes the class and registers topics.
@@ -130,7 +130,7 @@ public:
    * @param nh local ros::NodeHandle
    * @param visualization_frame frame in which objects are defined
    */
-  void initialize(ros::NodeHandle& nh, const std::string& visualization_frame);
+  void initialize(ros::NodeHandle& nh, const std::string& visualization_frame, const TebConfig& cfg);
 
   /** @name Publish to topics */
   //@{
@@ -283,7 +283,7 @@ public:
    */
   void publishFeedbackMessage(
       const std::vector<boost::shared_ptr<TebOptimalPlanner>> &teb_planners,
-      unsigned int selected_trajectory_idx, const ObstContainer &obstacles);
+      int selected_trajectory_idx, const ObstContainer &obstacles);
 
   /**
    * @brief Publish a feedback message (single trajectory overload)
@@ -325,6 +325,7 @@ protected:
   ros::Publisher human_trajs_time_pub_, human_paths_time_pub_;
 
   std::string visualization_frame_ = "map"; // coordinate frame in which everything should be visualized by default
+  const TebConfig* cfg_; //!< Config class that stores and manages all related parameters
 
   bool initialized_; //!< Keeps track about the correct initialization of this
                      //! class

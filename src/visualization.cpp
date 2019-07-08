@@ -66,16 +66,19 @@ namespace teb_local_planner {
 
 TebVisualization::TebVisualization() : initialized_(false) {}
 
-TebVisualization::TebVisualization(ros::NodeHandle &nh, const TebConfig &cfg)
+TebVisualization::TebVisualization(ros::NodeHandle &nh, const std::string& visualization_frame, const TebConfig& cfg)
     : initialized_(false) {
-  initialize(nh, cfg);
+  initialize(nh, visualization_frame, cfg);
 }
 
-void TebVisualization::initialize(ros::NodeHandle &nh, const TebConfig &cfg) {
+void TebVisualization::initialize(ros::NodeHandle &nh, const std::string& visualization_frame, const TebConfig& cfg) {
   if (initialized_)
     ROS_WARN("TebVisualization already initialized. Reinitalizing...");
 
-  // set config
+  // set visualization frame
+  visualization_frame_ = visualization_frame;
+
+  //set cfg
   cfg_ = &cfg;
 
   // register topics
@@ -156,7 +159,7 @@ void TebVisualization::publishHumanGlobalPlans(
   }
 
   auto now = ros::Time::now();
-  auto frame_id = cfg_->map_frame;
+  auto frame_id = visualization_frame_;
 
   hanp_msgs::HumanPathArray human_path_array;
   human_path_array.header.stamp = now;
@@ -212,7 +215,7 @@ void TebVisualization::publishLocalPlanAndPoses(
     return;
   }
 
-  auto frame_id = cfg_->map_frame;
+  auto frame_id =  visualization_frame_;
   auto now = ros::Time::now();
 
   // create path msg
@@ -227,7 +230,7 @@ void TebVisualization::publishLocalPlanAndPoses(
 
   // fill path msgs with teb configurations
   double pose_time = 0.0;
-  for (unsigned int i = 0; i < teb.sizePoses(); i++) {
+  for ( int i = 0; i < teb.sizePoses(); i++) {
     geometry_msgs::PoseStamped pose;
     pose.header.frame_id = frame_id;
     pose.header.stamp = now;
@@ -262,7 +265,7 @@ void TebVisualization::publishLocalPlanAndPoses(
         std::vector<visualization_msgs::Marker> fp_markers;
         robot_model.visualizeRobot(pose, fp_markers);
         for (auto &marker : fp_markers) {
-          marker.header.frame_id = cfg_->map_frame;
+          marker.header.frame_id = visualization_frame_;
           marker.header.stamp = ros::Time::now();
           marker.action = visualization_msgs::Marker::ADD;
           marker.ns = ROBOT_FP_POSES_NS;
@@ -273,7 +276,7 @@ void TebVisualization::publishLocalPlanAndPoses(
       }
       while (idx < last_robot_fp_poses_idx_) {
         visualization_msgs::Marker clean_fp_marker;
-        clean_fp_marker.header.frame_id = cfg_->map_frame;
+        clean_fp_marker.header.frame_id = visualization_frame_;
         clean_fp_marker.header.stamp = ros::Time::now();
         clean_fp_marker.action = visualization_msgs::Marker::DELETE;
         clean_fp_marker.id = idx++;
@@ -294,7 +297,7 @@ void TebVisualization::publishTrajectory(
     return;
   }
 
-  auto frame_id = cfg_->map_frame;
+  auto frame_id = visualization_frame_;
   auto now = ros::Time::now();
 
   hanp_msgs::Trajectory trajectory;
@@ -379,7 +382,7 @@ void TebVisualization::publishHumanLocalPlansAndPoses(
 
   // create pose array for all humans
   geometry_msgs::PoseArray humans_teb_poses;
-  humans_teb_poses.header.frame_id = cfg_->map_frame;
+  humans_teb_poses.header.frame_id = visualization_frame_;
   humans_teb_poses.header.stamp = ros::Time::now();
 
   for (auto &human_teb_kv : humans_tebs_map) {
@@ -391,7 +394,7 @@ void TebVisualization::publishHumanLocalPlansAndPoses(
     }
 
     double pose_time = 0.0;
-    for (unsigned int i = 0; i < human_teb.sizePoses(); i++) {
+    for ( int i = 0; i < human_teb.sizePoses(); i++) {
       geometry_msgs::Pose pose;
       pose.position.x = human_teb.Pose(i).x();
       pose.position.y = human_teb.Pose(i).y();
@@ -417,7 +420,7 @@ void TebVisualization::publishHumanLocalPlansAndPoses(
         std::vector<visualization_msgs::Marker> human_fp_markers;
         human_model.visualizeRobot(pose, human_fp_markers);
         for (auto &human_marker : human_fp_markers) {
-          human_marker.header.frame_id = cfg_->map_frame;
+          human_marker.header.frame_id = visualization_frame_;
           human_marker.header.stamp = ros::Time::now();
           human_marker.action = visualization_msgs::Marker::ADD;
           human_marker.ns = HUMAN_FP_POSES_NS;
@@ -428,7 +431,7 @@ void TebVisualization::publishHumanLocalPlansAndPoses(
       }
       while (idx < last_human_fp_poses_idx_) {
         visualization_msgs::Marker clean_fp_marker;
-        clean_fp_marker.header.frame_id = cfg_->map_frame;
+        clean_fp_marker.header.frame_id = visualization_frame_;
         clean_fp_marker.header.stamp = ros::Time::now();
         clean_fp_marker.action = visualization_msgs::Marker::DELETE;
         clean_fp_marker.id = idx++;
@@ -451,7 +454,7 @@ void TebVisualization::publishHumanTrajectories(
   }
 
   auto now = ros::Time::now();
-  auto frame_id = cfg_->map_frame;
+  auto frame_id = visualization_frame_;
 
   hanp_msgs::HumanTrajectoryArray hanp_trajectory_array;
   hanp_trajectory_array.header.stamp = now;
@@ -568,7 +571,7 @@ void TebVisualization::publishRobotFootprintModel(
   for (std::vector<visualization_msgs::Marker>::iterator
            marker_it = markers.begin();
        marker_it != markers.end(); ++marker_it, ++idx) {
-    marker_it->header.frame_id = cfg_->map_frame;
+    marker_it->header.frame_id = visualization_frame_;
     marker_it->header.stamp = ros::Time::now();
     marker_it->action = visualization_msgs::Marker::ADD;
     marker_it->ns = ns;
@@ -585,7 +588,7 @@ void TebVisualization::publishObstacles(const ObstContainer &obstacles) const {
   // Visualize point obstacles
   {
     visualization_msgs::Marker marker;
-    marker.header.frame_id = cfg_->map_frame;
+    marker.header.frame_id = visualization_frame_;
     marker.header.stamp = ros::Time::now();
     marker.ns = "PointObstacles";
     marker.id = 0;
@@ -618,7 +621,7 @@ void TebVisualization::publishObstacles(const ObstContainer &obstacles) const {
 
   // Visualize line obstacles
   {
-    unsigned int idx = 0;
+    std::size_t idx = 0;
     for (ObstContainer::const_iterator obst = obstacles.begin();
          obst != obstacles.end(); ++obst) {
       boost::shared_ptr<LineObstacle> pobst =
@@ -627,7 +630,7 @@ void TebVisualization::publishObstacles(const ObstContainer &obstacles) const {
         continue;
 
       visualization_msgs::Marker marker;
-      marker.header.frame_id = cfg_->map_frame;
+      marker.header.frame_id = visualization_frame_;
       marker.header.stamp = ros::Time::now();
       marker.ns = "LineObstacles";
       marker.id = idx++;
@@ -658,7 +661,7 @@ void TebVisualization::publishObstacles(const ObstContainer &obstacles) const {
 
   // Visualize polygon obstacles
   {
-    unsigned int idx = 0;
+    std::size_t idx = 0;
     for (ObstContainer::const_iterator obst = obstacles.begin();
          obst != obstacles.end(); ++obst) {
       boost::shared_ptr<PolygonObstacle> pobst =
@@ -667,7 +670,7 @@ void TebVisualization::publishObstacles(const ObstContainer &obstacles) const {
         continue;
 
       visualization_msgs::Marker marker;
-      marker.header.frame_id = cfg_->map_frame;
+      marker.header.frame_id = visualization_frame_;
       marker.header.stamp = ros::Time::now();
       marker.ns = "PolyObstacles";
       marker.id = idx++;
@@ -713,7 +716,7 @@ void TebVisualization::publishViaPoints(
     return;
 
   visualization_msgs::Marker marker;
-  marker.header.frame_id = cfg_->map_frame;
+  marker.header.frame_id = visualization_frame_;
   marker.header.stamp = ros::Time::now();
   marker.ns = ns;
   marker.id = 0;
@@ -745,7 +748,7 @@ void TebVisualization::publishTebContainer(
     return;
 
   visualization_msgs::Marker marker;
-  marker.header.frame_id = cfg_->map_frame;
+  marker.header.frame_id = visualization_frame_;
   marker.header.stamp = ros::Time::now();
   marker.ns = ns;
   marker.id = 0;
@@ -787,10 +790,10 @@ void TebVisualization::publishTebContainer(
 
 void TebVisualization::publishFeedbackMessage(
     const std::vector<boost::shared_ptr<TebOptimalPlanner>> &teb_planners,
-    unsigned int selected_trajectory_idx, const ObstContainer &obstacles) {
+     int selected_trajectory_idx, const ObstContainer &obstacles) {
   FeedbackMsg msg;
   msg.header.stamp = ros::Time::now();
-  msg.header.frame_id = cfg_->map_frame;
+  msg.header.frame_id = visualization_frame_;
   msg.selected_trajectory_idx = selected_trajectory_idx;
 
   msg.trajectories.resize(teb_planners.size());
@@ -817,7 +820,7 @@ void TebVisualization::publishFeedbackMessage(
     const TebOptimalPlanner &teb_planner, const ObstContainer &obstacles) {
   FeedbackMsg msg;
   msg.header.stamp = ros::Time::now();
-  msg.header.frame_id = cfg_->map_frame;
+  msg.header.frame_id = visualization_frame_;
   msg.selected_trajectory_idx = 0;
 
   msg.trajectories.resize(1);
@@ -834,7 +837,7 @@ void TebVisualization::publishFeedbackMessage(
   feedback_pub_.publish(msg);
 }
 
-inline bool TebVisualization::printErrorWhenNotInitialized() const {
+bool TebVisualization::printErrorWhenNotInitialized() const {
   if (!initialized_) {
     ROS_ERROR("TebVisualization class not initialized. You must call "
               "initialize or an appropriate constructor");
@@ -850,7 +853,7 @@ void TebVisualization::clearingTimerCB(const ros::TimerEvent &event) {
     // clear robot global plans
     nav_msgs::Path empty_path;
     empty_path.header.stamp = ros::Time::now();
-    empty_path.header.frame_id = cfg_->map_frame;
+    empty_path.header.frame_id = visualization_frame_;
     global_plan_pub_.publish(empty_path);
   }
   last_publish_robot_global_plan =
@@ -863,7 +866,7 @@ void TebVisualization::clearingTimerCB(const ros::TimerEvent &event) {
     nav_msgs::Path empty_path;
     hanp_msgs::Trajectory empty_traj;
     empty_path.header.stamp = ros::Time::now();
-    empty_path.header.frame_id = cfg_->map_frame;
+    empty_path.header.frame_id = visualization_frame_;
     local_plan_pub_.publish(empty_path);
     local_traj_pub_.publish(empty_traj);
   }
@@ -875,7 +878,7 @@ void TebVisualization::clearingTimerCB(const ros::TimerEvent &event) {
     // clear robot local plan poses
     geometry_msgs::PoseArray empty_pose_array;
     empty_pose_array.header.stamp = ros::Time::now();
-    empty_pose_array.header.frame_id = cfg_->map_frame;
+    empty_pose_array.header.frame_id = visualization_frame_;
     teb_poses_pub_.publish(empty_pose_array);
   }
   last_publish_robot_local_plan_poses =
@@ -886,7 +889,7 @@ void TebVisualization::clearingTimerCB(const ros::TimerEvent &event) {
       !cfg_->visualization.publish_robot_local_plan_fp_poses) {
     // clear robot local plan fp poses
     visualization_msgs::Marker clean_fp_poses;
-    clean_fp_poses.header.frame_id = cfg_->map_frame;
+    clean_fp_poses.header.frame_id = visualization_frame_;
     clean_fp_poses.header.stamp = ros::Time::now();
     clean_fp_poses.action = 3; // visualization_msgs::Marker::DELETEALL;
     clean_fp_poses.ns = ROBOT_FP_POSES_NS;
@@ -903,7 +906,7 @@ void TebVisualization::clearingTimerCB(const ros::TimerEvent &event) {
     // clear human global plans
     hanp_msgs::HumanPathArray empty_path_array;
     empty_path_array.header.stamp = ros::Time::now();
-    empty_path_array.header.frame_id = cfg_->map_frame;
+    empty_path_array.header.frame_id = visualization_frame_;
     humans_global_plans_pub_.publish(empty_path_array);
   }
   last_publish_human_global_plans =
@@ -915,7 +918,7 @@ void TebVisualization::clearingTimerCB(const ros::TimerEvent &event) {
     // clear human local plans
     hanp_msgs::HumanTrajectoryArray empty_trajectory_array;
     empty_trajectory_array.header.stamp = ros::Time::now();
-    empty_trajectory_array.header.frame_id = cfg_->map_frame;
+    empty_trajectory_array.header.frame_id = visualization_frame_;
     humans_local_plans_pub_.publish(empty_trajectory_array);
   }
   last_publish_human_local_plans =
@@ -927,7 +930,7 @@ void TebVisualization::clearingTimerCB(const ros::TimerEvent &event) {
     // clear human local plan poses
     geometry_msgs::PoseArray empty_pose_array;
     empty_pose_array.header.stamp = ros::Time::now();
-    empty_pose_array.header.frame_id = cfg_->map_frame;
+    empty_pose_array.header.frame_id = visualization_frame_;
     humans_tebs_poses_pub_.publish(empty_pose_array);
   }
   last_publish_human_local_plan_poses =
@@ -938,7 +941,7 @@ void TebVisualization::clearingTimerCB(const ros::TimerEvent &event) {
       !cfg_->visualization.publish_human_local_plan_fp_poses) {
     // clear human local plan fp poses
     visualization_msgs::Marker clean_fp_poses;
-    clean_fp_poses.header.frame_id = cfg_->map_frame;
+    clean_fp_poses.header.frame_id = visualization_frame_;
     clean_fp_poses.header.stamp = ros::Time::now();
     clean_fp_poses.action = 3; // visualization_msgs::Marker::DELETEALL;
     clean_fp_poses.ns = HUMAN_FP_POSES_NS;
