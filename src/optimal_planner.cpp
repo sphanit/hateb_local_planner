@@ -2029,7 +2029,6 @@ void TebOptimalPlanner::getFullHumanTrajectory(
   auto human_teb_it = humans_tebs_map_.find(human_id);
   if (human_teb_it != humans_tebs_map_.end()) {
     auto &human_teb = human_teb_it->second;
-
     auto human_teb_size = human_teb.sizePoses();
     if (human_teb_size < 3) {
       ROS_WARN("TEB size is %ld for human %ld", human_teb_size, human_id);
