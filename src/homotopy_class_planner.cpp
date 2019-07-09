@@ -166,9 +166,9 @@ bool HomotopyClassPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const
   auto other_time = ros::Time::now() - other_start_time;
 
   auto total_time = ros::Time::now() - start_time;
-  ROS_INFO_STREAM_COND((total_time.toSec() + pre_plan_time) > 0.05, "\nhomotopy class plan times:\n" <<
-    "\ttotal plan time            " << std::to_string(total_time.toSec() + pre_plan_time) << "\n" <<
-    "\tpre-plan time              " << std::to_string(pre_plan_time) << "\n" <<
+  ROS_INFO_STREAM_COND((total_time.toSec() /*+ pre_plan_time*/) > 0.05, "\nhomotopy class plan times:\n" <<
+    "\ttotal plan time            " << std::to_string(total_time.toSec()/* + pre_plan_time*/) << "\n" <<
+    // "\tpre-plan time              " << std::to_string(pre_plan_time) << "\n" <<
     "\tteb update time            " << std::to_string(teb_update_time.toSec()) << "\n" <<
     "\thomotopy exploration time  " << std::to_string(hex_time.toSec()) << "\n" <<
     "\tvia points time            " << std::to_string(via_time.toSec()) << "\n" <<
@@ -645,7 +645,7 @@ void HomotopyClassPlanner::updateReferenceTrajectoryViaPoints(bool all_trajector
   if ( (!all_trajectories && !initial_plan_) || !via_points_ || via_points_->empty() || cfg_->optim.weight_viapoint <= 0)
     return;
 
-  if(h_signatures_.size() < tebs_.size())
+  if(equivalence_classes_.size() < tebs_.size())
   {
     ROS_ERROR("HomotopyClassPlanner::updateReferenceTrajectoryWithViaPoints(): Number of h-signatures does not match number of trajectories.");
     return;
@@ -750,7 +750,7 @@ void HomotopyClassPlanner::optimizeAllTEBs( int iter_innerloop,  int iter_outerl
     {
       teb_threads.create_thread( boost::bind(&TebOptimalPlanner::optimizeTEB, it_teb->get(), iter_innerloop, iter_outerloop,
                                              true, cfg_->hcp.selection_obst_cost_scale, cfg_->hcp.selection_viapoint_cost_scale,
-                                             cfg_->hcp.selection_alternative_time_cost, op_costs) );
+                                             cfg_->hcp.selection_alternative_time_cost) );
     }
     teb_threads.join_all();
   }
@@ -759,7 +759,7 @@ void HomotopyClassPlanner::optimizeAllTEBs( int iter_innerloop,  int iter_outerl
     for (TebOptPlannerContainer::iterator it_teb = tebs_.begin(); it_teb != tebs_.end(); ++it_teb)
     {
       it_teb->get()->optimizeTEB(iter_innerloop,iter_outerloop, true, cfg_->hcp.selection_obst_cost_scale,
-                                 cfg_->hcp.selection_viapoint_cost_scale, cfg_->hcp.selection_alternative_time_cost, op_costs); // compute cost as well inside optimizeTEB (last argument = true)
+                                 cfg_->hcp.selection_viapoint_cost_scale, cfg_->hcp.selection_alternative_time_cost); // compute cost as well inside optimizeTEB (last argument = true)
     }
   }
 }
@@ -877,10 +877,10 @@ TebOptimalPlannerPtr HomotopyClassPlanner::selectBestTeb()
       // get cost of this candidate
       min_cost_initial_plan_teb = initial_plan_teb->getCurrentCost() * cfg_->hcp.selection_prefer_initial_plan; // small hysteresis
     }
-  }
-  best_teb_.reset(); // reset pointer
 
-     for (TebOptPlannerContainer::iterator it_teb = tebs_.begin(); it_teb != tebs_.end(); ++it_teb)
+    best_teb_.reset(); // reset pointer
+
+    for (TebOptPlannerContainer::iterator it_teb = tebs_.begin(); it_teb != tebs_.end(); ++it_teb)
     {
         // check if the related TEB leaves the local costmap region
 //      if (tebs_.size()>1 && !(*it_teb)->teb().isTrajectoryInsideRegion(20, -1, 1))

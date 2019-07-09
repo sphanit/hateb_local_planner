@@ -115,7 +115,7 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer *tf2,
     robot_base_frame_ = costmap_ros_->getBaseFrameID();
 
     // create visualization instance
-    visualization_ = TebVisualizationPtr(new TebVisualization(nh, cfg_.map_frame));
+    visualization_ = TebVisualizationPtr(new TebVisualization(nh, cfg_.map_frame, cfg_));
 
     // create robot footprint/contour model for optimization
     RobotFootprintModelPtr robot_model = getRobotFootprintFromParamServer(nh);
@@ -228,12 +228,9 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer *tf2,
     robot_pose_pub_ = nh.advertise<geometry_msgs::Pose>(
         ROB_POS_TOPIC, 1);
 
-    last_call_time_ =
-        ros::Time::now() - ros::Duration(cfg_.human.pose_prediction_reset_time);
+    last_call_time_ = ros::Time::now() - ros::Duration(cfg_.human.pose_prediction_reset_time);
 
-    last_omega_sign_change_ =
-        ros::Time::now() -
-        ros::Duration(cfg_.optim.omega_chage_time_seperation);
+    last_omega_sign_change_ = ros::Time::now() - ros::Duration(cfg_.optim.omega_chage_time_seperation);
     last_omega_ = 0.0;
 
     // set initialized flag
@@ -305,11 +302,11 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   auto vel_get_start_time = ros::Time::now();
   geometry_msgs::PoseStamped robot_vel_tf;
   odom_helper_.getRobotVel(robot_vel_tf);
-  tf::Pose robot_vel_tf_pose;
-  tf::poseMsgToTF(robot_vel_tf.pose,robot_vel_tf_pose);
-  robot_vel_.linear.x = robot_vel_tf.getOrigin().getX();
-  robot_vel_.linear.y = robot_vel_tf.getOrigin().getY();
-  robot_vel_.angular.z = tf::getYaw(robot_vel_tf.getRotation());
+  // tf::Pose robot_vel_tf_pose;
+  // tf2::transformPoseMsgtoTF(robot_vel_tf.pose,robot_vel_tf_pose);
+  robot_vel_.linear.x = robot_vel_tf.pose.position.x;
+  robot_vel_.linear.y = robot_vel_tf.pose.position.y;
+  robot_vel_.angular.z = robot_vel_tf.pose.orientation.z; //tf::getYaw(robot_vel_tf.getRotation());
   auto vel_get_time = ros::Time::now() - vel_get_start_time;
 
   // prune global plan to cut off parts of the past (spatially before the robot)
@@ -681,6 +678,14 @@ bool TebLocalPlannerROS::computeVelocityCommands(
     }
     visualization_->publishHumanTrajectories(human_plans_traj_array);
   }
+  // Now visualize everything
+
+  auto viz_start_time = ros::Time::now();
+  planner_->visualize();
+  visualization_->publishObstacles(obstacles_);
+  visualization_->publishViaPoints(via_points_);
+  visualization_->publishGlobalPlan(global_plan_);
+
   auto viz_time = ros::Time::now() - viz_start_time;
 
   // Undo temporary horizon reduction
@@ -711,16 +716,16 @@ bool TebLocalPlannerROS::computeVelocityCommands(
     cmd_vel.linear.y = 0;
     cmd_vel.angular.z = 0;
 
-    if (!horizon_reduced_ && cfg_.trajectory.shrink_horizon_backup &&
-        planner_->isHorizonReductionAppropriate(transformed_plan)) {
-      horizon_reduced_ = true;
-      planner_->local_weight_optimaltime_ = 0.4;
-
-      ROS_WARN("TebLocalPlannerROS: trajectory is not feasible, using slower "
-               "trajectory for next 5s...");
-      horizon_reduced_stamp_ = ros::Time::now();
-      return true; // commanded velocity is zero for this step
-    }
+    // if (!horizon_reduced_ && cfg_.trajectory.shrink_horizon_backup &&
+    //     planner_->isHorizonReductionAppropriate(transformed_plan)) {
+    //   horizon_reduced_ = true;
+    //   planner_->local_weight_optimaltime_ = 0.4;
+    //
+    //   ROS_WARN("TebLocalPlannerROS: trajectory is not feasible, using slower "
+    //            "trajectory for next 5s...");
+    //   horizon_reduced_stamp_ = ros::Time::now();
+    //   return true; // commanded velocity is zero for this step
+    // }
     // now we reset everything to start again with the initialization of new
     // trajectories.
     planner_->clearPlanner();
@@ -747,7 +752,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   // Saturate velocity, if the optimization results violates the constraints
   // (could be possible due to soft constraints).
   saturateVelocity(cmd_vel.linear.x, cmd_vel.linear.y, cmd_vel.angular.z, cfg_.robot.max_vel_x, cfg_.robot.max_vel_y,
-                   cfg_.robot.max_vel_theta, cfg_.robot.max_vel_x_backwards);
+                   cfg_.robot.max_vel_theta, cfg_.robot.min_vel_theta, cfg_.robot.max_vel_x_backwards);
 
   // convert rot-vel to steering angle if desired (carlike robot).
   // The min_turning_radius is allowed to be slighly smaller since it is a
@@ -807,13 +812,6 @@ bool TebLocalPlannerROS::computeVelocityCommands(
   // a feasible solution should be found, reset counter
   no_infeasible_plans_ = 0;
 
-   // Now visualize everything
-
-  auto viz_start_time = ros::Time::now();
-  planner_->visualize();
-  visualization_->publishObstacles(obstacles_);
-  visualization_->publishViaPoints(via_points_);
-  visualization_->publishGlobalPlan(global_plan_);
   return true;
 }
 
@@ -1197,32 +1195,31 @@ bool TebLocalPlannerROS::transformGlobalPlan(
     // // Modification for teb_local_planner:
     // // Return the index of the current goal point (inside the distance
     // // threshold)
-    // if (current_goal_idx)
-    //   *current_goal_idx =
-    //       i - 1; // minus 1, since i was increased once before leaving the loop
-    //
-    // while (i < (int)global_plan.size()) {
-    //   const geometry_msgs::PoseStamped &pose = global_plan[i];
-    //   tf2::fromMsg(pose, tf_pose);
-    //   tf_pose.setData(plan_to_global_transform_ * tf_pose);
-    //   tf_pose.stamp_ = plan_to_global_transform_.stamp_;
-    //   tf_pose.frame_id_ = global_frame;
-    //   tf2::toMsg(tf_pose, newer_pose);
-    //   transformed_plan_combined.plan_after.push_back(newer_pose);
-    //   ++i;
-    // }
+    if (current_goal_idx)
+      *current_goal_idx = i - 1; // minus 1, since i was increased once before leaving the loop
+
+    while (i < (int)global_plan.size()) {
+      const geometry_msgs::PoseStamped &pose = global_plan[i];
+      tf2::fromMsg(pose, tf_pose);
+      tf_pose.setData(plan_to_global_transform_ * tf_pose);
+      tf_pose.stamp_ = plan_to_global_transform_.stamp_;
+      tf_pose.frame_id_ = global_frame;
+      tf2::toMsg(tf_pose, newer_pose);
+      transformed_plan_combined.plan_after.push_back(newer_pose);
+      ++i;
+    }
 
     // if we are really close to the goal (<sq_dist_threshold) and the goal is not yet reached (e.g. orientation error >>0)
     // the resulting transformed plan can be empty. In that case we explicitly inject the global goal.
-    if (transformed_plan.empty())
+    if (transformed_plan_combined.plan_after.empty())
     {
-      tf2::fromMsgF(global_plan.back(), tf_pose);
-      tf_pose.setData(plan_to_global_transform * tf_pose);
-      tf_pose.stamp_ = plan_to_global_transform.stamp_;
+      tf2::fromMsg(global_plan.back(), tf_pose);
+      tf_pose.setData(plan_to_global_transform_ * tf_pose);
+      tf_pose.stamp_ = plan_to_global_transform_.stamp_;
       tf_pose.frame_id_ = global_frame;
       tf2::toMsg(tf_pose, newer_pose);
 
-      transformed_plan.push_back(newer_pose);
+      transformed_plan_combined.plan_after.push_back(newer_pose);
 
        // Return the index of the current goal point (inside the distance threshold)
       if (current_goal_idx) *current_goal_idx = int(global_plan.size())-1;
@@ -1570,7 +1567,7 @@ double TebLocalPlannerROS::estimateLocalGoalOrientation(
   return average_angles(candidates);
 }
 
-void TebLocalPlannerROS::saturateVelocity(double& vx, double& vy, double& omega, double max_vel_x, double max_vel_y, double max_vel_theta, double max_vel_x_backwards) const
+void TebLocalPlannerROS::saturateVelocity(double& vx, double& vy, double& omega, double max_vel_x, double max_vel_y, double max_vel_theta, double min_vel_theta, double max_vel_x_backwards)
 {
   // Limit translational velocity for forward driving
     if (vx > max_vel_x)
@@ -2093,7 +2090,7 @@ bool TebLocalPlannerROS::optimizeStandalone(
 
   // get the velocity command for this sampling interval
   auto vel_start_time = ros::Time::now();
-  if (!planner_->getVelocityCommand(cmd_vel.linear.x, cmd_vel.angular.z)) {
+  if (!planner_->getVelocityCommand(cmd_vel.linear.x, cmd_vel.linear.y, cmd_vel.angular.z)) {
     res.message += feasible ? "\nhowever," : "\nand";
     res.message += " velocity command is invalid";
   }

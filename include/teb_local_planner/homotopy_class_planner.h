@@ -317,30 +317,32 @@ public:
    * @tparam Fun unyary function that transforms the dereferenced iterator into an Eigen::Vector2d
    * @return Shared pointer to the newly created teb optimal planner
    */
-  template<typename BidirIter, typename Fun>
-  void addAndInitNewTeb(BidirIter path_start, BidirIter path_end, Fun fun_position, double start_orientation, double goal_orientation, boost::optional<const Eigen::Vector2d&> start_velocity);
+   template<typename BidirIter, typename Fun>
+   TebOptimalPlannerPtr addAndInitNewTeb(BidirIter path_start, BidirIter path_end, Fun fun_position, double start_orientation, double goal_orientation, const geometry_msgs::Twist* start_velocity);
 
-  /**
-   * @brief Add a new Teb to the internal trajectory container and initialize it with a simple straight line between a given start and goal
-   * @param start start pose
-   * @param goal goal pose
-   * @param start_velocity start velocity (optional)
-   */
-  TebOptimalPlannerPtr addAndInitNewTeb(BidirIter path_start, BidirIter path_end, Fun fun_position, double start_orientation, double goal_orientation, const geometry_msgs::Twist* start_velocity);
+   /**
+    * @brief Add a new Teb to the internal trajectory container and initialize it with a simple straight line between a given start and goal
+    * @param start start pose
+    * @param goal goal pose
+    * @param start_velocity start velocity (optional)
+    * @return Shared pointer to the newly created teb optimal planner
+    */
+   TebOptimalPlannerPtr addAndInitNewTeb(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_velocity);
 
-    /**
-   * @brief Add a new Teb to the internal trajectory container and initialize it using a PoseStamped container
-   * @param initial_plan container of poses (start and goal orientation should be valid!)
-   * @param start_velocity start velocity (optional)
-   */
-  TebOptimalPlannerPtr addAndInitNewTeb(const std::vector<geometry_msgs::PoseStamped>& initial_plan, const geometry_msgs::Twist* start_velocity);
+   /**
+    * @brief Add a new Teb to the internal trajectory container and initialize it using a PoseStamped container
+    * @param initial_plan container of poses (start and goal orientation should be valid!)
+    * @param start_velocity start velocity (optional)
+    * @return Shared pointer to the newly created teb optimal planner
+    */
+   TebOptimalPlannerPtr addAndInitNewTeb(const std::vector<geometry_msgs::PoseStamped>& initial_plan, const geometry_msgs::Twist* start_velocity);
 
-  /**
-   * @brief Update TEBs with new pose, goal and current velocity.
-   * @param start New start pose (optional)
-   * @param goal New goal pose (optional)
-   * @param start_velocity start velocity (optional)
-   */
+   /**
+    * @brief Update TEBs with new pose, goal and current velocity.
+    * @param start New start pose (optional)
+    * @param goal New goal pose (optional)
+    * @param start_velocity start velocity (optional)
+    */
   void updateAllTEBs(const PoseSE2* start, const PoseSE2* goal, const geometry_msgs::Twist* start_velocity);
 
 
@@ -510,6 +512,13 @@ protected:
    * @param start_velocity start velocity (optional)
    */
   void createProbRoadmapGraph(const PoseSE2& start, const PoseSE2& goal, double dist_to_obst, int no_samples, double obstacle_heading_threshold, const geometry_msgs::Twist* start_velocity);
+
+  /**
+ * @brief Check if a h-signature exists already.
+ * @param eq_class equivalence class that should be tested
+ * @return \c true if the h-signature is found, \c false otherwise
+ */
+  bool hasEquivalenceClass(const EquivalenceClassPtr& eq_class) const;
 
   /**
    * @brief Internal helper function that adds a new equivalence class to the list of known classes only if it is unique..

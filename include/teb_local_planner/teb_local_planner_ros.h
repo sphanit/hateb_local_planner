@@ -404,7 +404,7 @@ protected:
    * driving
    */
    void saturateVelocity(double& vx, double& vy, double& omega, double max_vel_x, double max_vel_y,
-                           double max_vel_theta, double max_vel_x_backwards) const;
+                           double max_vel_theta, double min_vel_theta, double max_vel_x_backwards);
 
   /**
    * @brief Convert translational and rotational velocities to a steering angle
@@ -515,7 +515,7 @@ private:
   geometry_msgs::Twist robot_vel_; //!< Store current robot translational and angular
                               //!velocity (vx, vy, omega)
   bool goal_reached_;         //!< store whether the goal is reached or not
-  
+
   ros::Time time_last_infeasible_plan_; //!< Store at which time stamp the last infeasible plan was detected
   int no_infeasible_plans_; //!< Store how many times in a row the planner failed to find a feasible plan
 
