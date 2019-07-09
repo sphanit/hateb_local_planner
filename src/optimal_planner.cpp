@@ -860,7 +860,7 @@ void TebOptimalPlanner::AddEdgesObstaclesLegacy(double weight_multiplier) {
 
     int index;
 
-    if (cfg_->obstacles.obstacle_poses_affected >= (int)teb_.sizePoses())
+    if (cfg_->obstacles.obstacle_poses_affected >= teb_.sizePoses())
       index = teb_.sizePoses() / 2;
     else
       index = teb_.findClosestTrajectoryPose(*(obst->get()));
@@ -950,7 +950,7 @@ void TebOptimalPlanner::AddEdgesObstaclesForHumans() {
     for (auto &human_teb_kv : humans_tebs_map_) {
       auto &human_teb = human_teb_kv.second;
 
-      if (cfg_->obstacles.obstacle_poses_affected >= (int)human_teb.sizePoses())
+      if (cfg_->obstacles.obstacle_poses_affected >= human_teb.sizePoses())
         index = human_teb.sizePoses() / 2;
       else
         index = human_teb.findClosestTrajectoryPose(*(obst->get()));
@@ -982,7 +982,7 @@ void TebOptimalPlanner::AddEdgesObstaclesForHumans() {
               obst->get());
           optimizer_->addEdge(dist_bandpt_obst_n_r);
         }
-        if ((int)index - (int)neighbourIdx >=
+        if (index - neighbourIdx >=
             0) { // TODO: may be > is enough instead of >=
           EdgeObstacle *dist_bandpt_obst_n_l = new EdgeObstacle;
           dist_bandpt_obst_n_l->setVertex(
@@ -1097,7 +1097,7 @@ void TebOptimalPlanner::AddEdgesViaPointsForHumans() {
 
   int start_pose_idx = 0;
 
-  int n = (int)teb_.sizePoses();
+  int n = teb_.sizePoses();
   if (n < 3)
     return;
 
@@ -2154,7 +2154,7 @@ bool TebOptimalPlanner::isHorizonReductionAppropriate(
   // (maybe too much is cut off)
   int idx = 0; // first get point close to the robot (should be fast if the
                // global path is already pruned!)
-  for (; idx < (int)initial_plan.size(); ++idx) {
+  for (; idx < initial_plan.size(); ++idx) {
     if (std::sqrt(
             std::pow(initial_plan[idx].pose.position.x - teb_.Pose(0).x(), 2) +
             std::pow(initial_plan[idx].pose.position.y - teb_.Pose(0).y(), 2)))

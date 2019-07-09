@@ -1135,7 +1135,7 @@ bool TebLocalPlannerROS::transformGlobalPlan(
 
     // we need to loop to a point on the plan that is within a certain
     // distance of the robot
-    while (i < (int)global_plan.size()) {
+    while (i < global_plan.size()) {
       double x_diff =
           robot_pose.getOrigin().x() - global_plan[i].pose.position.x;
       double y_diff =
@@ -1167,7 +1167,7 @@ bool TebLocalPlannerROS::transformGlobalPlan(
         0; // check cumulative Euclidean distance along the plan
 
     // now we'll transform until points are outside of our distance threshold
-    while (i < (int)global_plan.size() && sq_dist <= sq_dist_threshold &&
+    while (i < global_plan.size() && sq_dist <= sq_dist_threshold &&
            (max_plan_length <= 0 || plan_length <= max_plan_length)) {
       const geometry_msgs::PoseStamped &pose = global_plan[i];
       tf2::fromMsg(pose, tf_pose);
@@ -1198,7 +1198,7 @@ bool TebLocalPlannerROS::transformGlobalPlan(
     if (current_goal_idx)
       *current_goal_idx = i - 1; // minus 1, since i was increased once before leaving the loop
 
-    while (i < (int)global_plan.size()) {
+    while (i < global_plan.size()) {
       const geometry_msgs::PoseStamped &pose = global_plan[i];
       tf2::fromMsg(pose, tf_pose);
       tf_pose.setData(plan_to_global_transform_ * tf_pose);
@@ -1522,7 +1522,7 @@ double TebLocalPlannerROS::estimateLocalGoalOrientation(
     const tf2::Stamped<tf2::Transform> &local_goal, int current_goal_idx,
     const tf2::Stamped<tf2::Transform> &tf_plan_to_global,
     int moving_average_length) const {
-  int n = (int)global_plan.size();
+  int n = global_plan.size();
 
   // check if we are near the global goal already
   if (current_goal_idx > n - moving_average_length - 2) {
@@ -1661,7 +1661,7 @@ void TebLocalPlannerROS::validateFootprints(double opt_inscribed_radius, double 
 
      // reduced horizon backup mode
     if (cfg_.trajectory.shrink_horizon_backup &&
-        goal_idx < (int)transformed_plan.size()-1 && // we do not reduce if the goal is already selected (because the orientation might change -> can introduce oscillations)
+        goal_idx < transformed_plan.size()-1 && // we do not reduce if the goal is already selected (because the orientation might change -> can introduce oscillations)
        (no_infeasible_plans_>0 || (current_time - time_last_infeasible_plan_).toSec() < cfg_.trajectory.shrink_horizon_min_duration )) // keep short horizon for at least a few seconds
     {
         ROS_INFO_COND(no_infeasible_plans_==1, "Activating reduced horizon backup mode for at least %.2f sec (infeasible trajectory detected).", cfg_.trajectory.shrink_horizon_min_duration);

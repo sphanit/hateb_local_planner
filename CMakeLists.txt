@@ -36,10 +36,10 @@ find_package(G2O REQUIRED)
 
 # Eigen3 FindScript Backward compatibility (ubuntu saucy)
 # Since FindEigen.cmake is deprecated starting from jade.
-#if (EXISTS "FindEigen3.cmake")
-# find_package(Eigen3 REQUIRED)
-# set(Eigen_INCLUDE_DIRS ${Eigen3_INCLUDE_DIRS})
-if (EXISTS "FindEigen.cmake")
+if (EXISTS "FindEigen3.cmake")
+  find_package(Eigen3 REQUIRED)
+  set(Eigen_INCLUDE_DIRS ${Eigen3_INCLUDE_DIRS})
+elseif (EXISTS "FindEigen.cmake")
   find_package(Eigen REQUIRED)
 elseif (EXISTS "FindEigen.cmake")
   message(WARNING "No findEigen cmake script found. You must provde one of them,
