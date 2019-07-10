@@ -119,7 +119,7 @@ bool HomotopyClassPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& i
   PoseSE2 goal(initial_plan.back().pose);
   // Eigen::Vector2d vel = start_vel ?  Eigen::Vector2d( start_vel->linear.x, start_vel->angular.z ) : Eigen::Vector2d::Zero();
   auto pre_plan_time = ros::Time::now() - start_time;
-  return plan(start, goal, start_vel, free_goal_vel);
+  return plan(start, goal, start_vel, free_goal_vel, pre_plan_time.toSec());
 }
 
 
@@ -131,7 +131,7 @@ bool HomotopyClassPlanner::plan(const tf::Pose& start, const tf::Pose& goal, con
   return plan(start_pose, goal_pose, start_vel, free_goal_vel);
 }
 
-bool HomotopyClassPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel, bool free_goal_vel)
+bool HomotopyClassPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel, bool free_goal_vel, double pre_plan_time)
 {
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
   auto start_time = ros::Time::now();
@@ -166,9 +166,9 @@ bool HomotopyClassPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const
   auto other_time = ros::Time::now() - other_start_time;
 
   auto total_time = ros::Time::now() - start_time;
-  ROS_INFO_STREAM_COND((total_time.toSec() /*+ pre_plan_time*/) > 0.05, "\nhomotopy class plan times:\n" <<
-    "\ttotal plan time            " << std::to_string(total_time.toSec()/* + pre_plan_time*/) << "\n" <<
-    // "\tpre-plan time              " << std::to_string(pre_plan_time) << "\n" <<
+  ROS_INFO_STREAM_COND((total_time.toSec() + pre_plan_time) > 0.05, "\nhomotopy class plan times:\n" <<
+    "\ttotal plan time            " << std::to_string(total_time.toSec() + pre_plan_time) << "\n" <<
+    "\tpre-plan time              " << std::to_string(pre_plan_time) << "\n" <<
     "\tteb update time            " << std::to_string(teb_update_time.toSec()) << "\n" <<
     "\thomotopy exploration time  " << std::to_string(hex_time.toSec()) << "\n" <<
     "\tvia points time            " << std::to_string(via_time.toSec()) << "\n" <<
@@ -229,7 +229,7 @@ void HomotopyClassPlanner::visualize()
 
 
 
-void HomotopyClassPlanner::createGraph(const PoseSE2& start, const PoseSE2& goal, double dist_to_obst, double obstacle_heading_threshold, const geometry_msgs::Twist* start_velocity)
+void HomotopyClassPlanner::createGraph(const PoseSE2& start, const PoseSE2& goal, double dist_to_obst, double obstacle_heading_threshold, boost::optional<const geometry_msgs::Twist*> start_velocity)
 {
   // Clear existing graph and paths
   clearGraph();
@@ -354,7 +354,7 @@ void HomotopyClassPlanner::createGraph(const PoseSE2& start, const PoseSE2& goal
 }
 
 
-void HomotopyClassPlanner::createProbRoadmapGraph(const PoseSE2& start, const PoseSE2& goal, double dist_to_obst, int no_samples, double obstacle_heading_threshold, const geometry_msgs::Twist* start_velocity)
+void HomotopyClassPlanner::createProbRoadmapGraph(const PoseSE2& start, const PoseSE2& goal, double dist_to_obst, int no_samples, double obstacle_heading_threshold, boost::optional<const geometry_msgs::Twist*> start_velocity)
 {
   // Clear existing graph and paths
   clearGraph();
@@ -476,7 +476,7 @@ void HomotopyClassPlanner::createProbRoadmapGraph(const PoseSE2& start, const Po
 
 
 void HomotopyClassPlanner::DepthFirst(HcGraph& g, std::vector<HcGraphVertexType>& visited, const HcGraphVertexType& goal,
-                                      double start_orientation, double goal_orientation, const geometry_msgs::Twist* start_velocity)
+                                      double start_orientation, double goal_orientation, boost::optional<const geometry_msgs::Twist*> start_velocity)
 {
   // see http://www.technical-recipes.com/2011/a-recursive-algorithm-to-find-all-paths-between-two-given-nodes/ for details on finding all simple paths
 
@@ -673,7 +673,7 @@ void HomotopyClassPlanner::updateReferenceTrajectoryViaPoints(bool all_trajector
 }
 
 
-void HomotopyClassPlanner::exploreEquivalenceClassesAndInitTebs(const PoseSE2& start, const PoseSE2& goal, double dist_to_obst, const geometry_msgs::Twist* start_vel)
+void HomotopyClassPlanner::exploreEquivalenceClassesAndInitTebs(const PoseSE2& start, const PoseSE2& goal, double dist_to_obst, boost::optional<const geometry_msgs::Twist*> start_vel)
 {
   // first process old trajectories
   renewAndAnalyzeOldTebs(false);
@@ -695,29 +695,29 @@ void HomotopyClassPlanner::exploreEquivalenceClassesAndInitTebs(const PoseSE2& s
 }
 
 
-TebOptimalPlannerPtr HomotopyClassPlanner::addAndInitNewTeb(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_velocity)
+TebOptimalPlannerPtr HomotopyClassPlanner::addAndInitNewTeb(const PoseSE2& start, const PoseSE2& goal, boost::optional<const geometry_msgs::Twist*> start_velocity)
 {
   tebs_.push_back( TebOptimalPlannerPtr( new TebOptimalPlanner(*cfg_, obstacles_, robot_model_) ) );
   tebs_.back()->teb().initTEBtoGoal(start, goal, 0, cfg_->trajectory.dt_ref, cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion);
 
    if (start_velocity)
-    tebs_.back()->setVelocityStart(*start_velocity);
+    tebs_.back()->setVelocityStart(**start_velocity);
 
    return tebs_.back();
 }
 
-TebOptimalPlannerPtr HomotopyClassPlanner::addAndInitNewTeb(const std::vector<geometry_msgs::PoseStamped>& initial_plan, const geometry_msgs::Twist* start_velocity)
+TebOptimalPlannerPtr HomotopyClassPlanner::addAndInitNewTeb(const std::vector<geometry_msgs::PoseStamped>& initial_plan, boost::optional<const geometry_msgs::Twist*> start_velocity)
 {
   tebs_.push_back( TebOptimalPlannerPtr( new TebOptimalPlanner(*cfg_, obstacles_, robot_model_) ) );
   tebs_.back()->teb().initTEBtoGoal(*initial_plan_, cfg_->trajectory.dt_ref, true, cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion);
 
    if (start_velocity)
-    tebs_.back()->setVelocityStart(*start_velocity);
+    tebs_.back()->setVelocityStart(**start_velocity);
 
    return tebs_.back();
 }
 
-void HomotopyClassPlanner::updateAllTEBs(const PoseSE2* start, const PoseSE2* goal, const geometry_msgs::Twist* start_velocity)
+void HomotopyClassPlanner::updateAllTEBs(const PoseSE2* start, const PoseSE2* goal, boost::optional<const geometry_msgs::Twist*> start_velocity)
 {
   // If new goal is too far away, clear all existing trajectories to let them reinitialize later.
   // Since all Tebs are sharing the same fixed goal pose, just take the first candidate:
@@ -733,7 +733,7 @@ void HomotopyClassPlanner::updateAllTEBs(const PoseSE2* start, const PoseSE2* go
   {
     it_teb->get()->teb().updateAndPruneTEB(*start, *goal);
     if (start_velocity)
-      it_teb->get()->setVelocityStart(*start_velocity);
+      it_teb->get()->setVelocityStart(**start_velocity);
   }
 }
 
@@ -750,7 +750,7 @@ void HomotopyClassPlanner::optimizeAllTEBs( int iter_innerloop,  int iter_outerl
     {
       teb_threads.create_thread( boost::bind(&TebOptimalPlanner::optimizeTEB, it_teb->get(), iter_innerloop, iter_outerloop,
                                              true, cfg_->hcp.selection_obst_cost_scale, cfg_->hcp.selection_viapoint_cost_scale,
-                                             cfg_->hcp.selection_alternative_time_cost) );
+                                             cfg_->hcp.selection_alternative_time_cost, op_costs) );
     }
     teb_threads.join_all();
   }
@@ -759,7 +759,7 @@ void HomotopyClassPlanner::optimizeAllTEBs( int iter_innerloop,  int iter_outerl
     for (TebOptPlannerContainer::iterator it_teb = tebs_.begin(); it_teb != tebs_.end(); ++it_teb)
     {
       it_teb->get()->optimizeTEB(iter_innerloop,iter_outerloop, true, cfg_->hcp.selection_obst_cost_scale,
-                                 cfg_->hcp.selection_viapoint_cost_scale, cfg_->hcp.selection_alternative_time_cost); // compute cost as well inside optimizeTEB (last argument = true)
+                                 cfg_->hcp.selection_viapoint_cost_scale, cfg_->hcp.selection_alternative_time_cost,op_costs); // compute cost as well inside optimizeTEB (last argument = true)
     }
   }
 }

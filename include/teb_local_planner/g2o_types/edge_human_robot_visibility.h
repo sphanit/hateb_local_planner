@@ -38,89 +38,51 @@
 #include <teb_local_planner/g2o_types/vertex_pose.h>
 #include <teb_local_planner/g2o_types/penalties.h>
 #include <teb_local_planner/teb_config.h>
+#include <teb_local_planner/g2o_types/base_teb_edges.h>
 
-#include "g2o/core/base_unary_edge.h"
+// #include "g2o/core/base_unary_edge.h"
 
 namespace teb_local_planner {
 
-    class EdgeHumanRobotVisibility
-            : public g2o::BaseBinaryEdge<1, double, VertexPose, VertexPose> {
-    public:
-        EdgeHumanRobotVisibility() {
-            this->setMeasurement(0.);
-            _vertices[0] = _vertices[1] = NULL;
-        }
+class EdgeHumanRobotVisibility : public BaseTebBinaryEdge<1, double, VertexPose, VertexPose> {
+public:
+  EdgeHumanRobotVisibility()
+  {
+      this->setMeasurement(0.);
+  }
 
-        virtual ~EdgeHumanRobotVisibility() {
-            for (unsigned int i = 0; i < 2; i++) {
-                if (_vertices[i])
-                    _vertices[i]->edges().erase(this);
-            }
-        }
+  void computeError()
+  {
+    ROS_ASSERT_MSG(cfg_, "You must call setParameters() on EdgeHumanRobotVisibility()");
+    const VertexPose *robot_bandpt = static_cast<const VertexPose *>(_vertices[0]);
+    const VertexPose *human_bandpt = static_cast<const VertexPose *>(_vertices[1]);
+    Eigen::Vector2d d_rtoh = human_bandpt->position() - robot_bandpt->position();
+    Eigen::Vector2d d_htor = robot_bandpt->position() - human_bandpt->position();
+    Eigen::Vector2d humanLookAt = {cos(human_bandpt->theta()), sin(human_bandpt->theta())};
+    double deltaPsi = fabs(acos(humanLookAt.dot(d_htor) / (humanLookAt.norm() + d_htor.norm())));
+    //ROS_DEBUG_THROTTLE(0.5, "robot_human_angle deg : %f", deltaPsi * 180 / M_PI);
+    double c_visibility;
+    if (deltaPsi >= cfg_->human.fov * M_PI / 180){
+        c_visibility = deltaPsi * ((cos(d_rtoh.x()) + 1) * (cos(d_rtoh.y()) + 1));
+    }else{
+        c_visibility = 0.;
+    }
 
-        void computeError() {
-            ROS_ASSERT_MSG(cfg_,
-                           "You must call setParameters() on EdgeHumanRobotVisibility()");
-            const VertexPose *robot_bandpt =
-                    static_cast<const VertexPose *>(_vertices[0]);
-            const VertexPose *human_bandpt =
-                    static_cast<const VertexPose *>(_vertices[1]);
-            Eigen::Vector2d d_rtoh =
-                    human_bandpt->position() - robot_bandpt->position();
-            Eigen::Vector2d d_htor = robot_bandpt->position() - human_bandpt->position();
-            Eigen::Vector2d humanLookAt = {cos(human_bandpt->theta()), sin(human_bandpt->theta())};
-            double deltaPsi = fabs(acos(humanLookAt.dot(d_htor) / (humanLookAt.norm() + d_htor.norm())));
-            //ROS_DEBUG_THROTTLE(0.5, "robot_human_angle deg : %f", deltaPsi * 180 / M_PI);
-            double c_visibility;
-            if (deltaPsi >= cfg_->human.fov * M_PI / 180){
-                c_visibility = deltaPsi * ((cos(d_rtoh.x()) + 1) * (cos(d_rtoh.y()) + 1));
-            }else{
-                c_visibility = 0.;
-            }
-//            double robot_human_angle = center_radians(atan2(d_rtoh.y(), d_rtoh.x()) - human_bandpt->theta());
-//
-//            double c_visibility = fmaxf(0.,
-//                                           (pow(robot_human_angle, 2) - cfg_->human.fov / 2)
-//                                           / d_rtoh.dot(d_rtoh));
+    _error[0] = penaltyBoundFromAbove(c_visibility, cfg_->human.visibility_cost_threshold,
+                                      cfg_->optim.penalty_epsilon);
 
-            //ROS_DEBUG("c_visibility = %f", c_visibility);
-            _error[0] = penaltyBoundFromAbove(c_visibility, cfg_->human.visibility_cost_threshold,
-                                              cfg_->optim.penalty_epsilon);
+    ROS_ASSERT_MSG(std::isfinite(_error[0]), "EdgeHumanRobotVisibility::computeError() _error[0]=%f\n", _error[0]);
+  }
 
-            ROS_ASSERT_MSG(std::isfinite(_error[0]),
-                           "EdgeHumanRobotVisibility::computeError() _error[0]=%f\n",
-                           _error[0]);
-        }
+  void setParameters(const TebConfig &cfg)
+  {
+      cfg_ = &cfg;
+  }
 
-        ErrorVector &getError() {
-            computeError();
-            return _error;
-        }
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+};
 
-        virtual bool read(std::istream &is) {
-            // is >> _measurement[0];
-            return true;
-        }
-
-        virtual bool write(std::ostream &os) const {
-            // os << information()(0,0) << " Error: " << _error[0] << ", Measurement:"
-            //    << _measurement[0];
-            return os.good();
-        }
-
-        void setTebConfig(const TebConfig &cfg) { cfg_ = &cfg; }
-
-        void setParameters(const TebConfig &cfg) {
-            cfg_ = &cfg;
-        }
-
-    protected:
-        const TebConfig *cfg_;
-
-    public:
-        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    };
-
-} // end namespace
+}; // end namespace
 
 #endif

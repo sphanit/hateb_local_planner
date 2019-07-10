@@ -243,7 +243,7 @@ public:
    *		      otherwise the final velocity will be zero (default: false)
    * @return \c true if planning was successful, \c false otherwise
    */
-  virtual bool plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false);
+  virtual bool plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false, double pre_plan_time = 0.0);
 
   /**
    * @brief Get the velocity command from a previously optimized plan to control
@@ -301,7 +301,8 @@ public:
                    bool compute_cost_afterwards = false,
                    double obst_cost_scale = 1.0,
                    double viapoint_cost_scale = 1.0,
-                   bool alternative_time_cost = false);
+                   bool alternative_time_cost = false,
+                   teb_local_planner::OptimizationCostArray *op_costs = NULL);
 
   //@}
 
@@ -835,7 +836,7 @@ protected:
       optimizer_; //!< g2o optimizer for trajectory optimization
   std::pair<bool, geometry_msgs::Twist> vel_start_; //!< Store the initial velocity at the start pose
   std::pair<bool, geometry_msgs::Twist> vel_goal_; //!< Store the final velocity at the goal pose
-  std::map<uint64_t, std::pair<bool, Eigen::Vector2d>> humans_vel_start_, humans_vel_goal_;
+  std::map<uint64_t, std::pair<bool, geometry_msgs::Twist>> humans_vel_start_, humans_vel_goal_;
 
   bool initialized_; //!< Keeps track about the correct initialization of this
                      //!class

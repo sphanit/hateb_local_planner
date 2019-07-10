@@ -39,26 +39,24 @@
 #include <teb_local_planner/g2o_types/vertex_timediff.h>
 #include <teb_local_planner/g2o_types/penalties.h>
 #include <teb_local_planner/teb_config.h>
+#include <teb_local_planner/g2o_types/base_teb_edges.h>
 
-#include "g2o/core/base_multi_edge.h"
+// #include "g2o/core/base_multi_edge.h"
 
 namespace teb_local_planner {
 
-class EdgeHumanRobotTTC : public g2o::BaseMultiEdge<1, double> {
+class EdgeHumanRobotTTC : public BaseTebMultiEdge<1, double> {
 public:
   EdgeHumanRobotTTC() {
     this->resize(6);
-    // this->setMeasurement(0.);
-    _vertices[0] = _vertices[1] = _vertices[2] = _vertices[3] = _vertices[4] =
-        _vertices[5] = NULL;
   }
 
-  virtual ~EdgeHumanRobotTTC() {
-    for (unsigned int i = 0; i < 6; i++) {
-      if (_vertices[i])
-        _vertices[i]->edges().erase(this);
-    }
-  }
+  // virtual ~EdgeHumanRobotTTC() {
+  //   for (unsigned int i = 0; i < 6; i++) {
+  //     if (_vertices[i])
+  //       _vertices[i]->edges().erase(this);
+  //   }
+  // }
 
   void computeError() {
     ROS_ASSERT_MSG(cfg_ &&
@@ -128,33 +126,13 @@ public:
                    "EdgeHumanRobot::computeError() _error[0]=%f\n", _error[0]);
   }
 
-  ErrorVector &getError() {
-    computeError();
-    return _error;
-  }
-
-  virtual bool read(std::istream &is) {
-    // is >> _measurement[0];
-    return true;
-  }
-
-  virtual bool write(std::ostream &os) const {
-    // os << information()(0,0) << " Error: " << _error[0] << ", Measurement:"
-    //    << _measurement[0];
-    return os.good();
-  }
-
-  void setTebConfig(const TebConfig &cfg) { cfg_ = &cfg; }
-
-  void setParameters(const TebConfig &cfg, const double &robot_radius,
-                     const double &human_radius) {
+  void setParameters(const TebConfig &cfg, const double &robot_radius, const double &human_radius) {
     cfg_ = &cfg;
     radius_sum_ = robot_radius + human_radius;
     radius_sum_sq_ = radius_sum_ * radius_sum_;
   }
 
 protected:
-  const TebConfig *cfg_;
   double radius_sum_ = std::numeric_limits<double>::infinity();
   double radius_sum_sq_ = std::numeric_limits<double>::infinity();
 
@@ -162,6 +140,6 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-} // end namespace
+}; // end namespace
 
 #endif // EDGE_HUMAN_ROBOT_TTC_H_

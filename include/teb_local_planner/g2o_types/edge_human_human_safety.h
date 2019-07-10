@@ -38,69 +38,43 @@
 #include <teb_local_planner/g2o_types/penalties.h>
 #include <teb_local_planner/g2o_types/vertex_pose.h>
 #include <teb_local_planner/teb_config.h>
+#include <teb_local_planner/g2o_types/base_teb_edges.h>
 
-#include "g2o/core/base_unary_edge.h"
+// #include "g2o/core/base_unary_edge.h"
 
 namespace teb_local_planner {
 
-class EdgeHumanHumanSafety
-    : public g2o::BaseBinaryEdge<1, double, VertexPose, VertexPose> {
+class EdgeHumanHumanSafety : public BaseTebBinaryEdge<1, double, VertexPose, VertexPose>
+{
 public:
-  EdgeHumanHumanSafety() {
+  EdgeHumanHumanSafety()
+  {
     this->setMeasurement(0.);
-    _vertices[0] = _vertices[1] = NULL;
   }
 
-  virtual ~EdgeHumanHumanSafety() {
-    for (unsigned int i = 0; i < 2; i++) {
-      if (_vertices[i])
-        _vertices[i]->edges().erase(this);
-    }
-  }
+  // virtual ~EdgeHumanHumanSafety() {
+  //   for (unsigned int i = 0; i < 2; i++) {
+  //     if (_vertices[i])
+  //       _vertices[i]->edges().erase(this);
+  //   }
+  // }
 
   void computeError() {
-    ROS_ASSERT_MSG(cfg_ &&
-                       human_radius_ < std::numeric_limits<double>::infinity(),
-                   "You must call setParameters() on EdgeHumanHumanSafety()");
-    const VertexPose *human1_bandpt =
-        static_cast<const VertexPose *>(_vertices[0]);
-    const VertexPose *human2_bandpt =
-        static_cast<const VertexPose *>(_vertices[1]);
+    ROS_ASSERT_MSG(cfg_ &&  human_radius_ < std::numeric_limits<double>::infinity(), "You must call setParameters() on EdgeHumanHumanSafety()");
+    const VertexPose *human1_bandpt = static_cast<const VertexPose *>(_vertices[0]);
+    const VertexPose *human2_bandpt = static_cast<const VertexPose *>(_vertices[1]);
 
-    double dist = std::hypot(human1_bandpt->x() - human2_bandpt->x(),
-                             human1_bandpt->y() - human2_bandpt->y()) -
-                  (2 * human_radius_);
+    double dist = std::hypot(human1_bandpt->x() - human2_bandpt->x(), human1_bandpt->y() - human2_bandpt->y()) - (2 * human_radius_);
 
     ROS_DEBUG_THROTTLE(0.5, "human human external dist = %f", dist);
-    _error[0] = penaltyBoundFromBelow(dist, cfg_->human.min_human_human_dist,
-                                      cfg_->optim.penalty_epsilon);
+    _error[0] = penaltyBoundFromBelow(dist, cfg_->human.min_human_human_dist, cfg_->optim.penalty_epsilon);
 
-    ROS_ASSERT_MSG(std::isfinite(_error[0]),
-                   "EdgeHumanHumanSafety::computeError() _error[0]=%f\n",
-                   _error[0]);
-  }
-
-  ErrorVector &getError() {
-    computeError();
-    return _error;
-  }
-
-  virtual bool read(std::istream &is) {
-    // is >> _measurement[0];
-    return true;
-  }
-
-  virtual bool write(std::ostream &os) const {
-    // os << information()(0,0) << " Error: " << _error[0] << ", Measurement:"
-    //    << _measurement[0];
-    return os.good();
+    ROS_ASSERT_MSG(std::isfinite(_error[0]), "EdgeHumanHumanSafety::computeError() _error[0]=%f\n", _error[0]);
   }
 
   void setHumanRadius(const double human_radius) {
     human_radius_ = human_radius;
   }
-
-  void setTebConfig(const TebConfig &cfg) { cfg_ = &cfg; }
 
   void setParameters(const TebConfig &cfg, const double human_radius) {
     cfg_ = &cfg;
@@ -108,14 +82,12 @@ public:
   }
 
 protected:
-  const TebConfig *cfg_;
   double human_radius_ = std::numeric_limits<double>::infinity();
-  ;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-} // end namespace
+}; // end namespace
 
 #endif // EDGE_HUMAN_HUMAN_SAFETY_H_

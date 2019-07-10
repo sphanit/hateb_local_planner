@@ -263,56 +263,51 @@ public:
 
 };
 
-class EdgeVelocityHuman : public g2o::BaseMultiEdge<3, double> {
+class EdgeVelocityHuman : public BaseTebMultiEdge<3, double> {
 public:
-  EdgeVelocityHuman() {
+  EdgeVelocityHuman()
+  {
     this->resize(3);
-    for (unsigned int i = 0; i < 3; i++)
-      _vertices[i] = NULL;
+
   }
 
-  virtual ~EdgeVelocityHuman() {
-    for (unsigned int i = 0; i < 3; i++) {
-      if (_vertices[i])
-        _vertices[i]->edges().erase(this);
-    }
-  }
-
-  void computeError() {
+  void computeError()
+  {
     ROS_ASSERT_MSG(cfg_, "You must call setTebConfig on EdgeVelocityHuman()");
     const VertexPose *conf1 = static_cast<const VertexPose *>(_vertices[0]);
     const VertexPose *conf2 = static_cast<const VertexPose *>(_vertices[1]);
-    const VertexTimeDiff *deltaT =
-        static_cast<const VertexTimeDiff *>(_vertices[2]);
-    Eigen::Vector2d deltaS =
-        conf2->estimate().position() - conf1->estimate().position();
-    double vel = deltaS.norm() / deltaT->estimate();
-    // vel *= g2o::sign(deltaS[0]*cos(conf1->theta()) +
-    // deltaS[1]*sin(conf1->theta())); // consider direction
-    vel *= fast_sigmoid(
-        100 * (deltaS.x() * cos(conf1->theta()) +
-               deltaS.y() * sin(conf1->theta()))); // consider direction
+    const VertexTimeDiff *deltaT = static_cast<const VertexTimeDiff *>(_vertices[2]);
 
-    double omega = g2o::normalize_theta(conf2->theta() - conf1->theta()) /
-                   deltaT->estimate();
+    Eigen::Vector2d deltaS = conf2->estimate().position() - conf1->estimate().position();
 
-    _error[0] = penaltyBoundToInterval(vel, -cfg_->human.max_vel_x_backwards,
-                                       cfg_->human.max_vel_x,
-                                       cfg_->optim.penalty_epsilon);
-    _error[1] = penaltyBoundToInterval(omega, cfg_->human.max_vel_theta,
-                                       cfg_->optim.penalty_epsilon);
+    double dist = deltaS.norm();
+    double angle_diff = g2o::normalize_theta(conf2->theta() - conf1->theta());
+    if (cfg_->trajectory.exact_arc_length && angle_diff != 0)
+    {
+        double radius =  dist/(2*sin(angle_diff/2));
+        dist = fabs( angle_diff * radius ); // actual arg length!
+    }
+    double vel = dist / deltaT->estimate();
 
-    if (cfg_->optim.use_human_elastic_vel) {
+    // vel *= g2o::sign(deltaS[0]*cos(conf1->theta()) +  deltaS[1]*sin(conf1->theta())); // consider direction
+    vel *= fast_sigmoid( 100 * (deltaS.x()*cos(conf1->theta()) + deltaS.y()*sin(conf1->theta())) ); // consider direction
+
+    double omega = angle_diff / deltaT->estimate();
+
+    _error[0] = penaltyBoundToInterval(vel, -cfg_->human.max_vel_x_backwards, cfg_->human.max_vel_x, cfg_->optim.penalty_epsilon);
+    _error[1] = penaltyBoundToInterval(omega, cfg_->human.max_vel_theta, cfg_->optim.penalty_epsilon);
+
+    if (cfg_->optim.use_human_elastic_vel)
+    {
       double vel_diff = std::abs(cfg_->human.nominal_vel_x - vel);
       _error[2] = vel_diff;
-    } else {
+    }
+    else
+    {
       _error[2] = 0.0;
     }
 
-    ROS_ASSERT_MSG(
-        std::isfinite(_error[0]),
-        "EdgeVelocityHuman::computeError() _error[0]=%f _error[1]=%f\n",
-        _error[0], _error[1]);
+    ROS_ASSERT_MSG(std::isfinite(_error[0]), "EdgeVelocityHuman::computeError() _error[0]=%f _error[1]=%f\n", _error[0], _error[1]);
   }
 
   ErrorVector &getError() {
@@ -320,28 +315,10 @@ public:
     return _error;
   }
 
-  virtual bool read(std::istream &is) {
-    is >> _measurement;
-    is >> information()(0, 0);
-    return true;
-  }
-
-  virtual bool write(std::ostream &os) const {
-    // os << measurement() << " ";
-    os << information()(0, 0) << " Error Vel: " << _error[0]
-       << ", Error Omega: " << _error[1] << "Error EVel: " << _error[2];
-    return os.good();
-  }
-
-  void setTebConfig(const TebConfig &cfg) { cfg_ = &cfg; }
-
-protected:
-  const TebConfig *cfg_;
-
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-} // end namespace
+}; // end namespace
 
 #endif

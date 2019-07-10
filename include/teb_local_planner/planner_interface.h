@@ -142,7 +142,7 @@ public:
    *        otherwise the final velocity will be zero (default: false)
    * @return \c true if planning was successful, \c false otherwise
    */
-  virtual bool plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false) = 0;
+  virtual bool plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false, double pre_plan_time = 0.0) = 0;
 
   /**
    * @brief Get the velocity command from a previously optimized plan to control
