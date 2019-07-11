@@ -221,7 +221,7 @@ void TimedElasticBand::autoResize(double dt_ref, double dt_hysteresis, int min_s
 
       ++i; // skip the newly inserted pose
     }
-    else if(TimeDiff(i) < dt_ref - dt_hysteresis && sizeTimeDiffs()>min_samples) // only remove samples if size is larger than min_samples.
+    else if(TimeDiff(i) < dt_ref - dt_hysteresis && (int)sizeTimeDiffs()>min_samples) // only remove samples if size is larger than min_samples.
     {
       //ROS_DEBUG("teb_local_planner: autoResize() deleting bandpoint i=%u, #TimeDiffs=%lu",i,sizeTimeDiffs());
 
@@ -290,10 +290,10 @@ bool TimedElasticBand::initTEBtoGoal(const PoseSE2& start, const PoseSE2& goal, 
     }
 
     // if number of samples is not larger than min_samples, insert manually
-    if (sizePoses() < min_samples-1 )
+    if ((int)sizePoses() < min_samples-1 )
     {
       ROS_DEBUG("initTEBtoGoal(): number of generated samples is less than specified by min_samples. Forcing the insertion of more samples...");
-      while (sizePoses() < min_samples-1) // subtract goal point that will be added later
+      while ((int)sizePoses() < min_samples-1) // subtract goal point that will be added later
       {
         // simple strategy: interpolate between the current pose and the goal
         addPoseAndTimeDiff( PoseSE2::average(BackPose(), goal), timestep ); // let the optimier correct the timestep (TODO: better initialization
@@ -366,10 +366,10 @@ bool TimedElasticBand::initTEBtoGoal(const std::vector<geometry_msgs::PoseStampe
     // PoseSE2 goal(plan.back().pose);
 
     // if number of samples is not larger than min_samples, insert manually
-    if (sizePoses() < min_samples-1 )
+    if ((int)sizePoses() < min_samples-1 )
     {
       ROS_DEBUG("initTEBtoGoal(): number of generated samples is less than specified by min_samples. Forcing the insertion of more samples...");
-      while (sizePoses() < min_samples-1) // subtract goal point that will be added later
+      while ((int)sizePoses() < min_samples-1) // subtract goal point that will be added later
       {
         // simple strategy: interpolate between the current pose and the goal
         addPoseAndTimeDiff( PoseSE2::average(BackPose(), goal), dt ); // let the optimier correct the timestep (TODO: better initialization

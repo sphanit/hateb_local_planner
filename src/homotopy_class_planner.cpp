@@ -480,7 +480,7 @@ void HomotopyClassPlanner::DepthFirst(HcGraph& g, std::vector<HcGraphVertexType>
 {
   // see http://www.technical-recipes.com/2011/a-recursive-algorithm-to-find-all-paths-between-two-given-nodes/ for details on finding all simple paths
 
-  if (tebs_.size() >= cfg_->hcp.max_number_classes)
+  if ((int)tebs_.size() >= cfg_->hcp.max_number_classes)
     return; // We do not need to search for further possible alternative homotopy classes.
 
   HcGraphVertexType back = visited.back();
