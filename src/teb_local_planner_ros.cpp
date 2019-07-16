@@ -81,8 +81,6 @@ TebLocalPlannerROS::TebLocalPlannerROS() : costmap_ros_(NULL), tf_(NULL), costma
 {
 }
 
-TebLocalPlannerROS::~TebLocalPlannerROS() {}
-
 TebLocalPlannerROS::~TebLocalPlannerROS()
 {
 }
@@ -105,13 +103,30 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
     
     // reserve some memory for obstacles
     obstacles_.reserve(500);
-        
+
+    // init some variables
+    tf_ = tf;
+    costmap_ros_ = costmap_ros;
+    costmap_ = costmap_ros_->getCostmap(); // locking should be done in MoveBase.
+    
+    costmap_model_ = boost::make_shared<base_local_planner::CostmapModel>(*costmap_);
+    global_frame_ = costmap_ros_->getGlobalFrameID();
+    cfg_.map_frame = global_frame_; // TODO
+    robot_base_frame_ = costmap_ros_->getBaseFrameID();
     // create visualization instance	
     visualization_ = TebVisualizationPtr(new TebVisualization(nh, cfg_)); 
         
     // create robot footprint/contour model for optimization
     RobotFootprintModelPtr robot_model = getRobotFootprintFromParamServer(nh);
-    
+
+    CircularRobotFootprintPtr human_model = NULL;
+    auto human_radius = cfg_.human.radius;
+    if (human_radius < 0.0) {
+      ROS_WARN("human radius is set to negative, using 0.0");
+      human_radius = 0.0;
+    }
+    human_model = boost::make_shared<CircularRobotFootprint>(human_radius);
+
     // create the planner instance
     if (cfg_.hcp.enable_homotopy_class_planning)
     {
@@ -120,20 +135,12 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
     }
     else
     {
-      planner_ = PlannerInterfacePtr(new TebOptimalPlanner(cfg_, &obstacles_, robot_model, visualization_, &via_points_));
+      planner_ = PlannerInterfacePtr(new TebOptimalPlanner(cfg_, &obstacles_, robot_model, visualization_, &via_points_, human_model, &humans_via_points_map_));
+      planner_->local_weight_optimaltime_ = cfg_.optim.weight_optimaltime;
       ROS_INFO("Parallel planning in distinctive topologies disabled.");
     }
     
-    // init other variables
-    tf_ = tf;
-    costmap_ros_ = costmap_ros;
-    costmap_ = costmap_ros_->getCostmap(); // locking should be done in MoveBase.
-    
-    costmap_model_ = boost::make_shared<base_local_planner::CostmapModel>(*costmap_);
-
-    global_frame_ = costmap_ros_->getGlobalFrameID();
-    cfg_.map_frame = global_frame_; // TODO
-    robot_base_frame_ = costmap_ros_->getBaseFrameID();
+   
 
     //Initialize a costmap to polygon converter
     if (!cfg_.obstacles.costmap_converter_plugin.empty())
@@ -188,6 +195,31 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
     nh_move_base.param("controller_frequency", controller_frequency, controller_frequency);
     failure_detector_.setBufferLength(std::round(cfg_.recovery.oscillation_filter_duration*controller_frequency));
     
+    // setup human prediction client with persistent connection
+    predict_humans_client_ =
+        nh.serviceClient<hanp_prediction::HumanPosePredict>(
+            PREDICT_SERVICE_NAME, true);
+    reset_humans_prediction_client_ =
+        nh.serviceClient<std_srvs::Empty>(RESET_PREDICTION_SERVICE_NAME, true);
+    publish_predicted_markers_client_ =
+        nh.serviceClient<std_srvs::SetBool>(PUBLISH_MARKERS_SRV_NAME, true);
+
+    optimize_server_ = nh.advertiseService(
+        OPTIMIZE_SRV_NAME, &TebLocalPlannerROS::optimizeStandalone, this);
+    approach_server_ = nh.advertiseService(
+        APPROACH_SRV_NAME, &TebLocalPlannerROS::setApproachID, this);
+
+    op_costs_pub_ = nh.advertise<teb_local_planner::OptimizationCostArray>(
+        OP_COSTS_TOPIC, 1);
+
+    robot_pose_pub_ = nh.advertise<geometry_msgs::Pose>(
+        ROB_POS_TOPIC, 1);
+
+    last_call_time_ = ros::Time::now() - ros::Duration(cfg_.human.pose_prediction_reset_time);
+
+    last_omega_sign_change_ = ros::Time::now() - ros::Duration(cfg_.optim.omega_chage_time_seperation);
+    last_omega_ = 0.0;
+
     // set initialized flag
     initialized_ = true;
 
@@ -219,13 +251,20 @@ bool TebLocalPlannerROS::setPlan(const std::vector<geometry_msgs::PoseStamped>& 
             
   // reset goal_reached_ flag
   goal_reached_ = false;
-  
+
   return true;
 }
 
 
 bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
 {
+  auto start_time = ros::Time::now();
+  if ((start_time - last_call_time_).toSec() >
+      cfg_.human.pose_prediction_reset_time) {
+    resetHumansPrediction();
+  }
+  last_call_time_ = start_time;
+
   // check if plugin initialized
   if(!initialized_)
   {
@@ -239,17 +278,25 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   goal_reached_ = false;  
   
   // Get robot pose
+  auto pose_get_start_time = ros::Time::now();
+  // tf2::Stamped<tf2::Transform> robot_pose;
   geometry_msgs::PoseStamped robot_pose;
   costmap_ros_->getRobotPose(robot_pose);
   robot_pose_ = PoseSE2(robot_pose.pose);
-    
+  geometry_msgs::Pose robot_pos_msg;
+  robot_pose_.toPoseMsg(robot_pos_msg);
+  robot_pose_pub_.publish(robot_pos_msg);
+  auto pose_get_time = ros::Time::now() - pose_get_start_time;
+
   // Get robot velocity
+  auto vel_get_start_time = ros::Time::now();
   geometry_msgs::PoseStamped robot_vel_tf;
   odom_helper_.getRobotVel(robot_vel_tf);
   robot_vel_.linear.x = robot_vel_tf.pose.position.x;
   robot_vel_.linear.y = robot_vel_tf.pose.position.y;
   robot_vel_.angular.z = tf2::getYaw(robot_vel_tf.pose.orientation);
-  
+  auto vel_get_time = ros::Time::now() - vel_get_start_time;
+
   // prune global plan to cut off parts of the past (spatially before the robot)
   pruneGlobalPlan(*tf_, robot_pose, global_plan_, cfg_.trajectory.global_plan_prune_distance);
 
