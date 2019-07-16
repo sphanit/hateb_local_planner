@@ -83,7 +83,11 @@ void HomotopyClassPlanner::setVisualization(TebVisualizationPtr visualization)
 
 
 
-bool HomotopyClassPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan, const geometry_msgs::Twist* start_vel, bool free_goal_vel)
+bool HomotopyClassPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan,
+                                const geometry_msgs::Twist* start_vel,
+                                bool free_goal_vel,
+                                const HumanPlanVelMap *initial_human_plan_vels,
+                                teb_local_planner::OptimizationCostArray *op_costs)
 {
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
 
@@ -93,7 +97,7 @@ bool HomotopyClassPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& i
   PoseSE2 start(initial_plan.front().pose);
   PoseSE2 goal(initial_plan.back().pose);
 
-  return plan(start, goal, start_vel, free_goal_vel);
+  return plan(start, goal, start_vel, free_goal_vel, pre_plan_time.toSec());
 }
 
 
@@ -105,23 +109,49 @@ bool HomotopyClassPlanner::plan(const tf::Pose& start, const tf::Pose& goal, con
   return plan(start_pose, goal_pose, start_vel, free_goal_vel);
 }
 
-bool HomotopyClassPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel, bool free_goal_vel)
+bool HomotopyClassPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel, bool free_goal_vel, double pre_plan_time)
 {
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
+  auto start_time = ros::Time::now();
 
   // Update old TEBs with new start, goal and velocity
+  auto teb_update_start_time = ros::Time::now();
   updateAllTEBs(&start, &goal, start_vel);
+  auto teb_update_time = ros::Time::now() - teb_update_start_time;
 
   // Init new TEBs based on newly explored homotopy classes
+  auto hex_start_time = ros::Time::now();
   exploreEquivalenceClassesAndInitTebs(start, goal, cfg_->obstacles.min_obstacle_dist, start_vel);
+  auto hex_time = ros::Time::now() - hex_start_time;
+
   // update via-points if activated
+  auto via_start_time = ros::Time::now();
   updateReferenceTrajectoryViaPoints(cfg_->hcp.viapoints_all_candidates);
+  auto via_time = ros::Time::now() - via_start_time;
+
   // Optimize all trajectories in alternative homotopy classes
+  auto teb_start_time = ros::Time::now();
   optimizeAllTEBs(cfg_->optim.no_inner_iterations, cfg_->optim.no_outer_iterations);
+  auto teb_time = ros::Time::now() - teb_start_time;
+
+  auto other_start_time = ros::Time::now();
+  // Delete any detours
+  deleteTebDetours(-0.1);
   // Select which candidate (based on alternative homotopy classes) should be used
   selectBestTeb();
 
   initial_plan_ = nullptr; // clear pointer to any previous initial plan (any previous plan is useless regarding the h-signature);
+  auto other_time = ros::Time::now() - other_start_time;
+
+  auto total_time = ros::Time::now() - start_time;
+  ROS_INFO_STREAM_COND((total_time.toSec() + pre_plan_time) > 0.05, "\nhomotopy class plan times:\n" <<
+    "\ttotal plan time            " << std::to_string(total_time.toSec() + pre_plan_time) << "\n" <<
+    "\tpre-plan time              " << std::to_string(pre_plan_time) << "\n" <<
+    "\tteb update time            " << std::to_string(teb_update_time.toSec()) << "\n" <<
+    "\thomotopy exploration time  " << std::to_string(hex_time.toSec()) << "\n" <<
+    "\tvia points time            " << std::to_string(via_time.toSec()) << "\n" <<
+    "\tteb optimize time          " << std::to_string(teb_time.toSec()) << "\n" <<
+    "\tother time                 " << std::to_string(other_time.toSec()) << "\n-------------------------");
   return true;
 }
 
@@ -157,7 +187,7 @@ void HomotopyClassPlanner::visualize()
     TebOptimalPlannerConstPtr best_teb = bestTeb();
     if (best_teb)
     {
-      visualization_->publishLocalPlanAndPoses(best_teb->teb());
+      visualization_->publishLocalPlanAndPoses(best_teb->teb(), *robot_model_);
 
       if (best_teb->teb().sizePoses() > 0) //TODO maybe store current pose (start) within plan method as class field.
         visualization_->publishRobotFootprintModel(best_teb->teb().Pose(0), *robot_model_);
@@ -424,6 +454,8 @@ void HomotopyClassPlanner::updateAllTEBs(const PoseSE2* start, const PoseSE2* go
 
 void HomotopyClassPlanner::optimizeAllTEBs(int iter_innerloop, int iter_outerloop)
 {
+  teb_local_planner::OptimizationCostArray *op_costs = NULL;
+
   // optimize TEBs in parallel since they are independend of each other
   if (cfg_->hcp.enable_multithreading)
   {
@@ -437,7 +469,7 @@ void HomotopyClassPlanner::optimizeAllTEBs(int iter_innerloop, int iter_outerloo
     {
       teb_threads.create_thread( boost::bind(&TebOptimalPlanner::optimizeTEB, it_teb->get(), iter_innerloop, iter_outerloop,
                                              true, cfg_->hcp.selection_obst_cost_scale, cfg_->hcp.selection_viapoint_cost_scale,
-                                             cfg_->hcp.selection_alternative_time_cost) );
+                                             cfg_->hcp.selection_alternative_time_cost, op_costs) );
     }
     teb_threads.join_all();
   }
@@ -446,7 +478,7 @@ void HomotopyClassPlanner::optimizeAllTEBs(int iter_innerloop, int iter_outerloo
     for (TebOptPlannerContainer::iterator it_teb = tebs_.begin(); it_teb != tebs_.end(); ++it_teb)
     {
       it_teb->get()->optimizeTEB(iter_innerloop,iter_outerloop, true, cfg_->hcp.selection_obst_cost_scale,
-                                 cfg_->hcp.selection_viapoint_cost_scale, cfg_->hcp.selection_alternative_time_cost); // compute cost as well inside optimizeTEB (last argument = true)
+                                 cfg_->hcp.selection_viapoint_cost_scale, cfg_->hcp.selection_alternative_time_cost,op_costs); // compute cost as well inside optimizeTEB (last argument = true)
     }
   }
 }
@@ -500,6 +532,7 @@ TebOptimalPlannerPtr HomotopyClassPlanner::selectBestTeb()
     double min_cost = std::numeric_limits<double>::max(); // maximum cost
     double min_cost_last_best = std::numeric_limits<double>::max();
     double min_cost_initial_plan_teb = std::numeric_limits<double>::max();
+    // TebOptimalPlannerPtr last_best_teb;
     TebOptimalPlannerPtr initial_plan_teb = getInitialPlanTEB();
 
     // check if last best_teb is still a valid candidate

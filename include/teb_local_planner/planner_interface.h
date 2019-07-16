@@ -53,11 +53,21 @@
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/TwistStamped.h>
+#include <hanp_msgs/HumanPath.h>
+#include <teb_local_planner/OptimizationCostArray.h>
 
+#include <teb_local_planner/TrajectoryMsg.h>
 
 namespace teb_local_planner
 {
 
+typedef struct {
+  std::vector<geometry_msgs::PoseStamped> plan;
+  geometry_msgs::Twist start_vel;
+  geometry_msgs::Twist goal_vel;
+} PlanStartVelGoalVel;
+
+using HumanPlanVelMap = std::map<uint64_t, PlanStartVelGoalVel>;
 
 /**
  * @class PlannerInterface
@@ -95,8 +105,12 @@ public:
    *        otherwise the final velocity will be zero (default: false)
    * @return \c true if planning was successful, \c false otherwise
    */
-  virtual bool plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false) = 0;
-  
+  virtual bool
+  plan(const std::vector<geometry_msgs::PoseStamped> &initial_plan,
+       const geometry_msgs::Twist *start_vel = NULL, bool free_goal_vel = false,
+       const HumanPlanVelMap *initial_human_plan_vels = NULL,
+       teb_local_planner::OptimizationCostArray *op_costs = NULL) = 0;
+
   /**
    * @brief Plan a trajectory between a given start and goal pose (tf::Pose version).
    * 
@@ -197,8 +211,11 @@ public:
    */
   virtual void computeCurrentCost(std::vector<double>& cost, double obst_cost_scale=1.0, bool alternative_time_cost=false)
   {
-  }      
-                
+  }
+  virtual void getFullTrajectory(std::vector<TrajectoryPointMsg> &trajectory) const {};
+  virtual void getFullHumanTrajectory(const uint64_t human_id, std::vector<TrajectoryPointMsg> &human_trajectory) = 0;
+
+  double local_weight_optimaltime_;
 };
 
 //! Abbrev. for shared instances of PlannerInterface or it's subclasses 

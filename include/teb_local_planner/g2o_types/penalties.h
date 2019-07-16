@@ -116,6 +116,15 @@ inline double penaltyBoundFromBelow(const double& var, const double& a,const dou
   }
 }
 
+inline double penaltyBoundFromAbove(const double &var, const double &a,
+                                    const double &epsilon) {
+  if (var <= (a - epsilon)) {
+    return 0.0;
+  } else {
+    return (var - (a - epsilon));
+  }
+}
+
 /**
  * @brief Derivative of the linear penalty function for bounding \c var to the interval \f$ -a < var < a \f$
  * @param var The scalar that should be bounded
@@ -186,6 +195,18 @@ inline double penaltyBoundFromBelowDerivative(const double& var, const double& a
   }
 }
 
+inline double penaltyBoundFromBelowExp(const double &var, const double &a,
+                                       const double &epsilon,
+                                       const double &mul) {
+  if (var >= a + epsilon) {
+    return 0.0;
+  } else if (var < 0.0) {
+    return (-var + (a + epsilon));
+  } else {
+    return std::max(((a + epsilon - var) / (mul * var + 1.0)),
+                    0.00001); // for numerical stability
+  }
+}
 
 } // namespace teb_local_planner
 

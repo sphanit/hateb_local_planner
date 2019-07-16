@@ -61,10 +61,23 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <visualization_msgs/Marker.h>
 #include <costmap_converter/ObstacleMsg.h>
+#include <teb_local_planner/Optimize.h>
+#include <teb_local_planner/Approach.h>
+
+// human data
+#include <hanp_prediction/HumanPosePredict.h>
+#include <std_srvs/SetBool.h>
+#include <std_srvs/Empty.h>
 
 // transforms
 #include <tf2/utils.h>
 #include <tf2_ros/buffer.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2/impl/utils.h>
+#include <tf2/convert.h>
+#include <tf2_eigen/tf2_eigen.h>
+#include <eigen_conversions/eigen_msg.h>
 
 // costmap
 #include <costmap_2d/costmap_2d_ros.h>
@@ -215,28 +228,32 @@ protected:
    */
   void updateViaPointsContainer(const std::vector<geometry_msgs::PoseStamped>& transformed_plan, double min_separation);
   
-  
+  void updateHumanViaPointsContainers(
+      const HumanPlanVelMap &transformed_human_plan_vel_map,
+      double min_separation);
+
   /**
     * @brief Callback for the dynamic_reconfigure node.
     * 
-    * This callback allows to modify parameters dynamically at runtime without restarting the node
+    * This callback allows to modify parameters dynamically at runtime without 
+    *restarting the node
     * @param config Reference to the dynamic reconfigure config
     * @param level Dynamic reconfigure level
     */
   void reconfigureCB(TebLocalPlannerReconfigureConfig& config, uint32_t level);
-  
-  
-   /**
-    * @brief Callback for custom obstacles that are not obtained from the costmap 
-    * @param obst_msg pointer to the message containing a list of polygon shaped obstacles
-    */
+  /**
+   * @brief Callback for custom obstacles that are not obtained from the costmap
+   * @param obst_msg pointer to the message containing a list of polygon shaped
+   * obstacles
+   */
   void customObstacleCB(const costmap_converter::ObstacleArrayMsg::ConstPtr& obst_msg);
-  
+
    /**
     * @brief Callback for custom via-points
     * @param via_points_msg pointer to the message containing a list of via-points
     */
   void customViaPointsCB(const nav_msgs::Path::ConstPtr& via_points_msg);
+
 
    /**
     * @brief Prune global plan such that already passed poses are cut off
@@ -275,9 +292,37 @@ protected:
     */
   bool transformGlobalPlan(const tf2_ros::Buffer& tf, const std::vector<geometry_msgs::PoseStamped>& global_plan,
                            const geometry_msgs::PoseStamped& global_pose,  const costmap_2d::Costmap2D& costmap,
-                           const std::string& global_frame, double max_plan_length, std::vector<geometry_msgs::PoseStamped>& transformed_plan,
+                           const std::string& global_frame, double max_plan_length, PlanCombined &transformed_plan_combined,
                            int* current_goal_idx = NULL, geometry_msgs::TransformStamped* tf_plan_to_global = NULL) const;
-    
+
+  /**
+    * @brief  Transforms the human plan from the tracker frame to the local
+   * frame.
+    *
+    * @param tf A reference to a transform listener
+    * @param human_plan The plan to be transformed
+    * @param global_pose The global pose of the robot
+    * @param costmap A reference to the costmap being used so the window size
+   * for transforming can be computed
+    * @param global_frame The frame to transform the plan to
+    * @param[out] transformed_human_plan Populated with the transformed plan
+    * @param[out] tf_human_plan_to_global Transformation between the human plan
+   * and the local planning frame
+    * @return \c true if the global plan is transformed, \c false otherwise
+    */
+  bool transformHumanPlan(
+      const tf2_ros::Buffer &tf2, const geometry_msgs::PoseStamped &robot_pose,
+      const costmap_2d::Costmap2D &costmap, const std::string &global_frame,
+      const std::vector<geometry_msgs::PoseWithCovarianceStamped> &human_plan,
+      HumanPlanCombined &transformed_human_plan_combined,
+      geometry_msgs::TwistStamped &transformed_human_twist,
+      tf2::Stamped<tf2::Transform> *tf_human_plan_to_global = NULL) const;
+
+  bool transformHumanPose(const tf2_ros::Buffer &tf2,
+                     const std::string &global_frame,
+                     geometry_msgs::PoseWithCovarianceStamped &human_pose,
+                     geometry_msgs::PoseStamped &transformed_human_pose) const;
+
   /**
     * @brief Estimate the orientation of a pose from the global_plan that is treated as a local goal for the local planner.
     * 
@@ -340,13 +385,30 @@ protected:
    * @param costmap_inscribed_radius Inscribed radius of the footprint model used for the costmap
    * @param min_obst_dist desired distance to obstacles
    */
-  void validateFootprints(double opt_inscribed_radius, double costmap_inscribed_radius, double min_obst_dist);
-  
-  
   void configureBackupModes(std::vector<geometry_msgs::PoseStamped>& transformed_plan,  int& goal_idx);
 
+  void validateFootprints(double opt_inscribed_radius, double costmap_inscribed_radius, double min_obst_dist);
 
-  
+  // /**
+  //  * @brief Transformed human poses to planning frame
+  //  */
+  // hanp_prediction::PredictedPoses
+  // transformHumanPoses(hanp_prediction::PredictedPoses&, std::string
+  // frame_id);
+
+
+  int getLatestCommonTime(const std::string &source_frame, const std::string &target_frame, ros::Time& time, std::string* error_string) const;
+
+  void lookupTwist(const std::string& tracking_frame, const std::string& observation_frame,
+                                const ros::Time& time, const ros::Duration& averaging_interval,
+                                geometry_msgs::Twist& twist) const;
+
+  void lookupTwist(const std::string& tracking_frame, const std::string& observation_frame, const std::string& reference_frame,
+                   const tf2::Vector3 & reference_point, const std::string& reference_point_frame,
+                   const ros::Time& time, const ros::Duration& averaging_interval,
+                   geometry_msgs::Twist& twist) const;
+
+
 private:
   // Definition of member variables
 
@@ -359,6 +421,7 @@ private:
   PlannerInterfacePtr planner_; //!< Instance of the underlying optimal planner class
   ObstContainer obstacles_; //!< Obstacle vector that should be considered during local trajectory optimization
   ViaPointContainer via_points_; //!< Container of via-points that should be considered during local trajectory optimization
+  std::map<uint64_t, ViaPointContainer> humans_via_points_map_;
   TebVisualizationPtr visualization_; //!< Instance of the visualization class (local/global plan, obstacles, ...)
   boost::shared_ptr<base_local_planner::CostmapModel> costmap_model_;  
   TebConfig cfg_; //!< Config class that stores and manages all related parameters
@@ -398,12 +461,34 @@ private:
   std::string robot_base_frame_; //!< Used as the base frame id of the robot
     
   // flags
-  bool initialized_; //!< Keeps track about the correct initialization of this class
+  bool initialized_; //!< Keeps track about the correct initialization of this
+                     //!class
+
+  // human perdiction service
+  ros::ServiceClient predict_humans_client_, reset_humans_prediction_client_,
+      publish_predicted_markers_client_;
+
+  // optimize service
+  ros::ServiceServer optimize_server_, approach_server_;
+  bool optimizeStandalone(teb_local_planner::Optimize::Request &req,
+                          teb_local_planner::Optimize::Response &res);
+  bool setApproachID(teb_local_planner::Approach::Request &req,
+                     teb_local_planner::Approach::Response &res);
+
+  bool publish_predicted_human_markers_ = true;
+
+  void resetHumansPrediction();
+  ros::Time last_call_time_;
+
+  ros::Time last_omega_sign_change_;
+  double last_omega_;
+
+  ros::Publisher op_costs_pub_,robot_pose_pub_;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
-  
+
 }; // end namespace teb_local_planner
 
 #endif // TEB_LOCAL_PLANNER_ROS_H_

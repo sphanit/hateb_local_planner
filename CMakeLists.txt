@@ -18,11 +18,13 @@ find_package(catkin REQUIRED COMPONENTS
   nav_msgs
   roscpp
   std_msgs
+  std_srvs
   pluginlib
   tf2
   tf2_eigen
   tf2_geometry_msgs
   tf2_ros
+  hanp_msgs
   visualization_msgs
 )
 message(STATUS "System: ${CMAKE_SYSTEM}")
@@ -101,17 +103,20 @@ endif()
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
+  ObstacleMsg.msg
+  OptimizationCost.msg
+  OptimizationCostArray.msg
   TrajectoryPointMsg.msg
   TrajectoryMsg.msg
   FeedbackMsg.msg
 )
 
-## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+# Generate services in the 'srv' folder
+add_service_files(
+  FILES
+  Approach.srv
+  Optimize.srv
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -160,6 +165,7 @@ catkin_package(
 	std_msgs
         tf2
         tf2_ros
+        hanp_msgs
 	visualization_msgs
   DEPENDS SUITESPARSE G2O
 )

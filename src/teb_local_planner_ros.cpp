@@ -36,6 +36,18 @@
  * Author: Christoph Rösmann
  *********************************************************************/
 
+#define PREDICT_SERVICE_NAME "/human_pose_prediction/predict_human_poses"
+#define RESET_PREDICTION_SERVICE_NAME                                          \
+  "/human_pose_prediction/reset_external_paths"
+#define PUBLISH_MARKERS_SRV_NAME                                               \
+  "/human_pose_prediction/publish_prediction_markers"
+#define OPTIMIZE_SRV_NAME "optimize"
+#define APPROACH_SRV_NAME "set_approach_id"
+#define OP_COSTS_TOPIC "optimization_costs"
+#define ROB_POS_TOPIC "Robot_Pose"
+#define DEFAULT_HUMAN_SEGMENT hanp_msgs::TrackedSegmentType::TORSO
+#define THROTTLE_RATE 5.0 // seconds
+
 #include <teb_local_planner/teb_local_planner_ros.h>
 
 #include <tf2_eigen/tf2_eigen.h>
@@ -69,6 +81,7 @@ TebLocalPlannerROS::TebLocalPlannerROS() : costmap_ros_(NULL), tf_(NULL), costma
 {
 }
 
+TebLocalPlannerROS::~TebLocalPlannerROS() {}
 
 TebLocalPlannerROS::~TebLocalPlannerROS()
 {

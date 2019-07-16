@@ -140,14 +140,14 @@ void TebVisualization::publishGraph(const GraphType& graph, const std::string& n
     point.z = 0;
     marker.points.push_back(point);
     // add color
-    
+
     std_msgs::ColorRGBA color;
     color.a = 1.0;
     if (it_vert==end_vert-1)
     {
       color.r = 1;
       color.g = 0;
-      color.b = 0;		
+      color.b = 0;
     }
     else
     {
@@ -163,7 +163,7 @@ void TebVisualization::publishGraph(const GraphType& graph, const std::string& n
     marker.colors.front().b = 1;
     marker.colors.front().g = 0;
   }
-  
+
   marker.scale.x = 0.1;
   marker.scale.y = 0.1;
   marker.color.a = 1.0;
@@ -220,6 +220,6 @@ void TebVisualization::publishPathContainer(BidirIter first, BidirIter last, con
 
   teb_marker_pub_.publish( marker );
 }
-  
-  
+
+
 } // namespace teb_local_planner

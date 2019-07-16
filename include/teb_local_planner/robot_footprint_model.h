@@ -109,7 +109,7 @@ public:
    */
   virtual double getInscribedRadius() = 0;
 
-	
+  virtual double getCircumscribedRadius() const = 0;
 
 public:	
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -174,6 +174,10 @@ public:
    */
   virtual double getInscribedRadius() {return 0.0;}
 
+  virtual double getCircumscribedRadius() const {
+    return 0.0;
+  }
+
 };
 
 
@@ -189,6 +193,7 @@ public:
     * @brief Default constructor of the abstract obstacle class
     * @param radius radius of the robot
     */
+  CircularRobotFootprint() { }
   CircularRobotFootprint(double radius) : radius_(radius) { }
   
   /**
@@ -251,11 +256,15 @@ public:
    */
   virtual double getInscribedRadius() {return radius_;}
 
+  virtual double getCircumscribedRadius() const {
+      return radius_;
+  }
+
 private:
     
   double radius_;
 };
-
+typedef boost::shared_ptr<CircularRobotFootprint> CircularRobotFootprintPtr;
 
 /**
  * @class TwoCirclesRobotFootprint
@@ -367,6 +376,10 @@ public:
       double min_longitudinal = std::min(rear_offset_ + rear_radius_, front_offset_ + front_radius_);
       double min_lateral = std::min(rear_radius_, front_radius_);
       return std::min(min_longitudinal, min_lateral);
+  }
+
+  virtual double getCircumscribedRadius() const {
+    return std::max(front_offset_ + front_radius_, rear_offset_ + rear_radius_);
   }
 
 private:
@@ -504,6 +517,12 @@ public:
   virtual double getInscribedRadius() 
   {
       return 0.0; // lateral distance = 0.0
+  }
+
+  virtual double getCircumscribedRadius() const 
+  {
+    return std::max(std::hypot(line_start_.x(), line_start_.y()),
+                    std::hypot(line_end_.x(), line_end_.y()));
   }
 
 private:
@@ -653,6 +672,18 @@ public:
      return std::min(min_dist, std::min(vertex_dist, edge_dist));
   }
 
+  virtual double getCircumscribedRadius() const 
+  {
+    double radius = 0.0;
+    for (auto &vertex : vertices_) {
+      double dist = std::hypot(vertex.x(), vertex.y());
+      if (radius < dist) {
+        radius = dist;
+      }
+    }
+    return radius;
+  }
+
 private:
     
   /**
@@ -669,6 +700,7 @@ private:
       polygon_world[i].x() = current_pose.x() + cos_th * vertices_[i].x() - sin_th * vertices_[i].y();
       polygon_world[i].y() = current_pose.y() + sin_th * vertices_[i].x() + cos_th * vertices_[i].y();
     }
+    return radius;
   }
 
   Point2dContainer vertices_;

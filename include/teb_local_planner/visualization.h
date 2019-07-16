@@ -39,16 +39,15 @@
 #ifndef VISUALIZATION_H_
 #define VISUALIZATION_H_
 
-
-
 // teb stuff
+#include <teb_local_planner/TrajectoryMsg.h>
+#include <teb_local_planner/robot_footprint_model.h>
 #include <teb_local_planner/teb_config.h>
 #include <teb_local_planner/timed_elastic_band.h>
-#include <teb_local_planner/robot_footprint_model.h>
 
 // ros stuff
-#include <ros/publisher.h>
 #include <base_local_planner/goal_functions.h>
+#include <ros/publisher.h>
 
 // boost
 #include <boost/graph/adjacency_list.hpp>
@@ -58,21 +57,50 @@
 #include <iterator>
 
 // messages
-#include <nav_msgs/Path.h>
-#include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PoseArray.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <hanp_msgs/HumanPathArray.h>
+#include <hanp_msgs/HumanTimeToGoal.h>
+#include <hanp_msgs/HumanTimeToGoalArray.h>
+#include <hanp_msgs/HumanTrajectoryArray.h>
+#include <hanp_msgs/TimeToGoal.h>
 #include <std_msgs/ColorRGBA.h>
-#include <tf/transform_datatypes.h>
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
+#include <tf/transform_datatypes.h>
 #include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 
-namespace teb_local_planner
-{
-  
-class TebOptimalPlanner; //!< Forward Declaration 
+namespace teb_local_planner {
 
-  
+typedef struct {
+  std::vector<geometry_msgs::PoseStamped> plan_before;
+  std::vector<TrajectoryPointMsg> optimized_trajectory;
+  std::vector<geometry_msgs::PoseStamped> plan_after;
+} PlanTrajCombined;
+
+typedef struct {
+  std::vector<geometry_msgs::PoseStamped> plan_before;
+  std::vector<geometry_msgs::PoseStamped> plan_to_optimize;
+  std::vector<geometry_msgs::PoseStamped> plan_after;
+} PlanCombined;
+
+typedef struct {
+  uint64_t id;
+  std::vector<geometry_msgs::PoseStamped> plan_before;
+  std::vector<TrajectoryPointMsg> optimized_trajectory;
+  std::vector<geometry_msgs::PoseStamped> plan_after;
+} HumanPlanTrajCombined;
+
+typedef struct {
+  uint64_t id;
+  std::vector<geometry_msgs::PoseStamped> plan_before;
+  std::vector<geometry_msgs::PoseStamped> plan_to_optimize;
+  std::vector<geometry_msgs::PoseStamped> plan_after;
+} HumanPlanCombined;
+
+class TebOptimalPlanner; //!< Forward Declaration
+
 /**
  * @class TebVisualization
  * @brief Visualize stuff from the teb_local_planner
@@ -80,20 +108,19 @@ class TebOptimalPlanner; //!< Forward Declaration
 class TebVisualization
 {
 public:
-    
   /**
    * @brief Default constructor
    * @remarks do not forget to call initialize()
    */
   TebVisualization();
-  
+
   /**
    * @brief Constructor that initializes the class and registers topics
    * @param nh local ros::NodeHandle
    * @param cfg const reference to the TebConfig class for parameters
    */
   TebVisualization(ros::NodeHandle& nh, const TebConfig& cfg);
-  
+
   /**
    * @brief Initializes the class and registers topics.
    * 
@@ -102,8 +129,7 @@ public:
    * @param cfg const reference to the TebConfig class for parameters
    */
   void initialize(ros::NodeHandle& nh, const TebConfig& cfg);
-  
-  
+
   /** @name Publish to topics */
   //@{
   
@@ -112,13 +138,14 @@ public:
    * @param global_plan Pose array describing the global plan
    */
   void publishGlobalPlan(const std::vector<geometry_msgs::PoseStamped>& global_plan) const;
-  
+  void publishHumanGlobalPlans(const std::vector<HumanPlanCombined> &humans_plans) const;
+
   /**
    * @brief Publish a given local plan to the ros topic \e ../../local_plan
    * @param local_plan Pose array describing the local plan
    */
   void publishLocalPlan(const std::vector<geometry_msgs::PoseStamped>& local_plan) const;
-  
+
   /**
    * @brief Publish Timed_Elastic_Band related stuff (local plan, pose sequence).
    * 
@@ -126,11 +153,15 @@ public:
    * and the pose sequence to  \e ../../teb_poses.
    * @param teb const reference to a Timed_Elastic_Band
    */
-  void publishLocalPlanAndPoses(const TimedElasticBand& teb) const;
-  
+  void publishLocalPlanAndPoses(const TimedElasticBand &teb, const BaseRobotFootprintModel &robot_model) const;
+  void publishHumanLocalPlansAndPoses(const std::map<uint64_t, TimedElasticBand> &humans_tebs_map, const BaseRobotFootprintModel &human_model) const;
+
+  void publishTrajectory(const PlanTrajCombined &plan_traj_combined) const;
+  void publishHumanTrajectories(const std::vector<HumanPlanTrajCombined> &humans_plans_combined) const;
+
   /**
    * @brief Publish the visualization of the robot model
-   * 
+   *
    * @param current_pose Current pose of the robot
    * @param robot_model Subclass of BaseRobotFootprintModel
    * @param ns Namespace for the marker objects
@@ -251,18 +282,33 @@ protected:
   bool printErrorWhenNotInitialized() const;
 
   ros::Publisher global_plan_pub_; //!< Publisher for the global plan
-  ros::Publisher local_plan_pub_; //!< Publisher for the local plan
-  ros::Publisher teb_poses_pub_; //!< Publisher for the trajectory pose sequence
+  ros::Publisher local_plan_pub_;  //!< Publisher for the local plan
+  ros::Publisher local_traj_pub_;
+  ros::Publisher humans_global_plans_pub_; //!< Publisher for the local plan
+  ros::Publisher humans_local_plans_pub_;  //!< Publisher for the local plan
+  ros::Publisher humans_local_trajs_pub_;
+  ros::Publisher teb_poses_pub_, teb_fp_poses_pub_; //!< Publisher for the trajectory pose sequence
+  ros::Publisher humans_tebs_poses_pub_, humans_tebs_fp_poses_pub_; //!< Publisher for the trajectory pose sequence
   ros::Publisher teb_marker_pub_; //!< Publisher for visualization markers
-  ros::Publisher feedback_pub_; //!< Publisher for the feedback message for analysis and debug purposes
-  
-  const TebConfig* cfg_; //!< Config class that stores and manages all related parameters
-  
-  bool initialized_; //!< Keeps track about the correct initialization of this class
+  ros::Publisher feedback_pub_;   //!< Publisher for the feedback message for analysis and debug purposes
+  ros::Publisher robot_traj_time_pub_, robot_path_time_pub_;
+  ros::Publisher human_trajs_time_pub_, human_paths_time_pub_;
 
-    
+  const TebConfig* cfg_; //!< Config class that stores and manages all related parameters
+
+  bool initialized_; //!< Keeps track about the correct initialization of this class
+  ros::Timer clearing_timer_;
+  void clearingTimerCB(const ros::TimerEvent &event);
+  bool last_publish_robot_global_plan, last_publish_robot_local_plan,
+      last_publish_robot_local_plan_poses,
+      last_publish_robot_local_plan_fp_poses, last_publish_human_global_plans,
+      last_publish_human_local_plans, last_publish_human_local_plan_poses,
+      last_publish_human_local_plan_fp_poses;
+
+  mutable int last_robot_fp_poses_idx_, last_human_fp_poses_idx_;
+
 public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW    
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 //! Abbrev. for shared instances of the TebVisualization

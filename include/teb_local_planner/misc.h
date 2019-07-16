@@ -42,6 +42,7 @@
 #include <Eigen/Core>
 #include <boost/utility.hpp>
 #include <boost/type_traits.hpp>
+#include <vector>
 
 
 namespace teb_local_planner
@@ -95,6 +96,16 @@ inline bool smaller_than_abs(double i, double j) {return std::fabs(i)<std::fabs(
 inline double fast_sigmoid(double x)
 {
   return x / (1 + fabs(x));
+}
+
+inline double center_radians(double angle){
+    while (angle > M_PI){
+        angle -= 2*M_PI;
+    }
+    while (angle < -M_PI){
+        angle += 2 * M_PI;
+    }
+    return angle;
 }
 
 /**

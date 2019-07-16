@@ -423,7 +423,7 @@ public:
    * @param guess_backwards_motion Allow the initialization of backwards oriented trajectories if the goal heading is pointing behind the robot (this parameter is used only if \c estimate_orient is enabled.
    * @return true if everything was fine, false otherwise
    */
-  bool initTrajectoryToGoal(const std::vector<geometry_msgs::PoseStamped>& plan, double max_vel_x, bool estimate_orient=false, int min_samples = 3, bool guess_backwards_motion = false);
+  bool initTrajectoryToGoal(const std::vector<geometry_msgs::PoseStamped>& plan, double max_vel_x, bool estimate_orient=false, int min_samples = 3, bool guess_backwards_motion = false, double skip_dist = 0.0);
 
 
   ROS_DEPRECATED bool initTEBtoGoal(const PoseSE2& start, const PoseSE2& goal, double diststep=0, double timestep=1, int min_samples = 3, bool guess_backwards_motion = false)

@@ -159,7 +159,11 @@ public:
    *		      otherwise the final velocity will be zero (default: false)
    * @return \c true if planning was successful, \c false otherwise
    */
-  virtual bool plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false);
+  virtual bool plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan,
+                    const geometry_msgs::Twist* start_vel = NULL,
+                    bool free_goal_vel = false,
+                    const HumanPlanVelMap *initial_human_plan_vels =  NULL,
+                    teb_local_planner::OptimizationCostArray *op_costs = NULL);
 
   /**
    * @brief Plan a trajectory between a given start and goal pose (tf::Pose version).
@@ -185,7 +189,7 @@ public:
    *		      otherwise the final velocity will be zero (default: false)
    * @return \c true if planning was successful, \c false otherwise
    */
-  virtual bool plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false);
+  virtual bool plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false,  double pre_plan_time=0.0);
 
   /**
    * @brief Get the velocity command from a previously optimized plan to control the robot at the current sampling interval.
@@ -445,6 +449,8 @@ public:
    */
   bool computeStartOrientation(const TebOptimalPlannerPtr plan, const double len_orientation_vector, double& orientation);
 
+  virtual void getFullTrajectory(std::vector<TrajectoryPointMsg> &trajectory) const;
+  virtual void getFullHumanTrajectory(const uint64_t human_id, std::vector<TrajectoryPointMsg> &human_trajectory);
 
   /**
    * @brief Access config (read-only)

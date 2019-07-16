@@ -65,6 +65,8 @@ public:
   std::string odom_topic; //!< Topic name of the odometry message, provided by the robot driver or simulator
   std::string map_frame; //!< Global planning frame
 
+  int planning_mode;
+
   //! Trajectory related parameters
   struct Trajectory
   {
@@ -73,6 +75,7 @@ public:
     double dt_hysteresis; //!< Hysteresis for automatic resizing depending on the current temporal resolution (dt): usually 10% of dt_ref
     int min_samples; //!< Minimum number of samples (should be always greater than 2)
     int max_samples; //!< Maximum number of samples; Warning: if too small the discretization/resolution might not be sufficient for the given robot model or obstacle avoidance does not work anymore.
+    int human_min_samples;
     bool global_plan_overwrite_orientation; //!< Overwrite orientation of local subgoals provided by the global planner
     bool allow_init_with_backwards_motion; //!< If true, the underlying trajectories might be initialized with backwards motions in case the goal is behind the start within the local costmap (this is only recommended if the robot is equipped with rear sensors)
     double global_plan_viapoint_sep; //!< Min. separation between each two consecutive via-points extracted from the global plan (if negative: disabled)
@@ -84,6 +87,8 @@ public:
     int feasibility_check_no_poses; //!< Specify up to which pose on the predicted plan the feasibility should be checked each sampling interval.
     bool publish_feedback; //!< Publish planner feedback containing the full trajectory and a list of active obstacles (should be enabled only for evaluation or debugging purposes)
     double min_resolution_collision_check_angular; //! Min angular resolution used during the costmap collision check. If not respected, intermediate samples are added. [rad]
+    double teb_init_skip_dist;
+    double horizon_reduction_amount;
   } trajectory; //!< Trajectory related parameters
 
   //! Robot related parameters
@@ -102,6 +107,30 @@ public:
     bool is_footprint_dynamic; //<! If true, updated the footprint before checking trajectory feasibility
   } robot; //!< Robot related parameters
 
+  //! Human related parameters
+  struct Human
+  {
+    double radius;
+    double min_human_robot_dist;
+    double min_human_human_dist;
+    double max_vel_x;
+    double min_vel_x;
+    double nominal_vel_x;
+    double max_vel_x_backwards;
+    double min_vel_x_backwards;
+    double max_vel_theta;
+    double min_vel_theta;
+    double acc_lim_x;
+    double acc_lim_theta;
+    bool use_external_prediction;
+    bool predict_human_behind_robot;
+    double ttc_threshold;
+    double dir_cost_threshold;
+    double visibility_cost_threshold;
+    double pose_prediction_reset_time;
+    double fov;
+  } human;
+
   //! Goal tolerance related parameters
   struct GoalTolerance
   {
@@ -113,9 +142,11 @@ public:
 
   //! Obstacle related parameters
   struct Obstacles
-  {
+ {
     double min_obstacle_dist; //!< Minimum desired separation from obstacles
     double inflation_dist; //!< buffer zone around obstacles with non-zero penalty costs (should be larger than min_obstacle_dist in order to take effect)
+    bool use_nonlinear_obstacle_penalty;
+    double obstacle_cost_mult;
     double dynamic_obstacle_inflation_dist; //!< Buffer zone around predicted locations of dynamic obstacles with non-zero penalty costs (should be larger than min_obstacle_dist in order to take effect)
     bool include_dynamic_obstacles; //!< Specify whether the movement of dynamic obstacles should be predicted by a constant velocity model (this also effects homotopy class planning); If false, all obstacles are considered to be static.
     bool include_costmap_obstacles; //!< Specify whether the obstacles in the costmap should be taken into account directly
@@ -129,7 +160,6 @@ public:
     int costmap_converter_rate; //!< The rate that defines how often the costmap_converter plugin processes the current costmap (the value should not be much higher than the costmap update rate)
   } obstacles; //!< Obstacle related parameters
 
-
   //! Optimization related parameters
   struct Optimization
   {
@@ -140,7 +170,8 @@ public:
     bool optimization_verbose; //!< Print verbose information
 
     double penalty_epsilon; //!< Add a small safety margin to penalty functions for hard-constraint approximations
-
+    double time_penalty_epsilon;
+    bool cap_optimaltime_penalty;
     double weight_max_vel_x; //!< Optimization weight for satisfying the maximum allowed translational velocity
     double weight_max_vel_y; //!< Optimization weight for satisfying the maximum allowed strafing velocity (in use only for holonomic robots)
     double weight_max_vel_theta; //!< Optimization weight for satisfying the maximum allowed angular velocity
@@ -161,8 +192,47 @@ public:
 
     double weight_adapt_factor; //!< Some special weights (currently 'weight_obstacle') are repeatedly scaled by this factor in each outer TEB iteration (weight_new = weight_old*factor); Increasing weights iteratively instead of setting a huge value a-priori leads to better numerical conditions of the underlying optimization problem.
     double obstacle_cost_exponent; //!< Exponent for nonlinear obstacle cost (cost = linear_cost * obstacle_cost_exponent). Set to 1 to disable nonlinear cost (default)
+    
+    double weight_max_human_vel_x;
+    double weight_nominal_human_vel_x;
+    double weight_max_human_vel_theta;
+    double weight_human_acc_lim_x;
+    double weight_human_acc_lim_theta;
+    double weight_human_optimaltime;
+
+    // Hateb
+    double weight_human_viapoint;
+    double weight_human_robot_safety;
+    double weight_human_human_safety;
+    double weight_human_robot_ttc;
+    double weight_human_robot_dir;
+    double weight_human_robot_visibility;
+    double human_robot_ttc_scale_alpha;
+    bool disable_warm_start;
+    bool disable_rapid_omega_chage;
+    double omega_chage_time_seperation;
   } optim; //!< Optimization related parameters
 
+  struct Hateb
+  {
+    int planning_mode;
+    bool use_human_robot_safety_c;
+    bool use_human_human_safety_c;
+    bool use_human_robot_ttc_c;
+    bool scale_human_robot_ttc_c;
+    bool use_human_robot_dir_c;
+    bool use_human_robot_visi_c;
+    bool use_human_elastic_vel;
+  } hateb;
+
+  struct Approach 
+  {
+    int approach_id;
+    double approach_dist;
+    double approach_angle;
+    double approach_dist_tolerance;
+    double approach_angle_tolerance;
+  } approach;
 
   struct HomotopyClasses
   {
@@ -208,6 +278,19 @@ public:
     double oscillation_filter_duration; //!< Filter length/duration [sec] for the detection of oscillations
   } recovery; //!< Parameters related to recovery and backup strategies
 
+  //! Visualization
+  struct Visualization
+  {
+    bool publish_robot_global_plan;
+    bool publish_robot_local_plan;
+    bool publish_robot_local_plan_poses;
+    bool publish_robot_local_plan_fp_poses;
+    bool publish_human_global_plans;
+    bool publish_human_local_plans;
+    bool publish_human_local_plan_poses;
+    bool publish_human_local_plan_fp_poses;
+    double pose_array_z_scale;
+  } visualization;
 
   /**
   * @brief Construct the TebConfig using default values.
@@ -228,12 +311,15 @@ public:
     odom_topic = "odom";
     map_frame = "odom";
 
+    planning_mode = 1; // Human-Aware planning by default
+
     // Trajectory
 
     trajectory.teb_autosize = true;
     trajectory.dt_ref = 0.3;
     trajectory.dt_hysteresis = 0.1;
     trajectory.min_samples = 3;
+    trajectory.human_min_samples = 3;
     trajectory.max_samples = 500;
     trajectory.global_plan_overwrite_orientation = true;
     trajectory.allow_init_with_backwards_motion = false;
@@ -246,6 +332,8 @@ public:
     trajectory.feasibility_check_no_poses = 5;
     trajectory.publish_feedback = false;
     trajectory.min_resolution_collision_check_angular = M_PI;
+    trajectory.horizon_reduction_amount = 0.5;
+    trajectory.teb_init_skip_dist = 0.4;
 
     // Robot
 
@@ -261,6 +349,21 @@ public:
     robot.cmd_angle_instead_rotvel = false;
     robot.is_footprint_dynamic = false;
 
+    // Human
+    human.radius = 0.2;
+    human.min_human_robot_dist = 0.6;
+    human.min_human_human_dist = 0.6;
+    human.max_vel_x = 1.1;
+    human.nominal_vel_x = 0.8;
+    human.max_vel_x_backwards = 0.0;
+    human.max_vel_theta = 1.1;
+    human.acc_lim_x = 0.6;
+    human.acc_lim_theta = 0.8;
+    human.use_external_prediction = false;
+    human.predict_human_behind_robot = false;
+    human.ttc_threshold = 5.0;
+    human.pose_prediction_reset_time = 2.0;
+
     // GoalTolerance
 
     goal_tolerance.xy_goal_tolerance = 0.2;
@@ -272,6 +375,8 @@ public:
 
     obstacles.min_obstacle_dist = 0.5;
     obstacles.inflation_dist = 0.6;
+    obstacles.use_nonlinear_obstacle_penalty = true;
+    obstacles.obstacle_cost_mult = 1.0;
     obstacles.dynamic_obstacle_inflation_dist = 0.6;
     obstacles.include_dynamic_obstacles = true;
     obstacles.include_costmap_obstacles = true;
@@ -291,6 +396,8 @@ public:
     optim.optimization_activate = true;
     optim.optimization_verbose = false;
     optim.penalty_epsilon = 0.1;
+    optim.time_penalty_epsilon = 0.1;
+    optim.cap_optimaltime_penalty = true;
     optim.weight_max_vel_x = 2; //1
     optim.weight_max_vel_y = 2;
     optim.weight_max_vel_theta = 1;
@@ -311,6 +418,35 @@ public:
 
     optim.weight_adapt_factor = 2.0;
     optim.obstacle_cost_exponent = 1.0;
+
+    optim.weight_max_human_vel_x = 2.0;
+    optim.weight_nominal_human_vel_x = 2.0;
+    optim.weight_max_human_vel_theta = 2.0;
+    optim.weight_human_acc_lim_x = 1;
+    optim.weight_human_acc_lim_theta = 1;
+    optim.weight_human_optimaltime = 1;
+    optim.weight_human_viapoint = 1;
+    optim.weight_human_robot_safety = 20;
+    optim.weight_human_human_safety = 20;
+    optim.weight_human_robot_ttc = 20;
+    optim.weight_human_robot_dir = 20;
+    optim.weight_human_robot_visibility = 20;
+    optim.human_robot_ttc_scale_alpha = 1;
+    optim.disable_warm_start = false;
+    optim.disable_rapid_omega_chage = true;
+    optim.omega_chage_time_seperation = 1.0;
+
+
+    // Hateb
+
+    hateb.use_human_robot_safety_c = true;
+    hateb.use_human_human_safety_c = true;
+    hateb.use_human_robot_ttc_c = true;
+    hateb.scale_human_robot_ttc_c = true;
+    hateb.use_human_robot_dir_c = true;
+    hateb.use_human_robot_visi_c = true;
+    hateb.use_human_elastic_vel = true;
+
 
     // Homotopy Class Planner
 
@@ -352,6 +488,25 @@ public:
     recovery.oscillation_recovery_min_duration = 10;
     recovery.oscillation_filter_duration = 10;
 
+    // Visualization
+
+    visualization.publish_robot_global_plan = true;
+    visualization.publish_robot_local_plan = true;
+    visualization.publish_robot_local_plan_poses = false;
+    visualization.publish_robot_local_plan_fp_poses = false;
+    visualization.publish_human_global_plans = false;
+    visualization.publish_human_local_plans = true;
+    visualization.publish_human_local_plan_poses = false;
+    visualization.publish_human_local_plan_fp_poses = false;
+    visualization.pose_array_z_scale = 1.0;
+
+    // approach
+
+    approach.approach_id = 1;
+    approach.approach_dist = 0.5;
+    approach.approach_angle = 3.14;
+    approach.approach_dist_tolerance = 0.2;
+    approach.approach_angle_tolerance = 0.3;
 
   }
 

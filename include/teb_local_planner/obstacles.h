@@ -586,6 +586,11 @@ protected:
 
 
 public:
+  void setCentroid(double x, double y) {
+      pos_[0] = x;
+      pos_[1] = y;
+  }
+
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
