@@ -55,7 +55,7 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle& nh)
   nh.param("dt_hysteresis", trajectory.dt_hysteresis, trajectory.dt_hysteresis);
   nh.param("min_samples", trajectory.min_samples, trajectory.min_samples);
   nh.param("max_samples", trajectory.max_samples, trajectory.max_samples);
-nh.param("human_min_samples", trajectory.human_min_samples, trajectory.human_min_samples);
+  nh.param("human_min_samples", trajectory.human_min_samples, trajectory.human_min_samples);
   nh.param("global_plan_overwrite_orientation", trajectory.global_plan_overwrite_orientation, trajectory.global_plan_overwrite_orientation);
   nh.param("allow_init_with_backwards_motion", trajectory.allow_init_with_backwards_motion, trajectory.allow_init_with_backwards_motion);
   nh.getParam("global_plan_via_point_sep", trajectory.global_plan_viapoint_sep); // deprecated, see checkDeprecated()
@@ -167,7 +167,7 @@ nh.param("human_min_samples", trajectory.human_min_samples, trajectory.human_min
            optim.weight_human_acc_lim_theta);
   nh.param("weight_human_optimaltime", optim.weight_human_optimaltime,
            optim.weight_human_optimaltime);
-  h.param("weight_human_viapoint", optim.weight_human_viapoint,
+  nh.param("weight_human_viapoint", optim.weight_human_viapoint,
            optim.weight_human_viapoint);
   nh.param("weight_human_robot_safety", optim.weight_human_robot_safety,
            optim.weight_human_robot_safety);

@@ -25,6 +25,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_geometry_msgs
   tf2_ros
   hanp_msgs
+  hanp_prediction
   visualization_msgs
 )
 message(STATUS "System: ${CMAKE_SYSTEM}")
@@ -128,7 +129,7 @@ add_service_files(
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
    DEPENDENCIES
-   geometry_msgs std_msgs costmap_converter
+   geometry_msgs std_msgs costmap_converter hanp_msgs
 )
 
 #add dynamic reconfigure api
