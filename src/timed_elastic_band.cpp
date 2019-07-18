@@ -343,11 +343,12 @@ bool TimedElasticBand::initTrajectoryToGoal(const PoseSE2& start, const PoseSE2&
 }
 
 
-bool TimedElasticBand::initTrajectoryToGoal(const std::vector<geometry_msgs::PoseStamped>& plan, double max_vel_x, bool estimate_orient, int min_samples, bool guess_backwards_motion)
+bool TimedElasticBand::initTrajectoryToGoal(const std::vector<geometry_msgs::PoseStamped>& plan, double max_vel_x, bool estimate_orient, int min_samples, bool guess_backwards_motion, double skip_dist)
 {
   
   if (!isInit())
   {
+    
     PoseSE2 start(plan.front().pose);
     PoseSE2 goal(plan.back().pose);
 
@@ -356,13 +357,25 @@ bool TimedElasticBand::initTrajectoryToGoal(const std::vector<geometry_msgs::Pos
     addPose(start); // add starting point with given orientation
     setPoseVertexFixed(0,true); // StartConf is a fixed constraint during optimization
 
+    int last_i = 0;
     bool backwards = false;
+
     if (guess_backwards_motion && (goal.position()-start.position()).dot(start.orientationUnitVec()) < 0) // check if the goal is behind the start pose (w.r.t. start orientation)
         backwards = true;
     // TODO: dt ~ max_vel_x_backwards for backwards motions
     
     for (int i=1; i<(int)plan.size()-1; ++i)
     {
+        if (skip_dist > 0.0) {
+            double xdiff = plan[i].pose.position.x - plan[last_i].pose.position.x;
+            double ydiff = plan[i].pose.position.y - plan[last_i].pose.position.y;
+            double dist = std::hypot(xdiff, ydiff);
+            if (dist < skip_dist) {
+              continue;
+            }
+            last_i = i;
+        }
+
         double yaw;
         if (estimate_orient)
         {

@@ -413,6 +413,11 @@ public:
   {
     return std::complex<double>(pos_[0],pos_[1]);
   }
+
+  void setCentroid(double x, double y) {
+      pos_[0] = x;
+      pos_[1] = y;
+  }
   
   // Accessor methods
   const Eigen::Vector2d& position() const {return pos_;} //!< Return the current position of the obstacle (read-only)

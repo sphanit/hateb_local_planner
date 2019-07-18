@@ -301,7 +301,7 @@ public:
     _error[0] = penaltyBoundToInterval(vel, -cfg_->human.max_vel_x_backwards, cfg_->human.max_vel_x, cfg_->optim.penalty_epsilon);
     _error[1] = penaltyBoundToInterval(omega, cfg_->human.max_vel_theta, cfg_->optim.penalty_epsilon);
 
-    if (cfg_->optim.use_human_elastic_vel)
+    if (cfg_->hateb.use_human_elastic_vel)
     {
       double vel_diff = std::abs(cfg_->human.nominal_vel_x - vel);
       _error[2] = vel_diff;

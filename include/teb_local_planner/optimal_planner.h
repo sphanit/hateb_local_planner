@@ -67,6 +67,7 @@
 #include <teb_local_planner/g2o_types/edge_human_robot_directional.h>
 #include <teb_local_planner/g2o_types/edge_human_robot_safety.h>
 #include <teb_local_planner/g2o_types/edge_human_robot_ttc.h>
+#include <teb_local_planner/g2o_types/edge_human_robot_visibility.h>
 #include <teb_local_planner/g2o_types/edge_kinematics.h>
 #include <teb_local_planner/g2o_types/edge_time_optimal.h>
 #include <teb_local_planner/g2o_types/edge_shortest_path.h>
@@ -131,14 +132,11 @@ public:
    * @param via_points Container storing via-points (optional)
    */
   TebOptimalPlanner(const TebConfig& cfg, ObstContainer* obstacles = NULL,
-                    RobotFootprintModelPtr robot_model =
-                        boost::make_shared<PointRobotFootprint>(),
+                    RobotFootprintModelPtr robot_model = boost::make_shared<PointRobotFootprint>(),
                     TebVisualizationPtr visual = TebVisualizationPtr(),
                     const ViaPointContainer* via_points = NULL,
-                    CircularRobotFootprintPtr human_model =
-                        boost::make_shared<CircularRobotFootprint>(),
-                    const std::map<uint64_t, ViaPointContainer>
-                        *humans_via_points_map = NULL);
+                    CircularRobotFootprintPtr human_model = boost::make_shared<CircularRobotFootprint>(),
+                    const std::map<uint64_t, ViaPointContainer> *humans_via_points_map = NULL);
 
   /**
    * @brief Destruct the optimal planner.
@@ -154,14 +152,11 @@ public:
     * @param via_points Container storing via-points (optional)
     */
   void initialize(const TebConfig &cfg, ObstContainer *obstacles = NULL,
-                  RobotFootprintModelPtr robot_model =
-                      boost::make_shared<PointRobotFootprint>(),
+                  RobotFootprintModelPtr robot_model = boost::make_shared<PointRobotFootprint>(),
                   TebVisualizationPtr visual = TebVisualizationPtr(),
                   const ViaPointContainer *via_points = NULL,
-                  CircularRobotFootprintPtr human_model =
-                      boost::make_shared<CircularRobotFootprint>(),
-                  const std::map<uint64_t, ViaPointContainer>
-                      *humans_via_points_map = NULL);
+                  CircularRobotFootprintPtr human_model = boost::make_shared<CircularRobotFootprint>(),
+                  const std::map<uint64_t, ViaPointContainer> *humans_via_points_map = NULL);
 
   /** @name Plan a trajectory  */
   //@{
@@ -522,7 +517,7 @@ public:
    * @param[out] trajectory the resulting trajectory
    */
   void getFullTrajectory(std::vector<TrajectoryPointMsg>& trajectory) const;
-  virtual void getFullHumanTrajectory(const uint64_t human_id, std::vector<TrajectoryPointMsg> &human_trajectory);
+  void getFullHumanTrajectory(const uint64_t human_id, std::vector<TrajectoryPointMsg> &human_trajectory);
   
   /**
    * @brief Check whether the planned trajectory is feasible or not.
@@ -687,10 +682,9 @@ protected:
    * @see buildGraph
    * @see optimizeGraph
    * @param weight_multiplier Specify an additional weight multipler (in addition to the the config weight)
-
    */
-  void AddEdgesDynamicObstacles();
-  void AddEdgesDynamicObstaclesForHumans();
+  void AddEdgesDynamicObstacles(double weight_multiplier=1.0);
+  void AddEdgesDynamicObstaclesForHumans(double weight_multiplier=1.0);
 
   /**
    * @brief Add all edges (local cost functions) for satisfying kinematic constraints of a differential drive robot
@@ -710,6 +704,12 @@ protected:
    * @see optimizeGraph
    */
   void AddEdgesKinematicsCarlike();
+   /**
+   * @brief Add all edges (local cost functions) for prefering a specifiy turning direction (by penalizing the other one)
+   * @see buildGraph
+   * @see optimizeGraph
+   */
+  void AddEdgesPreferRotDir(); 
 
   void AddEdgesHumanRobotSafety();
   void AddEdgesHumanHumanSafety();

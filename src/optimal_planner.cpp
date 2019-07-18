@@ -36,6 +36,7 @@
  * Author: Christoph Rösmann
  *********************************************************************/
 
+#define THROTTLE_RATE 1.0 // seconds
 #include <teb_local_planner/optimal_planner.h>
 #include <map>
 #include <memory>
@@ -324,27 +325,34 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
         current_human_robot_min_dist = dist;
       }
 
-      if (humans_tebs_map_.find(human_id) == humans_tebs_map_.end()) {
+      if (humans_tebs_map_.find(human_id) == humans_tebs_map_.end()) 
+      {
         // create new human-teb for new human
         humans_tebs_map_[human_id] = TimedElasticBand();
-        humans_tebs_map_[human_id].initTrajectoryToGoal(initial_human_plan, cfg_->human.max_human_vel_x, true, cfg_->trajectory.human_min_samples, false, cfg_->trajectory.teb_init_skip_dist);
+        humans_tebs_map_[human_id].initTrajectoryToGoal(initial_human_plan, cfg_->human.max_vel_x, true, cfg_->trajectory.human_min_samples, false, cfg_->trajectory.teb_init_skip_dist);
       
-      } else if (cfg_->optim.disable_warm_start) {
+      } 
+      else if (cfg_->optim.disable_warm_start) 
+      {
         auto &human_teb = humans_tebs_map_[human_id];
         human_teb.clearTimedElasticBand();
-        human_teb.initTrajectoryToGoal(initial_human_plan, cfg_->human.max_human_vel_x, true, cfg_->trajectory.human_min_samples, false, cfg_->trajectory.teb_init_skip_dist);
+        human_teb.initTrajectoryToGoal(initial_human_plan, cfg_->human.max_vel_x, true, cfg_->trajectory.human_min_samples, false, cfg_->trajectory.teb_init_skip_dist);
 
-        else {
-        // modify human-teb for existing human
+      }
+
+      else 
+      {
+      // modify human-teb for existing human
         PoseSE2 human_start_(initial_human_plan.front().pose);
         PoseSE2 human_goal_(initial_human_plan.back().pose);
         auto &human_teb = humans_tebs_map_[human_id];
         if (human_teb.sizePoses() > 0 && (human_goal_.position() - human_teb.BackPose().position()).norm() < cfg_->trajectory.force_reinit_new_goal_dist)
-          human_teb.updateAndPruneTEB(human_start_, human_goal_, cfg_->trajectory.human_min_samples);
-        else {
-          ROS_DEBUG("New goal: distance to existing goal is higher than the specified threshold. Reinitializing human trajectories.");
-          human_teb.clearTimedElasticBand();
-          human_teb.initTrajectoryToGoal(initial_human_plan, cfg_->human.max_human_vel_x, true, cfg_->trajectory.human_min_samples, false, cfg_->trajectory.teb_init_skip_dist);
+        human_teb.updateAndPruneTEB(human_start_, human_goal_, cfg_->trajectory.human_min_samples);
+        else 
+        {
+        ROS_DEBUG("New goal: distance to existing goal is higher than the specified threshold. Reinitializing human trajectories.");
+        human_teb.clearTimedElasticBand();
+        human_teb.initTrajectoryToGoal(initial_human_plan, cfg_->human.max_vel_x, true, cfg_->trajectory.human_min_samples, false, cfg_->trajectory.teb_init_skip_dist);
         }
       }
       // give start velocity for humans
@@ -367,17 +375,23 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
     break;
   }
   case 2: {
-    if (initial_human_plan_vel_map->size() == 1) {
+    if (initial_human_plan_vel_map->size() == 1) 
+    {
       auto &approach_plan = initial_human_plan_vel_map->begin()->second.plan;
-      if (approach_plan.size() == 1) {
+      if (approach_plan.size() == 1) 
+      {
         approach_pose_ = approach_plan.front();
         // modify robot global plan
-      } else {
+      } 
+      else 
+      {
         ROS_INFO("empty pose of the human for approaching");
         // set approach_pose_ same as the current robot pose
         approach_pose_ = initial_plan.front();
       }
-    } else {
+    } 
+    else 
+    {
       ROS_INFO("no or multiple humans for approaching %d", initial_human_plan_vel_map->size());
       // set approach_pose_ same as the current robot pose
       approach_pose_ = initial_plan.front();
@@ -970,12 +984,14 @@ void TebOptimalPlanner::AddEdgesDynamicObstacles(double weight_multiplier)
   }
 }
 
-void TebOptimalPlanner::AddEdgesDynamicObstaclesForHumans() {
-  if (cfg_->optim.weight_obstacle == 0 || obstacles_ == NULL)
-    return;
+void TebOptimalPlanner::AddEdgesDynamicObstaclesForHumans(double weight_multiplier) {
+  if (cfg_->optim.weight_obstacle==0 || weight_multiplier==0 || obstacles_==NULL )
+    return; // if weight equals zero skip adding edges!
 
-  Eigen::Matrix<double, 1, 1> information;
-  information.fill(cfg_->optim.weight_dynamic_obstacle);
+  Eigen::Matrix<double,2,2> information;
+  information(0,0) = cfg_->optim.weight_dynamic_obstacle * weight_multiplier;
+  information(1,1) = cfg_->optim.weight_dynamic_obstacle_inflation;
+  information(0,1) = information(1,0) = 0;
 
   for (ObstContainer::const_iterator obst = obstacles_->begin();
        obst != obstacles_->end(); ++obst) {
@@ -1634,7 +1650,7 @@ void TebOptimalPlanner::AddVertexEdgesApproach() {
   }
 }
 
-void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoint_cost_scale, bool alternative_time_cost)
+void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoint_cost_scale, bool alternative_time_cost, teb_local_planner::OptimizationCostArray *op_costs)
 { 
   // check if graph is empty/exist  -> important if function is called between buildGraph and optimizeGraph/clearGraph
   bool graph_exist_flag(false);
@@ -2026,9 +2042,7 @@ void TebOptimalPlanner::getFullTrajectory(std::vector<TrajectoryPointMsg>& traje
   goal.time_from_start.fromSec(curr_time);
 }
 
-void TebOptimalPlanner::getFullHumanTrajectory(
-    const uint64_t human_id,
-    std::vector<TrajectoryPointMsg> &human_trajectory) {
+void TebOptimalPlanner::getFullHumanTrajectory(const uint64_t human_id, std::vector<TrajectoryPointMsg> &human_trajectory) {
   auto human_teb_it = humans_tebs_map_.find(human_id);
   if (human_teb_it != humans_tebs_map_.end()) {
     auto &human_teb = human_teb_it->second;

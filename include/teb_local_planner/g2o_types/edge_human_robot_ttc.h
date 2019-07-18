@@ -112,7 +112,7 @@ public:
 
       _error[0] = penaltyBoundFromBelow(ttc, cfg_->human.ttc_threshold,
                                         cfg_->optim.penalty_epsilon);
-      if (cfg_->optim.scale_human_robot_ttc_c) {
+      if (cfg_->hateb.scale_human_robot_ttc_c) {
         _error[0] = _error[0] * cfg_->optim.human_robot_ttc_scale_alpha / C_sq;
       }
 

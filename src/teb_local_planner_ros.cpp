@@ -431,7 +431,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
         // transform human plans
         HumanPlanCombined human_plan_combined;
         auto &transformed_vel = predicted_humans_poses.start_velocity;
-        if (!transformHumanPlan(*tf2_, robot_pose, *costmap_, global_frame_,
+        if (!transformHumanPlan(*tf_, robot_pose, *costmap_, global_frame_,
                                 predicted_humans_poses.poses,
                                 human_plan_combined, transformed_vel,
                                 &tf_human_plan_to_global)) {
@@ -491,7 +491,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
            predict_srv.response.predicted_humans_poses) {
         if (predicted_humans_poses.id == cfg_.approach.approach_id) {
           geometry_msgs::PoseStamped transformed_human_pose;
-          if (!transformHumanPose(*tf2_, global_frame_,
+          if (!transformHumanPose(*tf_, global_frame_,
                                   predicted_humans_poses.poses.front(),
                                   transformed_human_pose)) {
             ROS_WARN(
@@ -510,9 +510,8 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
             geometry_msgs::PoseStamped approach_pose[3];
             for (int i=0; i < 3; i++){
                 tf2::fromMsg(transformed_human_pose.pose, tf_human_pose);
-                tf_approach_pose[i].setOrigin(
-                        tf2::Vector3(cfg_.approach.approach_dist + (2 - i) * 0.3, 0.0, 0.0));
-		tf2::Quaternion approachQuaternion;
+                tf_approach_pose[i].setOrigin(tf2::Vector3(cfg_.approach.approach_dist + (2 - i) * 0.3, 0.0, 0.0));
+		            tf2::Quaternion approachQuaternion;
                 approachQuaternion.setEuler(cfg_.approach.approach_angle,0.0,0.0);
                 tf_approach_pose[i].setRotation(approachQuaternion);
                 tf_approach_pose[i] = tf_human_pose * tf_approach_pose[i];
@@ -553,8 +552,10 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
               for (int i = 0; i < 3; i++) {
                   transformed_plan.push_back(approach_pose[i]);
 
-                  // get approach poses in to the frame of global pla
-                  tf_approach_global[i] = tf_plan_to_global.inverse() * tf_approach_pose[i];
+                  // get approach poses in to the frame of global plan
+                  tf2::Stamped<tf2::Transform> temp;
+                  tf2::fromMsg(tf_plan_to_global,temp);
+                  tf_approach_global[i] = temp.inverse() * tf_approach_pose[i];
 
                   tf2::toMsg(tf_approach_global[i], approach_pose_global[i].pose);
                   approach_pose_global[i].header = global_plan_.back().header;
@@ -673,7 +674,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   auto fsb_time = ros::Time::now() - fsb_start_time;
 
   // Get the velocity command for this sampling interval
-  auto fsb_start_time = ros::Time::now();
+  auto vel_start_time = ros::Time::now();
   if (!planner_->getVelocityCommand(cmd_vel.linear.x, cmd_vel.linear.y, cmd_vel.angular.z))
   {
     planner_->clearPlanner();
@@ -736,8 +737,8 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
           << std::to_string(prune_time.toSec()) << "\n"
           << "\t\ttransform time               "
           << std::to_string(transform_time.toSec()) << "\n"
-          << "\t\thorizon setup time           "
-          << std::to_string((hr1_time + hr2_time).toSec()) << "\n"
+          // << "\t\thorizon setup time           "
+          // << std::to_string((hr1_time + hr2_time).toSec()) << "\n"
           << "\t\tother time                   "
           << std::to_string(other_time.toSec()) << "\n"
           << "\t\tcostmap convert time         "
@@ -994,15 +995,6 @@ void TebLocalPlannerROS::updateHumanViaPointsContainers(
   }
 }
 
-Eigen::Vector2d
-TebLocalPlannerROS::tfPoseToEigenVector2dTransRot(const tf::Pose &tf_vel) {
-  Eigen::Vector2d vel;
-  vel.coeffRef(0) =
-      std::sqrt(tf_vel.getOrigin().getX() * tf_vel.getOrigin().getX() +
-                tf_vel.getOrigin().getY() * tf_vel.getOrigin().getY());
-  vel.coeffRef(1) = tf::getYaw(tf_vel.getRotation());
-  return vel;
-}    
 bool TebLocalPlannerROS::pruneGlobalPlan(const tf2_ros::Buffer& tf, const geometry_msgs::PoseStamped& global_pose, std::vector<geometry_msgs::PoseStamped>& global_plan, double dist_behind_robot)
 {
   if (global_plan.empty())
@@ -1048,13 +1040,14 @@ bool TebLocalPlannerROS::pruneGlobalPlan(const tf2_ros::Buffer& tf, const geomet
 
 bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const std::vector<geometry_msgs::PoseStamped>& global_plan,
                   const geometry_msgs::PoseStamped& global_pose, const costmap_2d::Costmap2D& costmap, const std::string& global_frame, double max_plan_length,
-                  std::vector<geometry_msgs::PoseStamped>& transformed_plan, int* current_goal_idx, geometry_msgs::TransformStamped* tf_plan_to_global) const
+                  PlanCombined &transformed_plan_combined, int* current_goal_idx, geometry_msgs::TransformStamped* tf_plan_to_global) const
+
 {
   // this method is a slightly modified version of base_local_planner/goal_functions.h
 
   const geometry_msgs::PoseStamped& plan_pose = global_plan[0];
 
-  transformed_plan.clear();
+  transformed_plan_combined.plan_to_optimize.clear();
 
   try 
   {
@@ -1083,6 +1076,8 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
     int i = 0;
     double sq_dist_threshold = dist_threshold * dist_threshold;
     double sq_dist = 1e10;
+
+    tf2::Stamped<tf2::Transform> tf_pose;
     
     //we need to loop to a point on the plan that is within a certain distance of the robot
     for(int j=0; j < (int)global_plan.size(); ++j)
@@ -1098,8 +1093,19 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
         sq_dist = new_sq_dist;
         i = j;
       }
+      sq_dist = new_sq_dist;
+
+      // const geometry_msgs::PoseStamped &pose = global_plan[i];
+      // tf2::fromMsg(pose, tf_pose);
+      // tf_pose.setData(plan_to_global_transform * tf_pose);
+      // tf_pose.stamp_ = plan_to_global_transform.stamp_;
+      // tf_pose.frame_id_ = global_frame;
+      // newer_pose = tf2::toMsg(tf_pose, newer_pose);
+      // transformed_plan_combined.plan_before.push_back(newer_pose);
+
+      ++i;
     }
-    
+ 
     geometry_msgs::PoseStamped newer_pose;
     
     double plan_length = 0; // check cumulative Euclidean distance along the plan
@@ -1110,7 +1116,7 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
       const geometry_msgs::PoseStamped& pose = global_plan[i];
       tf2::doTransform(pose, newer_pose, plan_to_global_transform);
 
-      transformed_plan.push_back(newer_pose);
+      transformed_plan_combined.plan_before.push_back(newer_pose);
 
       double x_diff = robot_pose.pose.position.x - global_plan[i].pose.position.x;
       double y_diff = robot_pose.pose.position.y - global_plan[i].pose.position.y;
@@ -1122,15 +1128,32 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
 
       ++i;
     }
-        
+
+    // // // Modification for teb_local_planner:
+    // // // Return the index of the current goal point (inside the distance
+    // // // threshold)
+    // if (current_goal_idx)
+    //   *current_goal_idx = i - 1; // minus 1, since i was increased once before leaving the loop
+
+    // while (i < global_plan.size()) {
+    //   const geometry_msgs::PoseStamped &pose = global_plan[i];
+    //   tf2::fromMsg(pose, tf_pose);
+    //   tf_pose.setData(plan_to_global_transform_ * tf_pose);
+    //   tf_pose.stamp_ = plan_to_global_transform_.stamp_;
+    //   tf_pose.frame_id_ = global_frame;
+    //   tf2::toMsg(tf_pose, newer_pose);
+    //   transformed_plan_combined.plan_after.push_back(newer_pose);
+    //   ++i;
+    // }
+
     // if we are really close to the goal (<sq_dist_threshold) and the goal is not yet reached (e.g. orientation error >>0)
     // the resulting transformed plan can be empty. In that case we explicitly inject the global goal.
-    if (transformed_plan.empty())
+    if (transformed_plan_combined.plan_after.empty())
     {
       tf2::doTransform(global_plan.back(), newer_pose, plan_to_global_transform);
 
-      transformed_plan.push_back(newer_pose);
-      
+      transformed_plan_combined.plan_after.push_back(newer_pose);
+
       // Return the index of the current goal point (inside the distance threshold)
       if (current_goal_idx) *current_goal_idx = int(global_plan.size())-1;
     }
@@ -1168,10 +1191,10 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
     
 int TebLocalPlannerROS::getLatestCommonTime(const std::string &source_frame, const std::string &target_frame, ros::Time& time, std::string* error_string) const
 {
-  tf2::CompactFrameID target_id = tf2_->_lookupFrameNumber(tf::strip_leading_slash(target_frame));
-  tf2::CompactFrameID source_id = tf2_->_lookupFrameNumber(tf::strip_leading_slash(source_frame));
+  tf2::CompactFrameID target_id = tf_->_lookupFrameNumber(tf::strip_leading_slash(target_frame));
+  tf2::CompactFrameID source_id = tf_->_lookupFrameNumber(tf::strip_leading_slash(source_frame));
 
-  return tf2_->_getLatestCommonTime(source_id, target_id, time, error_string);
+  return tf_->_getLatestCommonTime(source_id, target_id, time, error_string);
 }
 
 void TebLocalPlannerROS::lookupTwist(const std::string& tracking_frame, const std::string& observation_frame,
@@ -1201,8 +1224,8 @@ void TebLocalPlannerROS::lookupTwist(const std::string& tracking_frame, const st
   ros::Time start_time = std::max(ros::Time().fromSec(.00001) + averaging_interval, end_time) - averaging_interval;  // don't collide with zero
   ros::Duration corrected_averaging_interval = end_time - start_time; //correct for the possiblity that start time was truncated above.
   geometry_msgs::TransformStamped start_msg, end_msg;
-  start_msg = tf2_->lookupTransform(observation_frame, tracking_frame, start_time);
-  end_msg = tf2_->lookupTransform(observation_frame, tracking_frame, end_time);
+  start_msg = tf_->lookupTransform(observation_frame, tracking_frame, start_time);
+  end_msg = tf_->lookupTransform(observation_frame, tracking_frame, end_time);
 
   tf2::Stamped< tf2::Transform > start,end;
   tf2::fromMsg(start_msg,start);
@@ -1230,7 +1253,7 @@ void TebLocalPlannerROS::lookupTwist(const std::string& tracking_frame, const st
 
   //correct for the position of the reference frame
   tf2::Stamped< tf2::Transform > inverse;
-  tf2::fromMsg(tf2_->lookupTransform(reference_frame,tracking_frame,  target_time),inverse);
+  tf2::fromMsg(tf_->lookupTransform(reference_frame,tracking_frame,  target_time),inverse);
   tf2::Vector3 out_rot = inverse.getBasis() * twist_rot;
   tf2::Vector3 out_vel = inverse.getBasis()* twist_vel + inverse.getOrigin().cross(out_rot);
 
@@ -1239,7 +1262,7 @@ void TebLocalPlannerROS::lookupTwist(const std::string& tracking_frame, const st
   // Start by computing the original reference point in the reference frame:
   tf2::Stamped<tf2::Vector3> rp_orig(tf2::Vector3(0,0,0), target_time, tracking_frame);
   geometry_msgs::TransformStamped reference_frame_trans;
-  tf2::fromMsg(tf2_->lookupTransform(reference_frame,rp_orig.frame_id_,rp_orig.stamp_),reference_frame_trans);
+  tf2::fromMsg(tf_->lookupTransform(reference_frame,rp_orig.frame_id_,rp_orig.stamp_),reference_frame_trans);
 
   geometry_msgs::PointStamped rp_orig_msg;
   tf2::toMsg(rp_orig,rp_orig_msg);
@@ -1477,7 +1500,7 @@ double TebLocalPlannerROS::estimateLocalGoalOrientation(const std::vector<geomet
 }
       
       
-void TebLocalPlannerROS::saturateVelocity(double& vx, double& vy, double& omega, double max_vel_x, double max_vel_y, double max_vel_theta, double max_vel_x_backwards) const
+void TebLocalPlannerROS::saturateVelocity(double& vx, double& vy, double& omega, double max_vel_x, double max_vel_y, double max_vel_theta, double max_vel_x_backwards)
 {
   // Limit translational velocity for forward driving
   if (vx > max_vel_x)
@@ -1504,6 +1527,7 @@ void TebLocalPlannerROS::saturateVelocity(double& vx, double& vy, double& omega,
     vx = -max_vel_x_backwards;
 
   // slow change of direction in angular velocity
+  double min_vel_theta = 0.02;
   if (cfg_.optim.disable_rapid_omega_chage) {
     if (std::signbit(omega) != std::signbit(last_omega_)) {
       // signs are changed
@@ -1855,11 +1879,10 @@ bool TebLocalPlannerROS::optimizeStandalone(
   ROS_INFO("transforming robot global plans");
   PlanCombined transformed_plan_combined;
   int goal_idx;
-  tf2::Stamped<tf2::Transform> tf_robot_plan_to_global;
-  tf2::Stamped<tf2::Transform> robot_pose_tf_;
-  tf2::fromMsg(robot_pose_tf,robot_pose_tf_);
+  geometry_msgs::TransformStamped tf_robot_plan_to_global;
+
   if (!transformGlobalPlan(
-          *tf2_, req.robot_plan.poses, robot_pose_tf_, *costmap_, global_frame_,
+          *tf_, req.robot_plan.poses, robot_pose_tf, *costmap_, global_frame_,
           cfg_.trajectory.max_global_plan_lookahead_dist, transformed_plan_combined,
           &goal_idx, &tf_robot_plan_to_global)) {
     res.success = false;
@@ -1915,7 +1938,7 @@ bool TebLocalPlannerROS::optimizeStandalone(
       human_path_cov.push_back(human_pos_cov);
     }
     ROS_INFO("transforming human %ld plan", human_path.id);
-    if (!transformHumanPlan(*tf2_, robot_pose_tf, *costmap_, global_frame_,
+    if (!transformHumanPlan(*tf_, robot_pose_tf, *costmap_, global_frame_,
                             human_path_cov, human_plan_combined,
                             transformed_vel, &tf_human_plan_to_global)) {
       res.success = false;
@@ -2020,10 +2043,9 @@ bool TebLocalPlannerROS::optimizeStandalone(
   planner_->clearPlanner();
 
   // saturate velocity
-  saturateVelocity(cmd_vel.linear.x, cmd_vel.angular.z, cfg_.robot.max_vel_x,
-                   cfg_.robot.min_vel_x, cfg_.robot.max_vel_theta,
-                   cfg_.robot.min_vel_theta, cfg_.robot.max_vel_x_backwards,
-                   cfg_.robot.min_vel_x_backwards);
+  saturateVelocity(cmd_vel.linear.x, cmd_vel.linear.y, cmd_vel.angular.z, cfg_.robot.max_vel_x, cfg_.robot.max_vel_y,
+                   cfg_.robot.max_vel_theta, cfg_.robot.max_vel_x_backwards);
+
   auto vel_time = ros::Time::now() - vel_start_time;
 
   auto total_time = ros::Time::now() - start_time;

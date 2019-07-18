@@ -199,7 +199,7 @@ void TebVisualization::publishHumanGlobalPlans(
     humans_global_plans_pub_.publish(human_path_array);
   }
 }
-void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand& teb) const
+void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand& teb, const BaseRobotFootprintModel &robot_model, const std_msgs::ColorRGBA &color) const
 {
   if (printErrorWhenNotInitialized() || (!cfg_->visualization.publish_robot_local_plan && !cfg_->visualization.publish_robot_local_plan_poses && !cfg_->visualization.publish_robot_local_plan_fp_poses))
     return;
@@ -251,7 +251,7 @@ void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand& teb) con
       int idx = 0;
       for (auto &pose : teb_poses.poses) {
         std::vector<visualization_msgs::Marker> fp_markers;
-        robot_model.visualizeRobot(pose, fp_markers);
+        robot_model.visualizeRobot(pose, fp_markers, color);
         for (auto &marker : fp_markers) {
           marker.header.frame_id = cfg_->map_frame;
           marker.header.stamp = ros::Time::now();
@@ -360,7 +360,7 @@ void TebVisualization::publishTrajectory(
 
 void TebVisualization::publishHumanLocalPlansAndPoses(
     const std::map<uint64_t, TimedElasticBand> &humans_tebs_map,
-    const BaseRobotFootprintModel &human_model) const {
+    const BaseRobotFootprintModel &human_model, const std_msgs::ColorRGBA &color) const {
   if (printErrorWhenNotInitialized() || humans_tebs_map.empty() ||
       (!cfg_->visualization.publish_human_local_plans &&
        !cfg_->visualization.publish_human_local_plan_poses &&
@@ -406,7 +406,7 @@ void TebVisualization::publishHumanLocalPlansAndPoses(
       int idx = 0;
       for (auto &pose : humans_teb_poses.poses) {
         std::vector<visualization_msgs::Marker> human_fp_markers;
-        human_model.visualizeRobot(pose, human_fp_markers);
+        human_model.visualizeRobot(pose, human_fp_markers, color);
         for (auto &human_marker : human_fp_markers) {
           human_marker.header.frame_id = cfg_->map_frame;
           human_marker.header.stamp = ros::Time::now();

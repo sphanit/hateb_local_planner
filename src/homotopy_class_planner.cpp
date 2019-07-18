@@ -90,13 +90,14 @@ bool HomotopyClassPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& i
                                 teb_local_planner::OptimizationCostArray *op_costs)
 {
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
+  auto start_time = ros::Time::now();
 
   // store initial plan for further initializations (must be valid for the lifetime of this object or clearPlanner() is called!)
   initial_plan_ = &initial_plan;
 
   PoseSE2 start(initial_plan.front().pose);
   PoseSE2 goal(initial_plan.back().pose);
-
+  auto pre_plan_time = ros::Time::now() - start_time;
   return plan(start, goal, start_vel, free_goal_vel, pre_plan_time.toSec());
 }
 
@@ -135,8 +136,7 @@ bool HomotopyClassPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const
   auto teb_time = ros::Time::now() - teb_start_time;
 
   auto other_start_time = ros::Time::now();
-  // Delete any detours
-  deleteTebDetours(-0.1);
+
   // Select which candidate (based on alternative homotopy classes) should be used
   selectBestTeb();
 

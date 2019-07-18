@@ -153,8 +153,8 @@ public:
    * and the pose sequence to  \e ../../teb_poses.
    * @param teb const reference to a Timed_Elastic_Band
    */
-  void publishLocalPlanAndPoses(const TimedElasticBand &teb, const BaseRobotFootprintModel &robot_model) const;
-  void publishHumanLocalPlansAndPoses(const std::map<uint64_t, TimedElasticBand> &humans_tebs_map, const BaseRobotFootprintModel &human_model) const;
+  void publishLocalPlanAndPoses(const TimedElasticBand &teb, const BaseRobotFootprintModel &robot_model, const std_msgs::ColorRGBA &color = toColorMsg(0.5, 0.0, 0.8, 0.0)) const;
+  void publishHumanLocalPlansAndPoses(const std::map<uint64_t, TimedElasticBand> &humans_tebs_map, const BaseRobotFootprintModel &human_model, const std_msgs::ColorRGBA &color= toColorMsg(0.5, 0.0, 0.8, 0.0)) const;
 
   void publishTrajectory(const PlanTrajCombined &plan_traj_combined) const;
   void publishHumanTrajectories(const std::vector<HumanPlanTrajCombined> &humans_plans_combined) const;

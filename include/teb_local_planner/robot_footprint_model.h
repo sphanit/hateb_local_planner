@@ -700,7 +700,6 @@ private:
       polygon_world[i].x() = current_pose.x() + cos_th * vertices_[i].x() - sin_th * vertices_[i].y();
       polygon_world[i].y() = current_pose.y() + sin_th * vertices_[i].x() + cos_th * vertices_[i].y();
     }
-    return radius;
   }
 
   Point2dContainer vertices_;

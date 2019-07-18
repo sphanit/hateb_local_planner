@@ -449,8 +449,15 @@ public:
    */
   bool computeStartOrientation(const TebOptimalPlannerPtr plan, const double len_orientation_vector, double& orientation);
 
-  virtual void getFullTrajectory(std::vector<TrajectoryPointMsg> &trajectory) const;
-  virtual void getFullHumanTrajectory(const uint64_t human_id, std::vector<TrajectoryPointMsg> &human_trajectory);
+  void getFullTrajectory(std::vector<TrajectoryPointMsg> &trajectory) const
+  {
+
+  }
+
+  void getFullHumanTrajectory(const uint64_t human_id, std::vector<TrajectoryPointMsg> &human_trajectory)
+  {
+
+  }
 
   /**
    * @brief Access config (read-only)
