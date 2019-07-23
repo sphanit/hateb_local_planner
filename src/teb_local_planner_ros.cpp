@@ -995,7 +995,7 @@ void TebLocalPlannerROS::updateHumanViaPointsContainers(
   auto itr = humans_via_points_map_.begin();
   while (itr != humans_via_points_map_.end())
   {
-    if (transformed_human_plan_vel_map.find(itr->first) != ransformed_human_plan_vel_map.end())
+    if (transformed_human_plan_vel_map.find(itr->first) != transformed_human_plan_vel_map.end())
       itr = humans_via_points_map_.erase(itr);
     else
       ++itr;
