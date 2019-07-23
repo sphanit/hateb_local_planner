@@ -77,7 +77,7 @@ namespace teb_local_planner
 TebLocalPlannerROS::TebLocalPlannerROS() : costmap_ros_(NULL), tf_(NULL), costmap_model_(NULL),
                                            costmap_converter_loader_("costmap_converter", "costmap_converter::BaseCostmapToPolygons"),
                                            dynamic_recfg_(NULL), custom_via_points_active_(false), goal_reached_(false), no_infeasible_plans_(0),
-                                           last_preferred_rotdir_(RotType::none), initialized_(false)
+                                           last_preferred_rotdir_(RotType::none),horizon_reduced_(false), initialized_(false)
 {
 }
 
@@ -191,7 +191,7 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
 
     // initialize failure detector
     ros::NodeHandle nh_move_base("~");
-    double controller_frequency = 5;
+    double controller_frequency = 10;
     nh_move_base.param("controller_frequency", controller_frequency, controller_frequency);
     failure_detector_.setBufferLength(std::round(cfg_.recovery.oscillation_filter_duration*controller_frequency));
 
@@ -235,6 +235,7 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
 
 bool TebLocalPlannerROS::setPlan(const std::vector<geometry_msgs::PoseStamped>& orig_global_plan)
 {
+  // std::cout << "I am in TebLocalPlannerROS::setPlan" << '\n';
   // check if plugin is initialized
   if(!initialized_)
   {
@@ -264,6 +265,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
     resetHumansPrediction();
   }
   last_call_time_ = start_time;
+  // std::cout << "I am in TebLocalPlannerROS::computeVelocityCommands" << '\n';
 
   // check if plugin initialized
   if(!initialized_)
@@ -315,6 +317,9 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   auto &transformed_plan = transformed_plan_combined.plan_to_optimize;
   auto transform_time = ros::Time::now() - transform_start_time;
 
+  // check if we should enter any backup mode and apply settings
+  configureBackupModes(transformed_plan, goal_idx);
+
   // update via-points container
   // if (!custom_via_points_active_)
   //   updateViaPointsContainer(transformed_plan, cfg_.trajectory.global_plan_viapoint_sep);
@@ -333,10 +338,6 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
     goal_reached_ = true;
     return true;
   }
-
-
-  // check if we should enter any backup mode and apply settings
-  configureBackupModes(transformed_plan, goal_idx);
 
   // Return false if the transformed global plan is empty
   if (transformed_plan.empty())
@@ -597,7 +598,9 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   auto plan_start_time = ros::Time::now();
   // bool success = planner_->plan(robot_pose_, robot_goal_, robot_vel_, cfg_.goal_tolerance.free_goal_vel); // straight line init
   teb_local_planner::OptimizationCostArray op_costs;
+  // std::cout << "I am in Planner" << '\n';
   bool success = planner_->plan(transformed_plan, &robot_vel_, cfg_.goal_tolerance.free_goal_vel, &transformed_human_plan_vel_map, &op_costs);
+  // std::cout << "I am out of Planner" << '\n';
   if (!success)
   {
     planner_->clearPlanner(); // force reinitialization for next time
@@ -613,26 +616,48 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
 
   PlanTrajCombined plan_traj_combined;
   plan_traj_combined.plan_before = transformed_plan_combined.plan_before;
+  // std::cout << "I am going into planner_->getFullTrajectory in computeVelocityCommands" << '\n';
   planner_->getFullTrajectory(plan_traj_combined.optimized_trajectory);
+  // std::cout << "I am out of planner_->getFullTrajectory in computeVelocityCommands" << '\n';
   plan_traj_combined.plan_after = transformed_plan_combined.plan_after;
+  // std::cout << "I am going into visualization_->publishTrajectory in computeVelocityCommands" << '\n';
   visualization_->publishTrajectory(plan_traj_combined);
+  // std::cout << "I am out of visualization_->publishTrajectory in computeVelocityCommands" << '\n';
 
   if (cfg_.planning_mode == 1) {
+    // std::cout << "I am going into visualization_->publishHumanGlobalPlans in computeVelocityCommands" << '\n';
     visualization_->publishHumanGlobalPlans(transformed_human_plans);
+    // std::cout << "I am out of visualization_->publishHumanGlobalPlans in computeVelocityCommands" << '\n';
     std::vector<HumanPlanTrajCombined> human_plans_traj_array;
     for (auto &human_plan_combined : transformed_human_plans) {
       HumanPlanTrajCombined human_plan_traj_combined;
       human_plan_traj_combined.id = human_plan_combined.id;
       human_plan_traj_combined.plan_before = human_plan_combined.plan_before;
+      // std::cout << "I am going into planner_->getFullHumanTrajectory in computeVelocityCommands" << '\n';
       planner_->getFullHumanTrajectory(
           human_plan_traj_combined.id,
           human_plan_traj_combined.optimized_trajectory);
       human_plan_traj_combined.plan_after = human_plan_combined.plan_after;
       human_plans_traj_array.push_back(human_plan_traj_combined);
+      // std::cout << "I am out of planner_->getFullHumanTrajectory in computeVelocityCommands" << '\n';
+
     }
+    // std::cout << "I am going into visualization_->publishHumanTrajectories in computeVelocityCommands" << '\n';
     visualization_->publishHumanTrajectories(human_plans_traj_array);
+    // std::cout << "I am out of visualization_->publishHumanTrajectories in computeVelocityCommands" << '\n';
   }
 
+  // Undo temporary horizon reduction
+  auto hr2_start_time = ros::Time::now();
+  if (horizon_reduced_ &&
+      (ros::Time::now() - horizon_reduced_stamp_).toSec() >= 5 &&
+      !planner_->isHorizonReductionAppropriate(transformed_plan)) // 10s are hardcoded for now...
+  {
+    horizon_reduced_ = false;
+    planner_->local_weight_optimaltime_ = cfg_.optim.weight_optimaltime;
+    ROS_INFO("Switching back to full horizon length.");
+  }
+  auto hr2_time = ros::Time::now() - hr2_start_time;
 
   // Check feasibility (but within the first few states only)
   auto fsb_start_time = ros::Time::now();
@@ -662,6 +687,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
 
   // Get the velocity command for this sampling interval
   auto vel_start_time = ros::Time::now();
+  // std::cout << "I am going into planner_->getVelocityCommand in computeVelocityCommands" << '\n';
   if (!planner_->getVelocityCommand(cmd_vel.linear.x, cmd_vel.linear.y, cmd_vel.angular.z))
   {
     planner_->clearPlanner();
@@ -675,6 +701,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   // Saturate velocity, if the optimization results violates the constraints (could be possible due to soft constraints).
   saturateVelocity(cmd_vel.linear.x, cmd_vel.linear.y, cmd_vel.angular.z, cfg_.robot.max_vel_x, cfg_.robot.max_vel_y,
                    cfg_.robot.max_vel_theta, cfg_.robot.max_vel_x_backwards);
+  // std::cout << "I am at last saturateVelocity" << '\n';
 
   // convert rot-vel to steering angle if desired (carlike robot).
   // The min_turning_radius is allowed to be slighly smaller since it is a soft-constraint
@@ -694,6 +721,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
       return false;
     }
   }
+  // std::cout << "I out of convertTransRotVelToSteeringAngle in computeVelocityCommands" << '\n';
   auto vel_time = ros::Time::now() - vel_start_time;
 
   // a feasible solution should be found, reset counter
@@ -704,16 +732,16 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
 
   // Now visualize everything
   auto viz_start_time = ros::Time::now();
+  // std::cout << "I am going into visualization" << '\n';
   planner_->visualize();
   visualization_->publishObstacles(obstacles_);
   visualization_->publishViaPoints(via_points_);
   visualization_->publishGlobalPlan(global_plan_);
   auto viz_time = ros::Time::now() - viz_start_time;
-
+  // std::cout << "I am out of visualization" << '\n';
   auto total_time = ros::Time::now() - start_time;
-  ROS_DEBUG_STREAM_COND(
-      total_time.toSec() > 0.1,
-      "\tcompute velocity times:\n"
+
+  ROS_DEBUG_STREAM_COND(total_time.toSec() > 0.1, "\tcompute velocity times:\n"
           << "\t\ttotal time                   "
           << std::to_string(total_time.toSec()) << "\n"
           << "\t\tpose get time                "
@@ -742,7 +770,9 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
           << std::to_string(vel_time.toSec()) << "\n"
           << "\t\tvisualization publish time   "
           << std::to_string(viz_time.toSec()) << "\n=========================");
+  // std::cout << "I am out of computeVelocityCommands" << '\n';
   return true;
+
 }
 
 
@@ -762,6 +792,7 @@ bool TebLocalPlannerROS::isGoalReached()
 
 void TebLocalPlannerROS::updateObstacleContainerWithCostmap()
 {
+  // std::cout << "I am in TebLocalPlannerROS::updateObstacleContainerWithCostmap" << '\n';
   // Add costmap obstacles if desired
   if (cfg_.obstacles.include_costmap_obstacles)
   {
@@ -790,6 +821,7 @@ void TebLocalPlannerROS::updateObstacleContainerWithCostmap()
 
 void TebLocalPlannerROS::updateObstacleContainerWithCostmapConverter()
 {
+  // std::cout << "I am in updateObstacleContainerWithCostmapConverter" << '\n';
   if (!costmap_converter_)
     return;
 
@@ -836,6 +868,7 @@ void TebLocalPlannerROS::updateObstacleContainerWithCostmapConverter()
 
 void TebLocalPlannerROS::updateObstacleContainerWithCustomObstacles()
 {
+  // std::cout << "I am in TebLocalPlannerROS::updateObstacleContainerWithCustomObstacles" << '\n';
   // Add custom obstacles obtained via message
   boost::mutex::scoped_lock l(custom_obst_mutex_);
 
@@ -911,6 +944,7 @@ void TebLocalPlannerROS::updateObstacleContainerWithCustomObstacles()
 
 void TebLocalPlannerROS::updateViaPointsContainer(const std::vector<geometry_msgs::PoseStamped>& transformed_plan, double min_separation)
 {
+  // std::cout << "I am in TebLocalPlannerROS::updateViaPointsContainer" << '\n';
   via_points_.clear();
 
   if (min_separation<=0)
@@ -927,11 +961,13 @@ void TebLocalPlannerROS::updateViaPointsContainer(const std::vector<geometry_msg
     via_points_.push_back( Eigen::Vector2d( transformed_plan[i].pose.position.x, transformed_plan[i].pose.position.y ) );
     prev_idx = i;
   }
+  // std::cout << "I am out of TebLocalPlannerROS::updateViaPointsContainer" << '\n';
 }
 
 
 Eigen::Vector2d TebLocalPlannerROS::tfPoseToEigenVector2dTransRot(const tf::Pose& tf_vel)
 {
+  // std::cout << "I am in TebLocalPlannerROS::tfPoseToEigenVector2dTransRot" << '\n';
   Eigen::Vector2d vel;
   vel.coeffRef(0) = std::sqrt( tf_vel.getOrigin().getX() * tf_vel.getOrigin().getX() + tf_vel.getOrigin().getY() * tf_vel.getOrigin().getY() );
   vel.coeffRef(1) = tf::getYaw(tf_vel.getRotation());
@@ -941,11 +977,13 @@ Eigen::Vector2d TebLocalPlannerROS::tfPoseToEigenVector2dTransRot(const tf::Pose
 void TebLocalPlannerROS::updateHumanViaPointsContainers(
     const HumanPlanVelMap &transformed_human_plan_vel_map,
     double min_separation) {
+  // std::cout << "I am in TebLocalPlannerROS::updateHumanViaPointsContainers" << '\n';
   if (min_separation < 0)
     return;
 
   // reset via-points for known humans, create via-points for new humans
-  for (auto &transformed_human_plan_vel_kv : transformed_human_plan_vel_map) {
+  for (auto &transformed_human_plan_vel_kv : transformed_human_plan_vel_map)
+  {
     auto &human_id = transformed_human_plan_vel_kv.first;
     if (humans_via_points_map_.find(human_id) != humans_via_points_map_.end())
       humans_via_points_map_[human_id].clear();
@@ -955,9 +993,9 @@ void TebLocalPlannerROS::updateHumanViaPointsContainers(
 
   // remove human via-points for vanished humans
   auto itr = humans_via_points_map_.begin();
-  while (itr != humans_via_points_map_.end()) {
-    if (transformed_human_plan_vel_map.find(itr->first) !=
-        transformed_human_plan_vel_map.end())
+  while (itr != humans_via_points_map_.end())
+  {
+    if (transformed_human_plan_vel_map.find(itr->first) != ransformed_human_plan_vel_map.end())
       itr = humans_via_points_map_.erase(itr);
     else
       ++itr;
@@ -969,14 +1007,9 @@ void TebLocalPlannerROS::updateHumanViaPointsContainers(
     auto &human_id = transformed_human_plan_vel_kv.first;
     auto &transformed_human_plan = transformed_human_plan_vel_kv.second.plan;
     for (std::size_t i = 1; i < transformed_human_plan.size(); ++i) {
-      if (distance_points2d(transformed_human_plan[prev_idx].pose.position,
-                            transformed_human_plan[i].pose.position) <
-          min_separation)
+      if (distance_points2d(transformed_human_plan[prev_idx].pose.position, transformed_human_plan[i].pose.position) < min_separation)
         continue;
-
-      humans_via_points_map_[human_id].push_back(
-          Eigen::Vector2d(transformed_human_plan[i].pose.position.x,
-                          transformed_human_plan[i].pose.position.y));
+      humans_via_points_map_[human_id].push_back(Eigen::Vector2d(transformed_human_plan[i].pose.position.x, transformed_human_plan[i].pose.position.y));
       prev_idx = i;
     }
   }
@@ -984,6 +1017,7 @@ void TebLocalPlannerROS::updateHumanViaPointsContainers(
 
 bool TebLocalPlannerROS::pruneGlobalPlan(const tf2_ros::Buffer& tf, const geometry_msgs::PoseStamped& global_pose, std::vector<geometry_msgs::PoseStamped>& global_plan, double dist_behind_robot)
 {
+  // std::cout << "I am in TebLocalPlannerROS::pruneGlobalPlan" << '\n';
   if (global_plan.empty())
     return true;
 
@@ -1030,6 +1064,7 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
                   PlanCombined &transformed_plan_combined, int* current_goal_idx, geometry_msgs::TransformStamped* tf_plan_to_global) const
 
 {
+  // std::cout << "I am in TebLocalPlannerROS::transformGlobalPlan" << '\n';
   // this method is a slightly modified version of base_local_planner/goal_functions.h
 
   const geometry_msgs::PoseStamped& plan_pose = global_plan[0];
@@ -1174,6 +1209,7 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
 
 int TebLocalPlannerROS::getLatestCommonTime(const std::string &source_frame, const std::string &target_frame, ros::Time& time, std::string* error_string) const
 {
+ // std::cout << "I am in getLatestCommonTime" << '\n';
   tf2::CompactFrameID target_id = tf_->_lookupFrameNumber(tf::strip_leading_slash(target_frame));
   tf2::CompactFrameID source_id = tf_->_lookupFrameNumber(tf::strip_leading_slash(source_frame));
 
@@ -1193,6 +1229,7 @@ void TebLocalPlannerROS::lookupTwist(const std::string& tracking_frame, const st
                  const ros::Time& time, const ros::Duration& averaging_interval,
                  geometry_msgs::Twist& twist) const
 {
+  // std::cout << "I am in TebLocalPlannerROS::lookupTwist" << '\n';
 
   ros::Time latest_time, target_time;
   getLatestCommonTime(observation_frame, tracking_frame, latest_time, NULL); ///\TODO check time on reference point too
@@ -1285,6 +1322,7 @@ bool TebLocalPlannerROS::transformHumanPlan(
     HumanPlanCombined &transformed_human_plan_combined,
     geometry_msgs::TwistStamped &transformed_human_twist,
     tf2::Stamped<tf2::Transform> *tf_human_plan_to_global) const {
+        // std::cout << "I am in TebLocalPlannerROS::transformHumanPlan" << '\n';
   try {
     if (human_plan.empty()) {
       ROS_ERROR("Received human plan with zero length");
@@ -1402,6 +1440,7 @@ bool TebLocalPlannerROS::transformHumanPose(
     const tf2_ros::Buffer &tf2, const std::string &global_frame,
     geometry_msgs::PoseWithCovarianceStamped &human_pose,
     geometry_msgs::PoseStamped &transformed_human_pose) const {
+      // std::cout << "I am in TebLocalPlannerROS::transformHumanPose" << '\n';
   try {
     // get human_pose_to_global_transform from plan frame to global_frame
     geometry_msgs::TransformStamped human_plan_to_global_transform;
@@ -1440,6 +1479,7 @@ double TebLocalPlannerROS::estimateLocalGoalOrientation(const std::vector<geomet
               int current_goal_idx, const geometry_msgs::TransformStamped& tf_plan_to_global, int moving_average_length) const
 {
   int n = (int)global_plan.size();
+  // std::cout << "I am in TebLocalPlannerROS::estimateLocalGoalOrientation" << '\n';
 
   // check if we are near the global goal already
   if (current_goal_idx > n-moving_average_length-2)
@@ -1485,6 +1525,7 @@ double TebLocalPlannerROS::estimateLocalGoalOrientation(const std::vector<geomet
 
 void TebLocalPlannerROS::saturateVelocity(double& vx, double& vy, double& omega, double max_vel_x, double max_vel_y, double max_vel_theta, double max_vel_x_backwards)
 {
+  // std::cout << "I am in TebLocalPlannerROS::saturateVelocity" << '\n';
   // Limit translational velocity for forward driving
   if (vx > max_vel_x)
     vx = max_vel_x;
@@ -1524,10 +1565,12 @@ void TebLocalPlannerROS::saturateVelocity(double& vx, double& vy, double& omega,
       last_omega_ = omega;
     }
   }
+  // std::cout << "I am out of TebLocalPlannerROS::saturateVelocity" << '\n';
 }
 
 double TebLocalPlannerROS::convertTransRotVelToSteeringAngle(double v, double omega, double wheelbase, double min_turning_radius) const
 {
+  // std::cout << "I am in TebLocalPlannerROS::convertTransRotVelToSteeringAngle" << '\n';
   if (omega==0 || v==0)
     return 0;
 
@@ -1551,6 +1594,7 @@ void TebLocalPlannerROS::validateFootprints(double opt_inscribed_radius, double 
 
 void TebLocalPlannerROS::configureBackupModes(std::vector<geometry_msgs::PoseStamped>& transformed_plan,  int& goal_idx)
 {
+    // std::cout << "I am in TebLocalPlannerROS::configureBackupModes" << '\n';
     ros::Time current_time = ros::Time::now();
 
     // reduced horizon backup mode
@@ -1626,12 +1670,14 @@ void TebLocalPlannerROS::configureBackupModes(std::vector<geometry_msgs::PoseSta
 
 void TebLocalPlannerROS::customObstacleCB(const costmap_converter::ObstacleArrayMsg::ConstPtr& obst_msg)
 {
+  // std::cout << "I am in TebLocalPlannerROS::customObstacleCB" << '\n';
   boost::mutex::scoped_lock l(custom_obst_mutex_);
   custom_obstacle_msg_ = *obst_msg;
 }
 
 void TebLocalPlannerROS::customViaPointsCB(const nav_msgs::Path::ConstPtr& via_points_msg)
 {
+  // std::cout << "I am in TebLocalPlannerROS::customViaPointsCB" << '\n';
   ROS_INFO_ONCE("Via-points received. This message is printed once.");
   if (cfg_.trajectory.global_plan_viapoint_sep > 0)
   {
@@ -1652,6 +1698,7 @@ void TebLocalPlannerROS::customViaPointsCB(const nav_msgs::Path::ConstPtr& via_p
 
 RobotFootprintModelPtr TebLocalPlannerROS::getRobotFootprintFromParamServer(const ros::NodeHandle& nh)
 {
+  // std::cout << "I am in TebLocalPlannerROS::getRobotFootprintFromParamServer" << '\n';
   std::string model_name;
   if (!nh.getParam("footprint_model/type", model_name))
   {
@@ -1774,6 +1821,7 @@ RobotFootprintModelPtr TebLocalPlannerROS::getRobotFootprintFromParamServer(cons
 
 Point2dContainer TebLocalPlannerROS::makeFootprintFromXMLRPC(XmlRpc::XmlRpcValue& footprint_xmlrpc, const std::string& full_param_name)
 {
+   // std::cout << "I am in TebLocalPlannerROS::makeFootprintFromXMLRPC" << '\n';
    // Make sure we have an array of at least 3 elements.
    if (footprint_xmlrpc.getType() != XmlRpc::XmlRpcValue::TypeArray ||
        footprint_xmlrpc.size() < 3)
@@ -1811,6 +1859,7 @@ Point2dContainer TebLocalPlannerROS::makeFootprintFromXMLRPC(XmlRpc::XmlRpcValue
 
 double TebLocalPlannerROS::getNumberFromXMLRPC(XmlRpc::XmlRpcValue& value, const std::string& full_param_name)
 {
+  // std::cout << "I am in TebLocalPlannerROS::getNumberFromXMLRPC" << '\n';
   // Make sure that the value we're looking at is either a double or an int.
   if (value.getType() != XmlRpc::XmlRpcValue::TypeInt &&
       value.getType() != XmlRpc::XmlRpcValue::TypeDouble)
@@ -1824,6 +1873,7 @@ double TebLocalPlannerROS::getNumberFromXMLRPC(XmlRpc::XmlRpcValue& value, const
 }
 
 void TebLocalPlannerROS::resetHumansPrediction() {
+  // std::cout << "I am in TebLocalPlannerROS::resetHumansPrediction" << '\n';
   std_srvs::Empty empty_service;
   ROS_INFO("Resetting human pose prediction");
   if (!reset_humans_prediction_client_ ||
@@ -1842,6 +1892,7 @@ void TebLocalPlannerROS::resetHumansPrediction() {
 bool TebLocalPlannerROS::optimizeStandalone(
     teb_local_planner::Optimize::Request &req,
     teb_local_planner::Optimize::Response &res) {
+      // std::cout << "I am in TebLocalPlannerROS::optimizeStandalone" << '\n';
   ROS_INFO("optimize service called");
   auto start_time = ros::Time::now();
 
@@ -2051,6 +2102,7 @@ bool TebLocalPlannerROS::optimizeStandalone(
 bool TebLocalPlannerROS::setApproachID(
     teb_local_planner::Approach::Request &req,
     teb_local_planner::Approach::Response &res) {
+      // std::cout << "I am in TebLocalPlannerROS::setApproachID" << '\n';
   if (cfg_.planning_mode == 2) {
     cfg_.approach.approach_id = req.human_id;
     res.message +=
