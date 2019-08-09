@@ -152,9 +152,13 @@ void TebOptimalPlanner::registerG2OTypes()
 
   //Humans
   factory->registerType("EDGE_VELOCITY_HUMAN", new g2o::HyperGraphElementCreator<EdgeVelocityHuman>);
+  factory->registerType("EDGE_VELOCITY_HOLONOMIC_HUMAN", new g2o::HyperGraphElementCreator<EdgeVelocityHolonomicHuman>);
   factory->registerType("EDGE_ACCELERATION_HUMAN", new g2o::HyperGraphElementCreator<EdgeAccelerationHuman>);
   factory->registerType("EDGE_ACCELERATION_HUMAN_START", new g2o::HyperGraphElementCreator<EdgeAccelerationHumanStart>);
   factory->registerType("EDGE_ACCELERATION_HUMAN_GOAL", new g2o::HyperGraphElementCreator<EdgeAccelerationHumanGoal>);
+  factory->registerType("EDGE_ACCELERATION_HOLONOMIC_HUMAN", new g2o::HyperGraphElementCreator<EdgeAccelerationHolonomicHuman>);
+  factory->registerType("EDGE_ACCELERATION_HOLONOMIC_HUMAN_START", new g2o::HyperGraphElementCreator<EdgeAccelerationHolonomicHumanStart>);
+  factory->registerType("EDGE_ACCELERATION_HOLONOMIC_HUMAN_GOAL", new g2o::HyperGraphElementCreator<EdgeAccelerationHolonomicHumanGoal>);
   factory->registerType("EDGE_HUMAN_ROBOT_SAFETY", new g2o::HyperGraphElementCreator<EdgeHumanRobotSafety>);
   factory->registerType("EDGE_HUMAN_HUMAN_SAFETY", new g2o::HyperGraphElementCreator<EdgeHumanHumanSafety>);
   factory->registerType("EDGE_HUMAN_ROBOT_TTC", new g2o::HyperGraphElementCreator<EdgeHumanRobotTTC>);
@@ -1159,29 +1163,60 @@ void TebOptimalPlanner::AddEdgesVelocity()
 }
 
 void TebOptimalPlanner::AddEdgesVelocityForHumans() {
-  if (cfg_->optim.weight_max_human_vel_x == 0 &&
-      cfg_->optim.weight_max_human_vel_theta == 0 &&
-      cfg_->optim.weight_nominal_human_vel_x == 0)
-    return;
+  if (cfg_->human.max_vel_y == 0) // non-holonomic robot
+  {
+    if ( cfg_->optim.weight_max_human_vel_x==0 && cfg_->optim.weight_max_human_vel_theta==0 && cfg_->optim.weight_nominal_human_vel_x == 0)
+      return; // if weight equals zero skip adding edges!
 
-  Eigen::Matrix<double, 3, 3> information;
-  information.fill(0);
-  information(0, 0) = cfg_->optim.weight_max_human_vel_x;
-  information(1, 1) = cfg_->optim.weight_max_human_vel_theta;
-  information(2, 2) = cfg_->optim.weight_nominal_human_vel_x;
+    Eigen::Matrix<double,3,3> information;
+    information.fill(0);
+    information(0, 0) = cfg_->optim.weight_max_human_vel_x;
+    information(1, 1) = cfg_->optim.weight_max_human_vel_theta;
+    information(2, 2) = cfg_->optim.weight_nominal_human_vel_x;
 
-  for (auto &human_teb_kv : humans_tebs_map_) {
-    auto &human_teb = human_teb_kv.second;
+    for (auto &human_teb_kv : humans_tebs_map_) {
+      auto &human_teb = human_teb_kv.second;
 
-    std::size_t NoBandpts(human_teb.sizePoses());
-    for (std::size_t i = 0; i < NoBandpts - 1; ++i) {
-      EdgeVelocityHuman *human_velocity_edge = new EdgeVelocityHuman;
-      human_velocity_edge->setVertex(0, human_teb.PoseVertex(i));
-      human_velocity_edge->setVertex(1, human_teb.PoseVertex(i + 1));
-      human_velocity_edge->setVertex(2, human_teb.TimeDiffVertex(i));
-      human_velocity_edge->setInformation(information);
-      human_velocity_edge->setTebConfig(*cfg_);
-      optimizer_->addEdge(human_velocity_edge);
+      int n = human_teb.sizePoses();
+      for (int i=0; i < n - 1; ++i)
+      {
+        EdgeVelocityHuman *human_velocity_edge = new EdgeVelocityHuman;
+        human_velocity_edge->setVertex(0, human_teb.PoseVertex(i));
+        human_velocity_edge->setVertex(1, human_teb.PoseVertex(i + 1));
+        human_velocity_edge->setVertex(2, human_teb.TimeDiffVertex(i));
+        human_velocity_edge->setInformation(information);
+        human_velocity_edge->setTebConfig(*cfg_);
+        optimizer_->addEdge(human_velocity_edge);
+      }
+    }
+  }
+  else // holonomic-human
+  {
+    if ( cfg_->optim.weight_max_human_vel_x==0 && cfg_->optim.weight_max_human_vel_y==0 && cfg_->optim.weight_max_human_vel_theta==0 && cfg_->optim.weight_nominal_human_vel_x == 0)
+      return; // if weight equals zero skip adding edges!
+
+    int n = teb_.sizePoses();
+    Eigen::Matrix<double,4,4> information;
+    information.fill(0);
+    information(0,0) = cfg_->optim.weight_max_human_vel_x;
+    information(1,1) = cfg_->optim.weight_max_human_vel_y;
+    information(2,2) = cfg_->optim.weight_max_human_vel_theta;
+    information(3,3) = cfg_->optim.weight_nominal_human_vel_x;
+
+    for (auto &human_teb_kv : humans_tebs_map_) {
+      auto &human_teb = human_teb_kv.second;
+
+      int n = human_teb.sizePoses();
+      for (int i=0; i < n - 1; ++i)
+      {
+        EdgeVelocityHolonomicHuman* human_velocity_edge = new EdgeVelocityHolonomicHuman;
+        human_velocity_edge->setVertex(0,human_teb.PoseVertex(i));
+        human_velocity_edge->setVertex(1,human_teb.PoseVertex(i+1));
+        human_velocity_edge->setVertex(2,human_teb.TimeDiffVertex(i));
+        human_velocity_edge->setInformation(information);
+        human_velocity_edge->setTebConfig(*cfg_);
+        optimizer_->addEdge(human_velocity_edge);
+      }
     }
   }
 }
@@ -1291,53 +1326,116 @@ void TebOptimalPlanner::AddEdgesAcceleration()
 }
 
 void TebOptimalPlanner::AddEdgesAccelerationForHumans() {
-  if (cfg_->optim.weight_human_acc_lim_x == 0 &&
-      cfg_->optim.weight_human_acc_lim_theta == 0)
-    return;
+  if (cfg_->optim.weight_human_acc_lim_x==0  && cfg_->optim.weight_human_acc_lim_theta==0)
+    return; // if weight equals zero skip adding edges!
 
-  Eigen::Matrix<double, 2, 2> information;
-  information.fill(0);
-  information(0, 0) = cfg_->optim.weight_human_acc_lim_x;
-  information(1, 1) = cfg_->optim.weight_human_acc_lim_theta;
 
-  for (auto &human_teb_kv : humans_tebs_map_) {
-    auto &human_it = human_teb_kv.first;
-    auto &human_teb = human_teb_kv.second;
 
-    std::size_t NoBandpts(human_teb.sizePoses());
+  if (cfg_->human.max_vel_y == 0 || cfg_->human.acc_lim_y == 0) // non-holonomic human
+  {
+    Eigen::Matrix<double,2,2> information;
+    information.fill(0);
+    information(0,0) = cfg_->optim.weight_human_acc_lim_x;
+    information(1,1) = cfg_->optim.weight_human_acc_lim_theta;
+    for (auto &human_teb_kv : humans_tebs_map_)
+    {
+      auto &human_it = human_teb_kv.first;
+      auto &human_teb = human_teb_kv.second;
+      // check if an initial velocity should be taken into accound
+      int n = human_teb.sizePoses();
 
-    if (humans_vel_start_[human_it].first) {
-      EdgeAccelerationHumanStart *human_acceleration_edge = new EdgeAccelerationHumanStart;
-      human_acceleration_edge->setVertex(0, human_teb.PoseVertex(0));
-      human_acceleration_edge->setVertex(1, human_teb.PoseVertex(1));
-      human_acceleration_edge->setVertex(2, human_teb.TimeDiffVertex(0));
-      human_acceleration_edge->setInitialVelocity(humans_vel_start_[human_it].second);
-      human_acceleration_edge->setInformation(information);
-      human_acceleration_edge->setTebConfig(*cfg_);
-      optimizer_->addEdge(human_acceleration_edge);
+      if (humans_vel_start_[human_it].first)
+      {
+        EdgeAccelerationHumanStart* human_acceleration_edge = new EdgeAccelerationHumanStart;
+        human_acceleration_edge->setVertex(0,human_teb.PoseVertex(0));
+        human_acceleration_edge->setVertex(1,human_teb.PoseVertex(1));
+        human_acceleration_edge->setVertex(2,human_teb.TimeDiffVertex(0));
+        human_acceleration_edge->setInitialVelocity(humans_vel_start_[human_it].second);
+        human_acceleration_edge->setInformation(information);
+        human_acceleration_edge->setTebConfig(*cfg_);
+        optimizer_->addEdge(human_acceleration_edge);
+      }
+
+      // now add the usual acceleration edge for each tuple of three teb poses
+      for (int i=0; i < n - 2; ++i)
+      {
+        EdgeAccelerationHuman* human_acceleration_edge = new EdgeAccelerationHuman;
+        human_acceleration_edge->setVertex(0,human_teb.PoseVertex(i));
+        human_acceleration_edge->setVertex(1,human_teb.PoseVertex(i+1));
+        human_acceleration_edge->setVertex(2,human_teb.PoseVertex(i+2));
+        human_acceleration_edge->setVertex(3,human_teb.TimeDiffVertex(i));
+        human_acceleration_edge->setVertex(4,human_teb.TimeDiffVertex(i+1));
+        human_acceleration_edge->setInformation(information);
+        human_acceleration_edge->setTebConfig(*cfg_);
+        optimizer_->addEdge(human_acceleration_edge);
+      }
+
+      // check if a goal velocity should be taken into accound
+      if (humans_vel_goal_[human_it].first)
+      {
+        EdgeAccelerationHumanGoal* human_acceleration_edge = new EdgeAccelerationHumanGoal;
+        human_acceleration_edge->setVertex(0,human_teb.PoseVertex(n-2));
+        human_acceleration_edge->setVertex(1,human_teb.PoseVertex(n-1));
+        human_acceleration_edge->setVertex(2,human_teb.TimeDiffVertex(human_teb.sizeTimeDiffs()-1 ));
+        human_acceleration_edge->setGoalVelocity(humans_vel_goal_[human_it].second);
+        human_acceleration_edge->setInformation(information);
+        human_acceleration_edge->setTebConfig(*cfg_);
+        optimizer_->addEdge(human_acceleration_edge);
+      }
     }
+  }
+  else // holonomic robot
+  {
+    Eigen::Matrix<double,3,3> information;
+    information.fill(0);
+    information(0,0) = cfg_->optim.weight_acc_lim_x;
+    information(1,1) = cfg_->optim.weight_acc_lim_y;
+    information(2,2) = cfg_->optim.weight_acc_lim_theta;
+    for (auto &human_teb_kv : humans_tebs_map_)
+    {
+      auto &human_it = human_teb_kv.first;
+      auto &human_teb = human_teb_kv.second;
+      // check if an initial velocity should be taken into accound
+      int n = human_teb.sizePoses();
+      // check if an initial velocity should be taken into accound
+      if (vel_start_.first)
+      {
+        EdgeAccelerationHolonomicHumanStart* human_acceleration_edge = new EdgeAccelerationHolonomicHumanStart;
+        human_acceleration_edge->setVertex(0,human_teb.PoseVertex(0));
+        human_acceleration_edge->setVertex(1,human_teb.PoseVertex(1));
+        human_acceleration_edge->setVertex(2,human_teb.TimeDiffVertex(0));
+        human_acceleration_edge->setInitialVelocity(humans_vel_start_[human_it].second);
+        human_acceleration_edge->setInformation(information);
+        human_acceleration_edge->setTebConfig(*cfg_);
+        optimizer_->addEdge(human_acceleration_edge);
+      }
 
-    for (std::size_t i = 0; i < NoBandpts - 2; ++i) {
-      EdgeAccelerationHuman *human_acceleration_edge = new EdgeAccelerationHuman;
-      human_acceleration_edge->setVertex(0, human_teb.PoseVertex(i));
-      human_acceleration_edge->setVertex(1, human_teb.PoseVertex(i + 1));
-      human_acceleration_edge->setVertex(2, human_teb.PoseVertex(i + 2));
-      human_acceleration_edge->setVertex(3, human_teb.TimeDiffVertex(i));
-      human_acceleration_edge->setVertex(4, human_teb.TimeDiffVertex(i + 1));
-      human_acceleration_edge->setInformation(information);
-      human_acceleration_edge->setTebConfig(*cfg_);
-      optimizer_->addEdge(human_acceleration_edge);
-    }
+      // now add the usual acceleration edge for each tuple of three teb poses
+      for (int i=0; i < n - 2; ++i)
+      {
+        EdgeAccelerationHolonomicHuman* human_acceleration_edge = new EdgeAccelerationHolonomicHuman;
+        human_acceleration_edge->setVertex(0,human_teb.PoseVertex(i));
+        human_acceleration_edge->setVertex(1,human_teb.PoseVertex(i+1));
+        human_acceleration_edge->setVertex(2,human_teb.PoseVertex(i+2));
+        human_acceleration_edge->setVertex(3,human_teb.TimeDiffVertex(i));
+        human_acceleration_edge->setVertex(4,human_teb.TimeDiffVertex(i+1));
+        human_acceleration_edge->setInformation(information);
+        human_acceleration_edge->setTebConfig(*cfg_);
+        optimizer_->addEdge(human_acceleration_edge);
+      }
 
-    if (humans_vel_goal_[human_it].first) {
-      EdgeAccelerationHumanGoal *human_acceleration_edge = new EdgeAccelerationHumanGoal;
-      human_acceleration_edge->setVertex(0, human_teb.PoseVertex(NoBandpts - 2));
-      human_acceleration_edge->setVertex(1,human_teb.PoseVertex(NoBandpts - 1));
-      human_acceleration_edge->setVertex(2, human_teb.TimeDiffVertex(human_teb.sizeTimeDiffs() - 1));
-      human_acceleration_edge->setGoalVelocity(humans_vel_goal_[human_it].second);
-      human_acceleration_edge->setInformation(information);
-      human_acceleration_edge->setTebConfig(*cfg_);
-      optimizer_->addEdge(human_acceleration_edge);
+      // check if a goal velocity should be taken into accound
+      if (vel_goal_.first)
+      {
+        EdgeAccelerationHolonomicHumanGoal* human_acceleration_edge = new EdgeAccelerationHolonomicHumanGoal;
+        human_acceleration_edge->setVertex(0,human_teb.PoseVertex(n-2));
+        human_acceleration_edge->setVertex(1,human_teb.PoseVertex(n-1));
+        human_acceleration_edge->setVertex(2,human_teb.TimeDiffVertex(human_teb.sizeTimeDiffs()-1 ));
+        human_acceleration_edge->setGoalVelocity(humans_vel_goal_[human_it].second);
+        human_acceleration_edge->setInformation(information);
+        human_acceleration_edge->setTebConfig(*cfg_);
+        optimizer_->addEdge(human_acceleration_edge);
+      }
     }
   }
 }
@@ -1472,6 +1570,30 @@ void TebOptimalPlanner::AddEdgesKinematicsCarlike()
   }
 }
 
+void TebOptimalPlanner::AddEdgesKinematicsCarlikeForHumans()
+{
+  if (cfg_->optim.weight_kinematics_nh==0 && cfg_->optim.weight_kinematics_turning_radius==0)
+    return; // if weight equals zero skip adding edges!
+
+  // create edge for satisfiying kinematic constraints
+  Eigen::Matrix<double,2,2> information_kinematics;
+  information_kinematics.fill(0.0);
+  information_kinematics(0, 0) = cfg_->optim.weight_kinematics_nh;
+  information_kinematics(1, 1) = cfg_->optim.weight_kinematics_turning_radius;
+
+  for (auto &human_teb_kv : humans_tebs_map_) {
+    auto &human_teb = human_teb_kv.second;
+    for (int i=0; i < human_teb.sizePoses()-1; i++) // ignore twiced start only
+    {
+      EdgeKinematicsCarlike* kinematics_edge = new EdgeKinematicsCarlike;
+      kinematics_edge->setVertex(0,human_teb.PoseVertex(i));
+      kinematics_edge->setVertex(1,human_teb.PoseVertex(i+1));
+      kinematics_edge->setInformation(information_kinematics);
+      kinematics_edge->setTebConfig(*cfg_);
+      optimizer_->addEdge(kinematics_edge);
+    }
+  }
+}
 
 void TebOptimalPlanner::AddEdgesPreferRotDir()
 {

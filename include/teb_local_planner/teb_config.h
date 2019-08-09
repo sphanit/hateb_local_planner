@@ -114,6 +114,7 @@ public:
     double min_human_robot_dist;
     double min_human_human_dist;
     double max_vel_x;
+    double max_vel_y;
     double min_vel_x;
     double nominal_vel_x;
     double max_vel_x_backwards;
@@ -121,6 +122,7 @@ public:
     double max_vel_theta;
     double min_vel_theta;
     double acc_lim_x;
+    double acc_lim_y;
     double acc_lim_theta;
     bool use_external_prediction;
     bool predict_human_behind_robot;
@@ -192,11 +194,13 @@ public:
 
     double weight_adapt_factor; //!< Some special weights (currently 'weight_obstacle') are repeatedly scaled by this factor in each outer TEB iteration (weight_new = weight_old*factor); Increasing weights iteratively instead of setting a huge value a-priori leads to better numerical conditions of the underlying optimization problem.
     double obstacle_cost_exponent; //!< Exponent for nonlinear obstacle cost (cost = linear_cost * obstacle_cost_exponent). Set to 1 to disable nonlinear cost (default)
-    
+
     double weight_max_human_vel_x;
+    double weight_max_human_vel_y;
     double weight_nominal_human_vel_x;
     double weight_max_human_vel_theta;
     double weight_human_acc_lim_x;
+    double weight_human_acc_lim_y;
     double weight_human_acc_lim_theta;
     double weight_human_optimaltime;
 
@@ -225,7 +229,7 @@ public:
     bool use_human_elastic_vel;
   } hateb;
 
-  struct Approach 
+  struct Approach
   {
     int approach_id;
     double approach_dist;
