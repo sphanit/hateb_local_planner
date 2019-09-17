@@ -553,6 +553,7 @@ bool TebOptimalPlanner::buildGraph(double weight_multiplier)
     AddEdgesTimeOptimalForHumans();
 
     AddEdgesKinematicsDiffDriveForHumans();
+    // AddEdgesKinematicsCarlikeForHumans();
 
     if (cfg_->hateb.use_human_robot_safety_c) {
       AddEdgesHumanRobotSafety();
@@ -1328,8 +1329,6 @@ void TebOptimalPlanner::AddEdgesAcceleration()
 void TebOptimalPlanner::AddEdgesAccelerationForHumans() {
   if (cfg_->optim.weight_human_acc_lim_x==0  && cfg_->optim.weight_human_acc_lim_theta==0)
     return; // if weight equals zero skip adding edges!
-
-
 
   if (cfg_->human.max_vel_y == 0 || cfg_->human.acc_lim_y == 0) // non-holonomic human
   {

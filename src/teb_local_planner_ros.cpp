@@ -986,9 +986,13 @@ void TebLocalPlannerROS::updateHumanViaPointsContainers(
   {
     auto &human_id = transformed_human_plan_vel_kv.first;
     if (humans_via_points_map_.find(human_id) != humans_via_points_map_.end())
-      humans_via_points_map_[human_id].clear();
+      {
+        humans_via_points_map_[human_id].clear();
+      }
     else
-      humans_via_points_map_[human_id] = ViaPointContainer();
+      {
+        humans_via_points_map_[human_id] = ViaPointContainer();
+      }
   }
 
   // remove human via-points for vanished humans
