@@ -124,12 +124,6 @@ public:
     double acc_lim_x;
     double acc_lim_y;
     double acc_lim_theta;
-    bool use_external_prediction;
-    bool predict_human_behind_robot;
-    double ttc_threshold;
-    double dir_cost_threshold;
-    double visibility_cost_threshold;
-    double pose_prediction_reset_time;
     double fov;
   } human;
 
@@ -209,9 +203,12 @@ public:
     double weight_human_robot_safety;
     double weight_human_human_safety;
     double weight_human_robot_ttc;
+    double weight_human_robot_ttcplus;
+    double weight_human_robot_ttclosest;
     double weight_human_robot_dir;
     double weight_human_robot_visibility;
     double human_robot_ttc_scale_alpha;
+    double human_robot_ttcplus_scale_alpha;
     bool disable_warm_start;
     bool disable_rapid_omega_chage;
     double omega_chage_time_seperation;
@@ -223,10 +220,22 @@ public:
     bool use_human_robot_safety_c;
     bool use_human_human_safety_c;
     bool use_human_robot_ttc_c;
+    bool use_human_robot_ttcplus_c;
+    bool use_human_robot_ttclosest_c;
     bool scale_human_robot_ttc_c;
+    bool scale_human_robot_ttcplus_c;
     bool use_human_robot_dir_c;
     bool use_human_robot_visi_c;
     bool use_human_elastic_vel;
+    bool use_external_prediction;
+    bool predict_human_behind_robot;
+    double ttc_threshold;
+    double ttcplus_threshold;                                        //michele
+    double ttclosest_threshold;                                    //michele
+    double ttcplus_timer;                                          //michele
+    double dir_cost_threshold;
+    double visibility_cost_threshold;
+    double pose_prediction_reset_time;
   } hateb;
 
   struct Approach
@@ -357,16 +366,14 @@ public:
     human.radius = 0.2;
     human.min_human_robot_dist = 0.6;
     human.min_human_human_dist = 0.6;
-    human.max_vel_x = 1.1;
-    human.nominal_vel_x = 0.8;
+    human.max_vel_x = 1.3;
+    human.nominal_vel_x = 1.1;
+    human.max_vel_y = 0.4;
     human.max_vel_x_backwards = 0.0;
     human.max_vel_theta = 1.1;
     human.acc_lim_x = 0.6;
     human.acc_lim_theta = 0.8;
-    human.use_external_prediction = false;
-    human.predict_human_behind_robot = false;
-    human.ttc_threshold = 5.0;
-    human.pose_prediction_reset_time = 2.0;
+
 
     // GoalTolerance
 
@@ -395,7 +402,7 @@ public:
 
     // Optimization
 
-    optim.no_inner_iterations = 5;
+    optim.no_inner_iterations = 8;
     optim.no_outer_iterations = 4;
     optim.optimization_activate = true;
     optim.optimization_verbose = false;
@@ -433,9 +440,12 @@ public:
     optim.weight_human_robot_safety = 20;
     optim.weight_human_human_safety = 20;
     optim.weight_human_robot_ttc = 20;
+    optim.weight_human_robot_ttcplus = 20;                       //michele
+    optim.weight_human_robot_ttclosest = 10;                     //michele
     optim.weight_human_robot_dir = 20;
     optim.weight_human_robot_visibility = 20;
     optim.human_robot_ttc_scale_alpha = 1;
+    optim.human_robot_ttcplus_scale_alpha = 1;
     optim.disable_warm_start = false;
     optim.disable_rapid_omega_chage = true;
     optim.omega_chage_time_seperation = 1.0;
@@ -446,10 +456,20 @@ public:
     hateb.use_human_robot_safety_c = true;
     hateb.use_human_human_safety_c = true;
     hateb.use_human_robot_ttc_c = true;
+    hateb.use_human_robot_ttcplus_c = false ;			//michele
+    hateb.use_human_robot_ttclosest_c = true;
     hateb.scale_human_robot_ttc_c = true;
+    hateb.scale_human_robot_ttcplus_c = true;
     hateb.use_human_robot_dir_c = true;
     hateb.use_human_robot_visi_c = true;
     hateb.use_human_elastic_vel = true;
+    hateb.use_external_prediction = false;
+    hateb.predict_human_behind_robot = false;
+    hateb.ttc_threshold = 5.0;
+    hateb.ttcplus_threshold = 5.0;
+    hateb.ttclosest_threshold = 0.5;                           //michele
+    hateb.ttcplus_timer = 5.0;
+    hateb.pose_prediction_reset_time = 2.0;
 
 
     // Homotopy Class Planner

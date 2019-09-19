@@ -99,14 +99,7 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle& nh)
   nh.param("human_acc_lim_x", human.acc_lim_x, human.acc_lim_x);
   nh.param("human_acc_lim_y", human.acc_lim_y, human.acc_lim_y);
   nh.param("human_acc_lim_theta", human.acc_lim_theta, human.acc_lim_theta);
-  nh.param("use_external_prediction", human.use_external_prediction,
-           human.use_external_prediction);
-  nh.param("predict_human_behind_robot", human.predict_human_behind_robot,
-           human.predict_human_behind_robot);
-  nh.param("ttc_threshold", human.ttc_threshold, human.ttc_threshold);
-  nh.param("human_pose_prediction_reset_time", human.pose_prediction_reset_time,
-           human.pose_prediction_reset_time);
-  nh.param("dir_cost_threshold", human.dir_cost_threshold, human.dir_cost_threshold);
+
 
   // GoalTolerance
   nh.param("xy_goal_tolerance", goal_tolerance.xy_goal_tolerance, goal_tolerance.xy_goal_tolerance);
@@ -181,10 +174,16 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle& nh)
            optim.weight_human_human_safety);
   nh.param("weight_human_robot_ttc", optim.weight_human_robot_ttc,
            optim.weight_human_robot_ttc);
+  nh.param("weight_human_robot_ttclosest", optim.weight_human_robot_ttclosest,
+          optim.weight_human_robot_ttclosest);                               //michele
+  nh.param("weight_human_robot_ttcplus", optim.weight_human_robot_ttcplus,
+          optim.weight_human_robot_ttcplus);
   nh.param("weight_human_robot_dir", optim.weight_human_robot_dir,
            optim.weight_human_robot_dir);
   nh.param("human_robot_ttc_scale_alpha", optim.human_robot_ttc_scale_alpha,
            optim.human_robot_ttc_scale_alpha);
+  nh.param("human_robot_ttcplus_scale_alpha", optim.human_robot_ttcplus_scale_alpha,					//michele
+           optim.human_robot_ttcplus_scale_alpha);
   nh.param("weight_human_robot_visibility", optim.weight_human_robot_visibility,
            optim.weight_human_robot_visibility);
   nh.param("disable_warm_start", optim.disable_warm_start,
@@ -201,14 +200,31 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle& nh)
            hateb.use_human_human_safety_c);
   nh.param("use_human_robot_ttc_c", hateb.use_human_robot_ttc_c,
            hateb.use_human_robot_ttc_c);
+  nh.param("use_human_robot_ttclosest_c", hateb.use_human_robot_ttclosest_c,
+           hateb.use_human_robot_ttclosest_c);
+  nh.param("use_human_robot_ttcplus_c", hateb.use_human_robot_ttcplus_c,
+           hateb.use_human_robot_ttcplus_c);
   nh.param("scale_human_robot_ttc_c", hateb.scale_human_robot_ttc_c,
            hateb.scale_human_robot_ttc_c);
+  nh.param("scale_human_robot_ttcplus_c", hateb.scale_human_robot_ttcplus_c,							//michele
+           hateb.scale_human_robot_ttcplus_c);
   nh.param("use_human_robot_dir_c", hateb.use_human_robot_dir_c,
            hateb.use_human_robot_dir_c);
   nh.param("use_human_robot_visi_c", hateb.use_human_robot_visi_c,
            hateb.use_human_robot_visi_c);
   nh.param("use_human_elastic_vel", hateb.use_human_elastic_vel,
            hateb.use_human_elastic_vel);
+  nh.param("use_external_prediction", hateb.use_external_prediction,
+            hateb.use_external_prediction);
+  nh.param("predict_human_behind_robot", hateb.predict_human_behind_robot,
+            hateb.predict_human_behind_robot);
+  nh.param("ttc_threshold", hateb.ttc_threshold, hateb.ttc_threshold);
+  nh.param("human_pose_prediction_reset_time", hateb.pose_prediction_reset_time,
+            hateb.pose_prediction_reset_time);
+  nh.param("dir_cost_threshold", hateb.dir_cost_threshold, hateb.dir_cost_threshold);
+  nh.param("ttclosest_threshold", hateb.ttclosest_threshold, hateb.ttclosest_threshold);
+  nh.param("ttcplus_threshold", hateb.ttcplus_threshold, hateb.ttcplus_threshold);
+  nh.param("ttcplus_timer", hateb.ttcplus_timer, hateb.ttcplus_timer);
 
   // Homotopy Class Planner
   nh.param("enable_homotopy_class_planning", hcp.enable_homotopy_class_planning, hcp.enable_homotopy_class_planning);
@@ -328,12 +344,6 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig& cfg)
   human.acc_lim_x = cfg.human_acc_lim_x;
   human.acc_lim_y = cfg.human_acc_lim_y;
   human.acc_lim_theta = cfg.human_acc_lim_theta;
-  human.use_external_prediction = cfg.use_external_prediction;
-  human.predict_human_behind_robot = cfg.predict_human_behind_robot;
-  human.ttc_threshold = cfg.ttc_threshold;
-  human.dir_cost_threshold = cfg.dir_cost_threshold;
-  human.visibility_cost_threshold = cfg.visibility_cost_threshold;
-  human.pose_prediction_reset_time = cfg.human_pose_prediction_reset_time;
   human.fov = cfg.fov;
 
   // GoalTolerance
@@ -395,9 +405,12 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig& cfg)
   optim.weight_human_robot_safety = cfg.weight_human_robot_safety;
   optim.weight_human_human_safety = cfg.weight_human_human_safety;
   optim.weight_human_robot_ttc = cfg.weight_human_robot_ttc;
+  optim.weight_human_robot_ttclosest = cfg.weight_human_robot_ttclosest;
+  optim.weight_human_robot_ttcplus = cfg.weight_human_robot_ttcplus;
   optim.weight_human_robot_dir = cfg.weight_human_robot_dir;
   optim.weight_human_robot_visibility = cfg.weight_human_robot_visibility;
   optim.human_robot_ttc_scale_alpha = cfg.human_robot_ttc_scale_alpha;
+  optim.human_robot_ttcplus_scale_alpha = cfg.human_robot_ttcplus_scale_alpha;
   optim.disable_warm_start = cfg.disable_warm_start;
   optim.disable_rapid_omega_chage = cfg.disable_rapid_omega_chage;
   optim.omega_chage_time_seperation = cfg.omega_chage_time_seperation;
@@ -406,10 +419,22 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig& cfg)
   hateb.use_human_robot_safety_c = cfg.use_human_robot_safety_c;
   hateb.use_human_human_safety_c = cfg.use_human_human_safety_c;
   hateb.use_human_robot_ttc_c = cfg.use_human_robot_ttc_c;
+  hateb.use_human_robot_ttcplus_c = cfg.use_human_robot_ttcplus_c;
+  hateb.use_human_robot_ttclosest_c = cfg.use_human_robot_ttclosest_c;
   hateb.scale_human_robot_ttc_c = cfg.scale_human_robot_ttc_c;
+  hateb.scale_human_robot_ttcplus_c = cfg.scale_human_robot_ttcplus_c;
   hateb.use_human_robot_dir_c = cfg.use_human_robot_dir_c;
   hateb.use_human_robot_visi_c = cfg.use_human_robot_visi_c;
   hateb.use_human_elastic_vel = cfg.use_human_elastic_vel;
+  hateb.use_external_prediction = cfg.use_external_prediction;
+  hateb.predict_human_behind_robot = cfg.predict_human_behind_robot;
+  hateb.ttc_threshold = cfg.ttc_threshold;
+  hateb.ttclosest_threshold = cfg.ttclosest_threshold;							//michele
+  hateb.ttcplus_threshold = cfg.ttcplus_threshold;
+//  human.ttcplus_timer = cfg.ttcplus_timer;
+  hateb.dir_cost_threshold = cfg.dir_cost_threshold;
+  hateb.visibility_cost_threshold = cfg.visibility_cost_threshold;
+  hateb.pose_prediction_reset_time = cfg.human_pose_prediction_reset_time;
 
   // Homotopy Class Planner
   hcp.enable_multithreading = cfg.enable_multithreading;

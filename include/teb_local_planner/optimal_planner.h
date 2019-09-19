@@ -67,6 +67,8 @@
 #include <teb_local_planner/g2o_types/edge_human_robot_directional.h>
 #include <teb_local_planner/g2o_types/edge_human_robot_safety.h>
 #include <teb_local_planner/g2o_types/edge_human_robot_ttc.h>
+#include <teb_local_planner/g2o_types/edge_human_robot_ttcplus.h>		      //michele
+#include <teb_local_planner/g2o_types/edge_human_robot_ttclosest.h>
 #include <teb_local_planner/g2o_types/edge_human_robot_visibility.h>
 #include <teb_local_planner/g2o_types/edge_kinematics.h>
 #include <teb_local_planner/g2o_types/edge_time_optimal.h>
@@ -715,6 +717,8 @@ protected:
   void AddEdgesHumanRobotSafety();
   void AddEdgesHumanHumanSafety();
   void AddEdgesHumanRobotTTC();
+  void AddEdgesHumanRobotTTCplus();			//michele
+  void AddEdgesHumanRobotTTClosest();                  //michele
   void AddEdgesHumanRobotDirectional();
   void AddEdgesHumanRobotVisibility();
 

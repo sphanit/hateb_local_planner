@@ -78,15 +78,19 @@ public:
     Eigen::Vector2d d_htor = robot_bandpt->position() - human_bandpt->position();
 
     double dir_cost = (std::max(robot_vel.dot(d_rtoh), 0.0) + std::max(human_vel.dot(d_htor), 0.0)) / d_rtoh.dot(d_rtoh);
+    // std::cout << "dir_cost "  << dir_cost << '\n';
     ROS_DEBUG_THROTTLE(0.5, "dir_cost value : %f", dir_cost);
 
-    _error[0] = penaltyBoundFromBelow(dir_cost, cfg_->human.dir_cost_threshold,
-                                      cfg_->optim.penalty_epsilon);
+    _error[0] = penaltyBoundFromBelow(dir_cost, cfg_->hateb.dir_cost_threshold, cfg_->optim.penalty_epsilon);
 
     ROS_ASSERT_MSG(std::isfinite(_error[0]), "EdgeHumanRobot::computeError() _error[0]=%f\n", _error[0]);
   }
 
-public:
+  void setParameters(const TebConfig &cfg){
+    cfg_ = &cfg;
+  }
+
+ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 

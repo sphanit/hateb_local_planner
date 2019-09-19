@@ -48,7 +48,7 @@ class EdgeHumanRobotVisibility : public BaseTebBinaryEdge<1, double, VertexPose,
 public:
   EdgeHumanRobotVisibility()
   {
-      this->setMeasurement(0.);
+      this->setMeasurement(0.0);
   }
 
   void computeError()
@@ -68,7 +68,7 @@ public:
         c_visibility = 0.;
     }
 
-    _error[0] = penaltyBoundFromAbove(c_visibility, cfg_->human.visibility_cost_threshold,
+    _error[0] = penaltyBoundFromAbove(c_visibility, cfg_->hateb.visibility_cost_threshold,
                                       cfg_->optim.penalty_epsilon);
 
     ROS_ASSERT_MSG(std::isfinite(_error[0]), "EdgeHumanRobotVisibility::computeError() _error[0]=%f\n", _error[0]);

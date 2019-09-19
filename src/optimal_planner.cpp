@@ -162,6 +162,8 @@ void TebOptimalPlanner::registerG2OTypes()
   factory->registerType("EDGE_HUMAN_ROBOT_SAFETY", new g2o::HyperGraphElementCreator<EdgeHumanRobotSafety>);
   factory->registerType("EDGE_HUMAN_HUMAN_SAFETY", new g2o::HyperGraphElementCreator<EdgeHumanHumanSafety>);
   factory->registerType("EDGE_HUMAN_ROBOT_TTC", new g2o::HyperGraphElementCreator<EdgeHumanRobotTTC>);
+  factory->registerType("EDGE_HUMAN_ROBOT_TTClosest", new g2o::HyperGraphElementCreator<EdgeHumanRobotTTClosest>);
+  factory->registerType("EDGE_HUMAN_ROBOT_TTCplus", new g2o::HyperGraphElementCreator<EdgeHumanRobotTTCplus>);
   factory->registerType("EDGE_HUMAN_ROBOT_DIRECTIONAL", new g2o::HyperGraphElementCreator<EdgeHumanRobotDirectional>);
   return;
 }
@@ -567,6 +569,13 @@ bool TebOptimalPlanner::buildGraph(double weight_multiplier)
       AddEdgesHumanRobotTTC();
     }
 
+    // if (cfg_->hateb.use_human_robot_ttclosest_c) {                //michele
+        // AddEdgesHumanRobotTTClosest();
+    // }
+
+    if (cfg_->hateb.use_human_robot_ttcplus_c) {                //michele
+      AddEdgesHumanRobotTTCplus();
+    }
     if (cfg_->hateb.use_human_robot_dir_c) {
       AddEdgesHumanRobotDirectional();
     }
@@ -1703,6 +1712,61 @@ void TebOptimalPlanner::AddEdgesHumanRobotTTC() {
   }
 }
 
+void TebOptimalPlanner::AddEdgesHumanRobotTTClosest() {                                       //michele
+  Eigen::Matrix<double, 1, 1> information_human_robot_ttclosest;
+  information_human_robot_ttclosest.fill(cfg_->optim.weight_human_robot_ttclosest);
+
+
+   auto robot_teb_size = teb_.sizePoses();
+  for (auto &human_teb_kv : humans_tebs_map_) {
+    auto &human_teb = human_teb_kv.second;
+
+     size_t human_teb_size = human_teb.sizePoses();
+    for (unsigned int i = 0;
+         (i < human_teb_size - 1) && (i < robot_teb_size - 1); i++) {
+
+       EdgeHumanRobotTTClosest *human_robot_ttclosest_edge = new EdgeHumanRobotTTClosest;          //michele
+      human_robot_ttclosest_edge->setVertex(0, teb_.PoseVertex(i));
+      human_robot_ttclosest_edge->setVertex(1, teb_.PoseVertex(i + 1));
+      human_robot_ttclosest_edge->setVertex(2, teb_.TimeDiffVertex(i));
+      human_robot_ttclosest_edge->setVertex(3, human_teb.PoseVertex(i));
+      human_robot_ttclosest_edge->setVertex(4, human_teb.PoseVertex(i + 1));
+      human_robot_ttclosest_edge->setVertex(5, human_teb.TimeDiffVertex(i));
+      human_robot_ttclosest_edge->setInformation(information_human_robot_ttclosest);
+      human_robot_ttclosest_edge->setParameters(*cfg_, robot_radius_, human_radius_);
+      optimizer_->addEdge(human_robot_ttclosest_edge);
+    }
+  }
+}
+
+
+void TebOptimalPlanner::AddEdgesHumanRobotTTCplus() {                                       //michele
+  Eigen::Matrix<double, 1, 1> information_human_robot_ttcplus;
+  information_human_robot_ttcplus.fill(cfg_->optim.weight_human_robot_ttcplus);
+
+
+   auto robot_teb_size = teb_.sizePoses();
+  for (auto &human_teb_kv : humans_tebs_map_) {
+    auto &human_teb = human_teb_kv.second;
+
+     size_t human_teb_size = human_teb.sizePoses();
+    for (unsigned int i = 0;
+         (i < human_teb_size - 1) && (i < robot_teb_size - 1); i++) {
+
+       EdgeHumanRobotTTCplus *human_robot_ttcplus_edge = new EdgeHumanRobotTTCplus();          //michele
+      human_robot_ttcplus_edge->setVertex(0, teb_.PoseVertex(i));
+      human_robot_ttcplus_edge->setVertex(1, teb_.PoseVertex(i + 1));
+      human_robot_ttcplus_edge->setVertex(2, teb_.TimeDiffVertex(i));
+      human_robot_ttcplus_edge->setVertex(3, human_teb.PoseVertex(i));
+      human_robot_ttcplus_edge->setVertex(4, human_teb.PoseVertex(i + 1));
+      human_robot_ttcplus_edge->setVertex(5, human_teb.TimeDiffVertex(i));
+      human_robot_ttcplus_edge->setInformation(information_human_robot_ttcplus);
+      human_robot_ttcplus_edge->setParameters(*cfg_, robot_radius_, human_radius_);
+      optimizer_->addEdge(human_robot_ttcplus_edge);
+    }
+  }
+}
+
 void TebOptimalPlanner::AddEdgesHumanRobotDirectional() {
   Eigen::Matrix<double, 1, 1> information_human_robot_directional;
   information_human_robot_directional.fill(cfg_->optim.weight_human_robot_dir);
@@ -1712,11 +1776,9 @@ void TebOptimalPlanner::AddEdgesHumanRobotDirectional() {
     auto &human_teb = human_teb_kv.second;
 
     size_t human_teb_size = human_teb.sizePoses();
-    for (unsigned int i = 0;
-         (i < human_teb_size - 1) && (i < robot_teb_size - 1); i++) {
+    for (unsigned int i = 0; (i < human_teb_size - 1) && (i < robot_teb_size - 1); i++) {
 
-      EdgeHumanRobotDirectional *human_robot_dir_edge =
-          new EdgeHumanRobotDirectional;
+      EdgeHumanRobotDirectional *human_robot_dir_edge = new EdgeHumanRobotDirectional;
       human_robot_dir_edge->setVertex(0, teb_.PoseVertex(i));
       human_robot_dir_edge->setVertex(1, teb_.PoseVertex(i + 1));
       human_robot_dir_edge->setVertex(2, teb_.TimeDiffVertex(i));
@@ -1724,7 +1786,7 @@ void TebOptimalPlanner::AddEdgesHumanRobotDirectional() {
       human_robot_dir_edge->setVertex(4, human_teb.PoseVertex(i + 1));
       human_robot_dir_edge->setVertex(5, human_teb.TimeDiffVertex(i));
       human_robot_dir_edge->setInformation(information_human_robot_directional);
-      human_robot_dir_edge->setTebConfig(*cfg_);
+      human_robot_dir_edge->setParameters(*cfg_);
       optimizer_->addEdge(human_robot_dir_edge);
     }
   }
@@ -1793,12 +1855,13 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
          kinematics_cl_cost = 0.0, robot_vel_cost = 0.0, human_vel_cost = 0.0,
          robot_acc_cost = 0.0, human_acc_cost = 0.0, obst_cost = 0.0,
          dyn_obst_cost = 0.0, via_cost = 0.0, hr_safety_cost = 0.0,
-         hh_safety_cost = 0.0, hr_ttc_cost = 0.0, hr_dir_cost = 0.0, hr_visi_cost = 0.0;
+         hh_safety_cost = 0.0, hr_ttc_cost = 0.0, hr_ttclosest_cost = 0.0 ,hr_ttcplus_cost = 0.0 ,  hr_dir_cost = 0.0, hr_visi_cost = 0.0;
 
   std::vector<double> time_opt_cost_vector, kinematics_dd_cost_vector, kinematics_cl_cost_vector,
                       robot_vel_cost_vector, human_vel_cost_vector, robot_acc_cost_vector, human_acc_cost_vector,
                       obst_cost_vector, dyn_obst_cost_vector, via_cost_vector, hr_safety_cost_vector,
-                      hh_safety_cost_vector, hr_ttc_cost_vector, hr_dir_cost_vector, hr_visi_cost_vector;
+                      hh_safety_cost_vector, hr_ttc_cost_vector, hr_ttclosest_cost_vector, hr_ttcplus_cost_vector,
+                      hr_dir_cost_vector, hr_visi_cost_vector;
 
   if (alternative_time_cost)
   {
@@ -1920,6 +1983,18 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
       continue;
     }
 
+    if (dynamic_cast<EdgeHumanRobotTTClosest *>(*it) != nullptr) {
+      hr_ttclosest_cost += cur_cost;
+      cost_ += cur_cost;
+      continue;
+    }
+
+    if (dynamic_cast<EdgeHumanRobotTTCplus *>(*it) != nullptr) {
+      hr_ttcplus_cost += cur_cost;
+      cost_ += cur_cost;
+      continue;
+    }
+
     if (dynamic_cast<EdgeHumanRobotDirectional *>(*it) != nullptr) {
       hr_dir_cost += cur_cost;
       cost_ += cur_cost;
@@ -1990,6 +2065,14 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     optc.cost = hr_ttc_cost;
     op_costs->costs.push_back(optc);
 
+    optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_TTClosest;                //michele
+    optc.cost = hr_ttclosest_cost;
+    op_costs->costs.push_back(optc);
+
+    optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_TTCplus;                //michele
+    optc.cost = hr_ttcplus_cost;
+    op_costs->costs.push_back(optc);
+
     optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_DIR;
     optc.cost = hr_dir_cost;
     op_costs->costs.push_back(optc);
@@ -2005,12 +2088,13 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
             "%.2f\n\thuman_acc_cost = %.2f\n\tobst_cost = "
             "%.2f\n\tdyn_obst_cost = %.2f\n\tvia_cost = "
             "%.2f\n\thr_safety_cost = %.2f\n\thh_safety_cost = "
-            "%.2f\n\thr_ttc_cost = %.2f\n\thr_dir_cost = "
+            "%.2f\n\thr_ttc_cost =   %.2f\n\thr_dir_cost = "
+            "%.2f\n\thr_ttclosest_cost = %.2f\n\thr_ttcplus_cost = "            //michele
             "%.2f\n\thr_visi_cost = %.2f\n\ttotal_tab_time = %.2f",
             time_opt_cost, kinematics_dd_cost, kinematics_cl_cost,
             robot_vel_cost, human_vel_cost, robot_acc_cost, human_acc_cost,
             obst_cost, dyn_obst_cost, via_cost, hr_safety_cost, hh_safety_cost,
-            hr_ttc_cost, hr_dir_cost, hr_visi_cost, teb_.getSumOfAllTimeDiffs());
+            hr_ttc_cost,hr_ttclosest_cost,hr_ttcplus_cost, hr_dir_cost, hr_visi_cost, teb_.getSumOfAllTimeDiffs());
 
   // delete temporary created graph
   if (!graph_exist_flag)

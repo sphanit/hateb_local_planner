@@ -485,7 +485,7 @@ private:
   ros::Time last_omega_sign_change_;
   double last_omega_;
 
-  ros::Publisher op_costs_pub_,robot_pose_pub_;
+  ros::Publisher op_costs_pub_,robot_pose_pub_,time_to_goal_pub_;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

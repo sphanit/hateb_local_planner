@@ -54,6 +54,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 #include <boost/algorithm/string.hpp>
+#include <std_msgs/Float64.h>
 
 // pluginlib macros
 #include <pluginlib/class_list_macros.h>
@@ -196,26 +197,20 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
     failure_detector_.setBufferLength(std::round(cfg_.recovery.oscillation_filter_duration*controller_frequency));
 
     // setup human prediction client with persistent connection
-    predict_humans_client_ =
-        nh.serviceClient<hanp_prediction::HumanPosePredict>(
-            PREDICT_SERVICE_NAME, true);
-    reset_humans_prediction_client_ =
-        nh.serviceClient<std_srvs::Empty>(RESET_PREDICTION_SERVICE_NAME, true);
-    publish_predicted_markers_client_ =
-        nh.serviceClient<std_srvs::SetBool>(PUBLISH_MARKERS_SRV_NAME, true);
+    predict_humans_client_ = nh.serviceClient<hanp_prediction::HumanPosePredict>(PREDICT_SERVICE_NAME, true);
+    reset_humans_prediction_client_ = nh.serviceClient<std_srvs::Empty>(RESET_PREDICTION_SERVICE_NAME, true);
+    publish_predicted_markers_client_ = nh.serviceClient<std_srvs::SetBool>(PUBLISH_MARKERS_SRV_NAME, true);
 
-    optimize_server_ = nh.advertiseService(
-        OPTIMIZE_SRV_NAME, &TebLocalPlannerROS::optimizeStandalone, this);
-    approach_server_ = nh.advertiseService(
-        APPROACH_SRV_NAME, &TebLocalPlannerROS::setApproachID, this);
+    optimize_server_ = nh.advertiseService(OPTIMIZE_SRV_NAME, &TebLocalPlannerROS::optimizeStandalone, this);
+    approach_server_ = nh.advertiseService(APPROACH_SRV_NAME, &TebLocalPlannerROS::setApproachID, this);
 
-    op_costs_pub_ = nh.advertise<teb_local_planner::OptimizationCostArray>(
-        OP_COSTS_TOPIC, 1);
+    op_costs_pub_ = nh.advertise<teb_local_planner::OptimizationCostArray>( OP_COSTS_TOPIC, 1);
 
-    robot_pose_pub_ = nh.advertise<geometry_msgs::Pose>(
-        ROB_POS_TOPIC, 1);
+    robot_pose_pub_ = nh.advertise<geometry_msgs::Pose>(ROB_POS_TOPIC, 1);
 
-    last_call_time_ = ros::Time::now() - ros::Duration(cfg_.human.pose_prediction_reset_time);
+    time_to_goal_pub_ = nh.advertise<std_msgs::Float64>("time_to_goal",100);
+
+    last_call_time_ = ros::Time::now() - ros::Duration(cfg_.hateb.pose_prediction_reset_time);
 
     last_omega_sign_change_ = ros::Time::now() - ros::Duration(cfg_.optim.omega_chage_time_seperation);
     last_omega_ = 0.0;
@@ -261,7 +256,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
 {
   auto start_time = ros::Time::now();
   if ((start_time - last_call_time_).toSec() >
-      cfg_.human.pose_prediction_reset_time) {
+      cfg_.hateb.pose_prediction_reset_time) {
     resetHumansPrediction();
   }
   last_call_time_ = start_time;
@@ -397,8 +392,8 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
     break;
   case 1: {
     hanp_prediction::HumanPosePredict predict_srv;
-    if (cfg_.human.use_external_prediction) {
-      if (cfg_.human.predict_human_behind_robot) {
+    if (cfg_.hateb.use_external_prediction) {
+      if (cfg_.hateb.predict_human_behind_robot) {
         predict_srv.request.type =
             hanp_prediction::HumanPosePredictRequest::BEHIND_ROBOT;
       } else {
@@ -406,8 +401,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
             hanp_prediction::HumanPosePredictRequest::EXTERNAL;
       }
     } else {
-      double traj_size = 10,
-             predict_time = 5.0; // TODO: make these values configurable
+      double traj_size = 10, predict_time = 5.0; // TODO: make these values configurable
       for (double i = 1.0; i <= traj_size; ++i) {
         predict_srv.request.predict_times.push_back(predict_time *
                                                     (i / traj_size));
@@ -601,6 +595,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   // std::cout << "I am in Planner" << '\n';
   bool success = planner_->plan(transformed_plan, &robot_vel_, cfg_.goal_tolerance.free_goal_vel, &transformed_human_plan_vel_map, &op_costs);
   // std::cout << "I am out of Planner" << '\n';
+
   if (!success)
   {
     planner_->clearPlanner(); // force reinitialization for next time
@@ -647,6 +642,11 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
     // std::cout << "I am out of visualization_->publishHumanTrajectories in computeVelocityCommands" << '\n';
   }
 
+  double ttg = std::hypot(transformed_plan.back().pose.position.x - transformed_plan.front().pose.position.x,
+                transformed_plan.back().pose.position.y - transformed_plan.front().pose.position.y)/std::hypot(robot_vel_.linear.x,robot_vel_.linear.y);
+  // std::cout <<"Time to goal: " <<ttg << '\n';
+  // std::cout <<"Velocity: " << std::hypot(robot_vel_.linear.x,robot_vel_.linear.y) << '\n';
+  time_to_goal_pub_.publish(ttg);
   // Undo temporary horizon reduction
   auto hr2_start_time = ros::Time::now();
   if (horizon_reduced_ &&
@@ -878,8 +878,8 @@ void TebLocalPlannerROS::updateObstacleContainerWithCustomObstacles()
     Eigen::Affine3d obstacle_to_map_eig;
     try
     {
-      geometry_msgs::TransformStamped obstacle_to_map =  tf_->lookupTransform(global_frame_, ros::Time(0),
-                                                                              custom_obstacle_msg_.header.frame_id, ros::Time(0),
+      geometry_msgs::TransformStamped obstacle_to_map =  tf_->lookupTransform(global_frame_, ros::Time::now(),
+                                                                              custom_obstacle_msg_.header.frame_id, ros::Time::now(),
                                                                               custom_obstacle_msg_.header.frame_id, ros::Duration(0.5));
       obstacle_to_map_eig = tf2::transformToEigen(obstacle_to_map);
     }
@@ -1085,7 +1085,7 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
     }
 
     // get plan_to_global_transform from plan frame to global_frame
-    geometry_msgs::TransformStamped plan_to_global_transform = tf.lookupTransform(global_frame, ros::Time(), plan_pose.header.frame_id, plan_pose.header.stamp,
+    geometry_msgs::TransformStamped plan_to_global_transform = tf.lookupTransform(global_frame, ros::Time::now(), plan_pose.header.frame_id, plan_pose.header.stamp,
                                                                                   plan_pose.header.frame_id, ros::Duration(0.5));
 
     //let's get the pose of the robot in the frame of the plan
@@ -1338,7 +1338,7 @@ bool TebLocalPlannerROS::transformHumanPlan(
     // tf.waitForTransform(global_frame, human_plan.front().header.frame_id,
                         // ros::Time(0), ros::Duration(0.5));
     human_plan_to_global_transform = tf2.lookupTransform(global_frame, human_plan.front().header.frame_id,
-                                                                        ros::Time(0),ros::Duration(0.5));
+                                                                        ros::Time::now(),ros::Duration(0.5));
     tf2::Stamped< tf2::Transform > human_plan_to_global_transform_;
     tf2::fromMsg(human_plan_to_global_transform,human_plan_to_global_transform_);
 
