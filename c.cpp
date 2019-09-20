@@ -165,6 +165,7 @@ void TebOptimalPlanner::registerG2OTypes()
   factory->registerType("EDGE_HUMAN_ROBOT_TTClosest", new g2o::HyperGraphElementCreator<EdgeHumanRobotTTClosest>);
   factory->registerType("EDGE_HUMAN_ROBOT_TTCplus", new g2o::HyperGraphElementCreator<EdgeHumanRobotTTCplus>);
   factory->registerType("EDGE_HUMAN_ROBOT_DIRECTIONAL", new g2o::HyperGraphElementCreator<EdgeHumanRobotDirectional>);
+  factory->registerType("EDGE_HUMAN_ROBOT_VISIBILITY", new g2o::HyperGraphElementCreator<EdgeHumanRobotVisibility>);
   return;
 }
 
@@ -554,7 +555,7 @@ bool TebOptimalPlanner::buildGraph(double weight_multiplier)
 
     AddEdgesTimeOptimalForHumans();
 
-    // AddEdgesKinematicsDiffDriveForHumans();
+    AddEdgesKinematicsDiffDriveForHumans();
     // AddEdgesKinematicsCarlikeForHumans();
 
     if (cfg_->hateb.use_human_robot_safety_c) {
@@ -1205,7 +1206,7 @@ void TebOptimalPlanner::AddEdgesVelocityForHumans() {
     if ( cfg_->optim.weight_max_human_vel_x==0 && cfg_->optim.weight_max_human_vel_y==0 && cfg_->optim.weight_max_human_vel_theta==0 && cfg_->optim.weight_nominal_human_vel_x == 0)
       return; // if weight equals zero skip adding edges!
 
-    // int n = human_teb.sizePoses();
+    int n = teb_.sizePoses();
     Eigen::Matrix<double,4,4> information;
     information.fill(0);
     information(0,0) = cfg_->optim.weight_max_human_vel_x;
@@ -1851,9 +1852,9 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
   optimizer_->computeInitialGuess();
 
   cost_ = 0;
-  double time_opt_cost = 0.0, kinematics_dd_cost = 0.0, shortest_path_cost =0.0,
-         kinematics_cl_cost = 0.0, robot_vel_cost = 0.0, human_vel_cost = 0.0, robot_vel_holo_cost=0.0,robot_acc_holo_cost=0.0,
-         robot_acc_cost = 0.0, human_acc_cost = 0.0, human_vel_holo_cost =0.0,human_acc_holo_cost=0.0, obst_cost = 0.0,rot_dir_cost=0.0,
+  double time_opt_cost = 0.0, kinematics_dd_cost = 0.0,
+         kinematics_cl_cost = 0.0, robot_vel_cost = 0.0, human_vel_cost = 0.0,
+         robot_acc_cost = 0.0, human_acc_cost = 0.0, obst_cost = 0.0,
          dyn_obst_cost = 0.0, via_cost = 0.0, hr_safety_cost = 0.0,
          hh_safety_cost = 0.0, hr_ttc_cost = 0.0, hr_ttclosest_cost = 0.0 ,hr_ttcplus_cost = 0.0 ,  hr_dir_cost = 0.0, hr_visi_cost = 0.0;
 
@@ -1893,67 +1894,33 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
 
 
     ////////////////////////////////////////////////////////////////////////////////////////
-
     if (dynamic_cast<EdgeTimeOptimal *>(*it) != nullptr && !alternative_time_cost) {
       time_opt_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeTimeOptimal " << cur_cost<< '\n';
-      continue;
-    }
-
-    if (dynamic_cast<EdgeShortestPath *>(*it) != nullptr) {
-      shortest_path_cost += cur_cost;
-      cost_ += cur_cost;
-      std::cout << "EdgeShortestPath " << cur_cost<< '\n';
-      continue;
-    }
-
-    if (dynamic_cast<EdgePreferRotDir *>(*it) != nullptr) {
-      rot_dir_cost += cur_cost;
-      cost_ += cur_cost;
-      std::cout << "EdgePreferRotDir " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeKinematicsDiffDrive *>(*it) != nullptr) {
       kinematics_dd_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeKinematicsDiffDrive " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeKinematicsCarlike *>(*it) != nullptr) {
       kinematics_cl_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeKinematicsCarlike " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeVelocity *>(*it) != nullptr) {
       robot_vel_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeVelocity " << cur_cost<< '\n';
-      continue;
-    }
-
-    if (dynamic_cast<EdgeVelocityHolonomic *>(*it) != nullptr) {
-      robot_vel_holo_cost += cur_cost;
-      cost_ += cur_cost;
-      std::cout << "EdgeVelocityHolonomic " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeVelocityHuman *>(*it) != nullptr) {
       human_vel_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeVelocityHuman " << cur_cost<< '\n';
-      continue;
-    }
-
-    if (dynamic_cast<EdgeVelocityHolonomicHuman *>(*it) != nullptr) {
-      human_vel_holo_cost += cur_cost;
-      cost_ += cur_cost;
-      std::cout << "EdgeVelocityHolonomicHuman " << cur_cost<< '\n';
       continue;
     }
 
@@ -1962,28 +1929,12 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     if (dynamic_cast<EdgeAcceleration *>(*it) != nullptr) {
       robot_acc_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeAcceleration " << cur_cost<< '\n';
-      continue;
-    }
-
-    if (dynamic_cast<EdgeAccelerationHolonomic *>(*it) != nullptr) {
-      robot_acc_holo_cost += cur_cost;
-      cost_ += cur_cost;
-      std::cout << "EdgeAccelerationHolonomic " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeAccelerationHuman *>(*it) != nullptr) {
       human_acc_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeAccelerationHuman " << cur_cost<< '\n';
-      continue;
-    }
-
-    if (dynamic_cast<EdgeAccelerationHolonomicHuman *>(*it) != nullptr) {
-      human_acc_cost += cur_cost;
-      cost_ += cur_cost;
-      std::cout << "EdgeAccelerationHolonomicHuman " << cur_cost<< '\n';
       continue;
     }
 
@@ -1991,7 +1942,6 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
       cur_cost *= obst_cost_scale;
       obst_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeObstacle " << cur_cost<< '\n';
       continue;
     }
 
@@ -1999,7 +1949,6 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     {
       cur_cost *= obst_cost_scale;
       cost_ += cur_cost;
-      std::cout << "EdgeInflatedObstacle " << cur_cost<< '\n';
       continue;
     }
 
@@ -2007,7 +1956,6 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
       cur_cost *= obst_cost_scale;
       dyn_obst_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeDynamicObstacle " << cur_cost<< '\n';
       continue;
     }
 
@@ -2015,56 +1963,49 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
       cur_cost *= viapoint_cost_scale;
       via_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeViaPoint " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeHumanRobotSafety *>(*it) != nullptr) {
       hr_safety_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeHumanRobotSafety " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeHumanHumanSafety *>(*it) != nullptr) {
       hh_safety_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeHumanHumanSafety " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeHumanRobotTTC *>(*it) != nullptr) {
       hr_ttc_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeHumanRobotTTC " << cur_cost<< '\n';
+      std::cout << "cur_cost : " << cur_cost <<'\n';
       continue;
     }
 
     if (dynamic_cast<EdgeHumanRobotTTClosest *>(*it) != nullptr) {
       hr_ttclosest_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeHumanRobotTTClosest " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeHumanRobotTTCplus *>(*it) != nullptr) {
       hr_ttcplus_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeHumanRobotTTCplus " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeHumanRobotDirectional *>(*it) != nullptr) {
       hr_dir_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeHumanRobotDirectional " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeHumanRobotVisibility *>(*it) != nullptr) {
         hr_visi_cost += cur_cost;
         cost_ += cur_cost;
-        std::cout << "EdgeHumanRobotVisibility " << cur_cost<< '\n';
         continue;
     }
   }

@@ -84,7 +84,8 @@ public:
 
     Eigen::Vector2d C = human_bandpt->position() - robot_bandpt->position();
 
-    static double ttc = std::numeric_limits<double>::infinity();
+    double ttc = std::numeric_limits<double>::infinity();
+    // int count = 0;
     double C_sq = C.dot(C);
     if (C_sq <= radius_sum_sq_) {
       ttc = 0.0;
@@ -95,6 +96,7 @@ public:
         double V_sq = V.dot(V);
         double f = (C_dot_V * C_dot_V) - (V_sq * (C_sq - radius_sum_sq_));
         if (f > 0) { // otherwise ttc is infinite
+          // count++;
           ttc = (C_dot_V - std::sqrt(f)) / V_sq;
         }
       }
@@ -102,15 +104,18 @@ public:
 
     if (ttc < std::numeric_limits<double>::infinity()) {
       _error[0] = penaltyBoundFromBelow(ttc, cfg_->hateb.ttc_threshold, cfg_->optim.penalty_epsilon);
+      // _error[0] = _error[0]*_error[0];
       if (cfg_->hateb.scale_human_robot_ttc_c) {
         _error[0] = _error[0] * cfg_->optim.human_robot_ttc_scale_alpha / C_sq;
       }
 
     } else {
       // no collsion possible
-      double k = cfg_->hateb.ttc_threshold/2;
-      _error[0] = _error[0] = penaltyBoundFromBelow(ttc, cfg_->hateb.ttc_threshold, cfg_->optim.penalty_epsilon)/k;
+      // double k = cfg_->hateb.ttc_threshold/2;
+      // _error[0] = penaltyBoundFromBelow(ttc, cfg_->hateb.ttc_threshold, cfg_->optim.penalty_epsilon)/(k*k);
+      _error[0] = 0.0;
     }
+    // std::cout << "_error[0] " <<_error[0] <<'\n';
     ROS_DEBUG_THROTTLE(0.5, "ttc value : %f", ttc);
 
     ROS_ASSERT_MSG(std::isfinite(_error[0]), "EdgeHumanRobot::computeError() _error[0]=%f\n", _error[0]);
