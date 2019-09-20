@@ -84,7 +84,7 @@ public:
 
     Eigen::Vector2d C = human_bandpt->position() - robot_bandpt->position();
 
-    double ttc = std::numeric_limits<double>::infinity();
+    static double ttc = std::numeric_limits<double>::infinity();
     double C_sq = C.dot(C);
     if (C_sq <= radius_sum_sq_) {
       ttc = 0.0;
@@ -101,29 +101,19 @@ public:
     }
 
     if (ttc < std::numeric_limits<double>::infinity()) {
-      // if (ttc > 0) {
-      //   // valid ttc
-      //   _error[0] = penaltyBoundFromBelow(ttc, cfg_->human.ttc_threshold,
-      //                                 cfg_->optim.penalty_epsilon);
-      // } else {
-      //   // already in collision
-      //   _error[0] = cfg_->optim.max_ttc_penalty;
-      // }
-      // std::cout << "ttc" << ttc << '\n';
-      _error[0] = penaltyBoundFromBelow(ttc, cfg_->hateb.ttc_threshold,
-                                        cfg_->optim.penalty_epsilon);
+      _error[0] = penaltyBoundFromBelow(ttc, cfg_->hateb.ttc_threshold, cfg_->optim.penalty_epsilon);
       if (cfg_->hateb.scale_human_robot_ttc_c) {
         _error[0] = _error[0] * cfg_->optim.human_robot_ttc_scale_alpha / C_sq;
       }
 
     } else {
       // no collsion possible
-      _error[0] = 0.0;
+      double k = cfg_->hateb.ttc_threshold/2;
+      _error[0] = _error[0] = penaltyBoundFromBelow(ttc, cfg_->hateb.ttc_threshold, cfg_->optim.penalty_epsilon)/k;
     }
     ROS_DEBUG_THROTTLE(0.5, "ttc value : %f", ttc);
 
-    ROS_ASSERT_MSG(std::isfinite(_error[0]),
-                   "EdgeHumanRobot::computeError() _error[0]=%f\n", _error[0]);
+    ROS_ASSERT_MSG(std::isfinite(_error[0]), "EdgeHumanRobot::computeError() _error[0]=%f\n", _error[0]);
   }
 
   void setParameters(const TebConfig &cfg, const double &robot_radius, const double &human_radius) {
