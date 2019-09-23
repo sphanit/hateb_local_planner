@@ -436,6 +436,8 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
           continue;
         }
 
+        std::cout <<"Predicted Pose[0]: \n" <<predicted_humans_poses.poses[0].pose.pose.position << '\n';
+
         human_plan_combined.id = predicted_humans_poses.id;
         transformed_human_plans.push_back(human_plan_combined);
 
@@ -1896,7 +1898,7 @@ void TebLocalPlannerROS::resetHumansPrediction() {
 bool TebLocalPlannerROS::optimizeStandalone(
     teb_local_planner::Optimize::Request &req,
     teb_local_planner::Optimize::Response &res) {
-      // std::cout << "I am in TebLocalPlannerROS::optimizeStandalone" << '\n';
+      std::cout << "I am in TebLocalPlannerROS::optimizeStandalone" << '\n';
   ROS_INFO("optimize service called");
   auto start_time = ros::Time::now();
 

@@ -1897,63 +1897,63 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     if (dynamic_cast<EdgeTimeOptimal *>(*it) != nullptr && !alternative_time_cost) {
       time_opt_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeTimeOptimal " << cur_cost<< '\n';
+      //std::// cout<< "EdgeTimeOptimal " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeShortestPath *>(*it) != nullptr) {
       shortest_path_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeShortestPath " << cur_cost<< '\n';
+      // std::cout << "EdgeShortestPath " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgePreferRotDir *>(*it) != nullptr) {
       rot_dir_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgePreferRotDir " << cur_cost<< '\n';
+      // std::cout << "EdgePreferRotDir " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeKinematicsDiffDrive *>(*it) != nullptr) {
       kinematics_dd_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeKinematicsDiffDrive " << cur_cost<< '\n';
+      // std::cout << "EdgeKinematicsDiffDrive " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeKinematicsCarlike *>(*it) != nullptr) {
       kinematics_cl_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeKinematicsCarlike " << cur_cost<< '\n';
+      // std::cout << "EdgeKinematicsCarlike " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeVelocity *>(*it) != nullptr) {
       robot_vel_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeVelocity " << cur_cost<< '\n';
+      // std::cout << "EdgeVelocity " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeVelocityHolonomic *>(*it) != nullptr) {
       robot_vel_holo_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeVelocityHolonomic " << cur_cost<< '\n';
+      // std::cout << "EdgeVelocityHolonomic " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeVelocityHuman *>(*it) != nullptr) {
       human_vel_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeVelocityHuman " << cur_cost<< '\n';
+      // std::cout << "EdgeVelocityHuman " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeVelocityHolonomicHuman *>(*it) != nullptr) {
       human_vel_holo_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeVelocityHolonomicHuman " << cur_cost<< '\n';
+      // std::cout << "EdgeVelocityHolonomicHuman " << cur_cost<< '\n';
       continue;
     }
 
@@ -1962,28 +1962,28 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     if (dynamic_cast<EdgeAcceleration *>(*it) != nullptr) {
       robot_acc_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeAcceleration " << cur_cost<< '\n';
+      // std::cout << "EdgeAcceleration " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeAccelerationHolonomic *>(*it) != nullptr) {
       robot_acc_holo_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeAccelerationHolonomic " << cur_cost<< '\n';
+      // std::cout << "EdgeAccelerationHolonomic " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeAccelerationHuman *>(*it) != nullptr) {
       human_acc_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeAccelerationHuman " << cur_cost<< '\n';
+      // std::cout << "EdgeAccelerationHuman " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeAccelerationHolonomicHuman *>(*it) != nullptr) {
       human_acc_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeAccelerationHolonomicHuman " << cur_cost<< '\n';
+      // std::cout << "EdgeAccelerationHolonomicHuman " << cur_cost<< '\n';
       continue;
     }
 
@@ -1991,7 +1991,7 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
       cur_cost *= obst_cost_scale;
       obst_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeObstacle " << cur_cost<< '\n';
+      // std::cout << "EdgeObstacle " << cur_cost<< '\n';
       continue;
     }
 
@@ -1999,7 +1999,7 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     {
       cur_cost *= obst_cost_scale;
       cost_ += cur_cost;
-      std::cout << "EdgeInflatedObstacle " << cur_cost<< '\n';
+      // std::cout << "EdgeInflatedObstacle " << cur_cost<< '\n';
       continue;
     }
 
@@ -2007,7 +2007,7 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
       cur_cost *= obst_cost_scale;
       dyn_obst_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeDynamicObstacle " << cur_cost<< '\n';
+      // std::cout << "EdgeDynamicObstacle " << cur_cost<< '\n';
       continue;
     }
 
@@ -2015,56 +2015,56 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
       cur_cost *= viapoint_cost_scale;
       via_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeViaPoint " << cur_cost<< '\n';
+      // std::cout << "EdgeViaPoint " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeHumanRobotSafety *>(*it) != nullptr) {
       hr_safety_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeHumanRobotSafety " << cur_cost<< '\n';
+      // std::cout << "EdgeHumanRobotSafety " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeHumanHumanSafety *>(*it) != nullptr) {
       hh_safety_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeHumanHumanSafety " << cur_cost<< '\n';
+      // std::cout << "EdgeHumanHumanSafety " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeHumanRobotTTC *>(*it) != nullptr) {
       hr_ttc_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeHumanRobotTTC " << cur_cost<< '\n';
+      // std::cout << "EdgeHumanRobotTTC " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeHumanRobotTTClosest *>(*it) != nullptr) {
       hr_ttclosest_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeHumanRobotTTClosest " << cur_cost<< '\n';
+      // std::cout << "EdgeHumanRobotTTClosest " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeHumanRobotTTCplus *>(*it) != nullptr) {
       hr_ttcplus_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeHumanRobotTTCplus " << cur_cost<< '\n';
+      // std::cout << "EdgeHumanRobotTTCplus " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeHumanRobotDirectional *>(*it) != nullptr) {
       hr_dir_cost += cur_cost;
       cost_ += cur_cost;
-      std::cout << "EdgeHumanRobotDirectional " << cur_cost<< '\n';
+      // std::cout << "EdgeHumanRobotDirectional " << cur_cost<< '\n';
       continue;
     }
 
     if (dynamic_cast<EdgeHumanRobotVisibility *>(*it) != nullptr) {
         hr_visi_cost += cur_cost;
         cost_ += cur_cost;
-        std::cout << "EdgeHumanRobotVisibility " << cur_cost<< '\n';
+        // std::cout << "EdgeHumanRobotVisibility " << cur_cost<< '\n';
         continue;
     }
   }
@@ -2323,6 +2323,7 @@ void TebOptimalPlanner::getFullHumanTrajectory(const uint64_t human_id, std::vec
 
     // start
     TrajectoryPointMsg &start = human_trajectory.front();
+    std::cout << "Human Teb Pose: 0\n" << start.pose.position << '\n';
     human_teb.Pose(0).toPoseMsg(start.pose);
     start.velocity.linear.y = start.velocity.linear.z = 0;
     start.velocity.angular.x = start.velocity.angular.y = 0;
@@ -2336,6 +2337,7 @@ void TebOptimalPlanner::getFullHumanTrajectory(const uint64_t human_id, std::vec
     for (int i = 1; i < human_teb_size - 1; ++i) {
       TrajectoryPointMsg &point = human_trajectory[i];
       human_teb.Pose(i).toPoseMsg(point.pose);
+      std::cout << "Human Teb Pose: " << i << '\n' << point.pose.position << '\n';
       point.velocity.linear.y = point.velocity.linear.z = 0;
       point.velocity.angular.x = point.velocity.angular.y = 0;
       double vel1_x, vel1_y, vel2_x, vel2_y, omega1, omega2;
@@ -2350,6 +2352,8 @@ void TebOptimalPlanner::getFullHumanTrajectory(const uint64_t human_id, std::vec
     }
     // goal
     TrajectoryPointMsg &goal = human_trajectory.back();
+    std::cout << "Human Teb Pose: end\n" << goal.pose.position << '\n';
+
     human_teb.BackPose().toPoseMsg(goal.pose);
     goal.velocity.linear.y = goal.velocity.linear.z = 0;
     goal.velocity.angular.x = goal.velocity.angular.y = 0;
