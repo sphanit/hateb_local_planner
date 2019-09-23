@@ -96,7 +96,7 @@ void TebOptimalPlanner::initialize(const TebConfig& cfg, ObstContainer* obstacle
 
   robot_radius_ = robot_model_->getCircumscribedRadius();
   human_radius_ = human_model_->getCircumscribedRadius();
-
+    
   initialized_ = true;
 }
 

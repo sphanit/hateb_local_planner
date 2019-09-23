@@ -254,7 +254,6 @@ protected:
     */
   void customViaPointsCB(const nav_msgs::Path::ConstPtr& via_points_msg);
 
-
    /**
     * @brief Prune global plan such that already passed poses are cut off
     *

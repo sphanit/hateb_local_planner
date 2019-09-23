@@ -213,6 +213,7 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
     last_call_time_ = ros::Time::now() - ros::Duration(cfg_.hateb.pose_prediction_reset_time);
 
     last_omega_sign_change_ = ros::Time::now() - ros::Duration(cfg_.optim.omega_chage_time_seperation);
+
     last_omega_ = 0.0;
 
     // set initialized flag
@@ -634,6 +635,9 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
       planner_->getFullHumanTrajectory(
           human_plan_traj_combined.id,
           human_plan_traj_combined.optimized_trajectory);
+
+      visualization_->publishTestHumans(human_plan_traj_combined.optimized_trajectory);
+
       human_plan_traj_combined.plan_after = human_plan_combined.plan_after;
       human_plans_traj_array.push_back(human_plan_traj_combined);
       // std::cout << "I am out of planner_->getFullHumanTrajectory in computeVelocityCommands" << '\n';
@@ -1319,7 +1323,6 @@ void TebLocalPlannerROS::lookupTwist(const std::string& tracking_frame, const st
   twist.angular.z =  out_rot.z();
 
 };
-
 
 bool TebLocalPlannerROS::transformHumanPlan(
     const tf2_ros::Buffer &tf2, const geometry_msgs::PoseStamped &robot_pose,
