@@ -63,6 +63,8 @@
 #include <hanp_msgs/HumanTimeToGoal.h>
 #include <hanp_msgs/HumanTimeToGoalArray.h>
 #include <hanp_msgs/HumanTrajectoryArray.h>
+#include <hanp_msgs/TrackedHumans.h>
+#include <hanp_msgs/TrackedSegmentType.h>
 #include <hanp_msgs/TimeToGoal.h>
 #include <std_msgs/ColorRGBA.h>
 #include <nav_msgs/Odometry.h>
@@ -145,6 +147,9 @@ public:
    * @param local_plan Pose array describing the local plan
    */
   void publishLocalPlan(const std::vector<geometry_msgs::PoseStamped>& local_plan) const;
+
+
+  void publishTestHumans(const hanp_msgs::TrackedHumansConstPtr &humans);
 
   /**
    * @brief Publish Timed_Elastic_Band related stuff (local plan, pose sequence).
@@ -295,6 +300,7 @@ protected:
   ros::Publisher feedback_pub_;   //!< Publisher for the feedback message for analysis and debug purposes
   ros::Publisher robot_traj_time_pub_, robot_path_time_pub_;
   ros::Publisher human_trajs_time_pub_, human_paths_time_pub_, marker_pub;
+  ros::Subscriber tracked_humans_sub_;
   uint32_t shape = visualization_msgs::Marker::CYLINDER;
 
   const TebConfig* cfg_; //!< Config class that stores and manages all related parameters

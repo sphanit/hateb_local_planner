@@ -96,7 +96,7 @@ void TebOptimalPlanner::initialize(const TebConfig& cfg, ObstContainer* obstacle
 
   robot_radius_ = robot_model_->getCircumscribedRadius();
   human_radius_ = human_model_->getCircumscribedRadius();
-    
+
   initialized_ = true;
 }
 
@@ -368,6 +368,7 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
       std::pair<bool, geometry_msgs::Twist> human_start_vel;
       human_start_vel.first = true;
       human_start_vel.second.linear.x = initial_human_plan_vel_kv.second.start_vel.linear.x;
+      human_start_vel.second.linear.y = initial_human_plan_vel_kv.second.start_vel.linear.y;
       human_start_vel.second.angular.z = initial_human_plan_vel_kv.second.start_vel.angular.z;
       humans_vel_start_[human_id] = human_start_vel;
 
@@ -2323,12 +2324,14 @@ void TebOptimalPlanner::getFullHumanTrajectory(const uint64_t human_id, std::vec
 
     // start
     TrajectoryPointMsg &start = human_trajectory.front();
-    std::cout << "Human Teb Pose: 0\n" << start.pose.position << '\n';
+    // std::cout << "Human Teb Pose: 0\n" << start.pose.position << '\n';
     human_teb.Pose(0).toPoseMsg(start.pose);
-    start.velocity.linear.y = start.velocity.linear.z = 0;
+    start.velocity.linear.z = 0;
     start.velocity.angular.x = start.velocity.angular.y = 0;
     start.velocity.linear.x = humans_vel_start_[human_id].second.linear.x;
-    start.velocity.angular.z = humans_vel_start_[human_id].second.linear.y;
+    start.velocity.linear.y = humans_vel_start_[human_id].second.linear.y;
+    start.velocity.angular.z = humans_vel_start_[human_id].second.angular.z;
+    // std::cout << "Human Teb Pose: " << 0 << '\n' << start.velocity << '\n';
     start.time_from_start.fromSec(curr_time);
 
     curr_time += human_teb.TimeDiff(0);
@@ -2337,8 +2340,8 @@ void TebOptimalPlanner::getFullHumanTrajectory(const uint64_t human_id, std::vec
     for (int i = 1; i < human_teb_size - 1; ++i) {
       TrajectoryPointMsg &point = human_trajectory[i];
       human_teb.Pose(i).toPoseMsg(point.pose);
-      std::cout << "Human Teb Pose: " << i << '\n' << point.pose.position << '\n';
-      point.velocity.linear.y = point.velocity.linear.z = 0;
+      // std::cout << "Human Teb Pose: " << i << '\n' << point.pose.position << '\n';
+      point.velocity.linear.z = 0;
       point.velocity.angular.x = point.velocity.angular.y = 0;
       double vel1_x, vel1_y, vel2_x, vel2_y, omega1, omega2;
       extractVelocity(human_teb.Pose(i-1), human_teb.Pose(i), human_teb.TimeDiff(i-1), vel1_x, vel1_y, omega1);
@@ -2346,19 +2349,21 @@ void TebOptimalPlanner::getFullHumanTrajectory(const uint64_t human_id, std::vec
       point.velocity.linear.x = 0.5*(vel1_x+vel2_x);
       point.velocity.linear.y = 0.5*(vel1_y+vel2_y);
       point.velocity.angular.z = 0.5 * (omega1 + omega2);
+      // std::cout << "Human Teb Pose: " << i << '\n' << point.velocity << '\n';
       point.time_from_start.fromSec(curr_time);
 
       curr_time += human_teb.TimeDiff(i);
     }
     // goal
     TrajectoryPointMsg &goal = human_trajectory.back();
-    std::cout << "Human Teb Pose: end\n" << goal.pose.position << '\n';
+    // std::cout << "Human Teb Pose: end\n" << goal.pose.position << '\n';
 
     human_teb.BackPose().toPoseMsg(goal.pose);
-    goal.velocity.linear.y = goal.velocity.linear.z = 0;
+    goal.velocity.linear.z = 0;
     goal.velocity.angular.x = goal.velocity.angular.y = 0;
     goal.velocity.linear.x = humans_vel_goal_[human_id].second.linear.x;
-    goal.velocity.angular.z = humans_vel_goal_[human_id].second.linear.y;
+    goal.velocity.linear.y = humans_vel_goal_[human_id].second.linear.y;
+    goal.velocity.angular.z = humans_vel_goal_[human_id].second.angular.z;
     goal.time_from_start.fromSec(curr_time);
   }
   return;

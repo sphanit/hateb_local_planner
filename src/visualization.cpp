@@ -53,10 +53,12 @@
 #define ROBOT_PATH_TIME_TOPIC "plan_time"
 #define HUMAN_TRAJS_TIME_TOPIC "human_trajs_time"
 #define HUMAN_PATHS_TIME_TOPIC "human_plans_time"
-
+#define DEFAUTL_SEGMENT_TYPE hanp_msgs::TrackedSegmentType::TORSO
 #include <teb_local_planner/FeedbackMsg.h>
 #include <teb_local_planner/optimal_planner.h>
 #include <teb_local_planner/visualization.h>
+#include <hanp_msgs/TrackedHumans.h>
+#include <hanp_msgs/TrackedSegmentType.h>
 
 namespace teb_local_planner
 {
@@ -125,6 +127,9 @@ void TebVisualization::initialize(ros::NodeHandle& nh, const TebConfig& cfg)
       cfg_->visualization.publish_human_local_plan_poses;
   last_publish_human_local_plan_fp_poses =
       cfg_->visualization.publish_human_local_plan_fp_poses;
+
+  tracked_humans_sub_ = nh.subscribe("/tracked_humans",10, &TebVisualization::publishTestHumans, this);
+
   clearing_timer_ = nh.createTimer(ros::Duration(CLEARING_TIMER_DURATION),
                                    &TebVisualization::clearingTimerCB, this);
 
@@ -493,6 +498,7 @@ void TebVisualization::publishHumanTrajectories(
       hanp_trajectory_point.transform.rotation =
           human_traj_point.pose.orientation;
       hanp_trajectory_point.velocity = human_traj_point.velocity;
+      // std::cout <<human_traj_point.velocity  << '\n';
       hanp_trajectory_point.time_from_start = human_traj_point.time_from_start;
       hanp_trajectory.trajectory.points.push_back(hanp_trajectory_point);
     }
@@ -545,74 +551,77 @@ void TebVisualization::publishHumanTrajectories(
   }
 }
 
-void TebVisualization::publishTestHumans(const std::vector<TrajectoryPointMsg> &plan){
+void TebVisualization::publishTestHumans(const hanp_msgs::TrackedHumansConstPtr &humans){
   visualization_msgs::Marker marker;
     // Set the frame ID and timestamp.  See the TF tutorials for information on these.
     marker.header.frame_id = "map";
     marker.header.stamp = ros::Time::now();
+    for(auto &human : humans->humans)
+    {
+      for(auto segment : human.segments)
+      {          // Set the namespace and id for this marker.  This serves to create a unique ID
+          // Any marker sent with the same namespace and id will overwrite the old one
+          marker.ns = "basic_shapes";
+          marker.id = 0;
 
-    if(!plan.empty() && plan.size()>=3){
-      auto point = plan[1];
-      // Set the namespace and id for this marker.  This serves to create a unique ID
-      // Any marker sent with the same namespace and id will overwrite the old one
-      marker.ns = "basic_shapes";
-      marker.id = 0;
+          // Set the marker type.  Initially this is CUBE, and cycles between that and SPHERE, ARROW, and CYLINDER
+          marker.type = shape;
 
-      // Set the marker type.  Initially this is CUBE, and cycles between that and SPHERE, ARROW, and CYLINDER
-      marker.type = shape;
+          // Set the marker action.  Options are ADD, DELETE, and new in ROS Indigo: 3 (DELETEALL)
+          marker.action = visualization_msgs::Marker::ADD;
 
-      // Set the marker action.  Options are ADD, DELETE, and new in ROS Indigo: 3 (DELETEALL)
-      marker.action = visualization_msgs::Marker::ADD;
+          // Set the pose of the marker.  This is a full 6DOF pose relative to the frame/time specified in the header
+          marker.pose.position.x = segment.pose.pose.position.x;
+          marker.pose.position.y = segment.pose.pose.position.y;
+          marker.pose.position.z = segment.pose.pose.position.z;
+          marker.pose.orientation.x = 0.0;
+          marker.pose.orientation.y = 0.0;
+          marker.pose.orientation.z = 0.0;
+          marker.pose.orientation.w = 1.0;
 
-      // Set the pose of the marker.  This is a full 6DOF pose relative to the frame/time specified in the header
-      marker.pose.position.x = point.pose.position.x;
-      marker.pose.position.y = point.pose.position.y;
-      marker.pose.position.z = point.pose.position.z;
-      marker.pose.orientation.x = 0.0;
-      marker.pose.orientation.y = 0.0;
-      marker.pose.orientation.z = 0.0;
-      marker.pose.orientation.w = 1.0;
+          // Set the scale of the marker -- 1x1x1 here means 1m on a side
+          marker.scale.x = 1.0;
+          marker.scale.y = 1.0;
+          marker.scale.z = 1.0;
 
-      // Set the scale of the marker -- 1x1x1 here means 1m on a side
-      marker.scale.x = 1.0;
-      marker.scale.y = 1.0;
-      marker.scale.z = 1.0;
+          // Set the color -- be sure to set alpha to something non-zero!
+          marker.color.r = 0.0f;
+          marker.color.g = 1.0f;
+          marker.color.b = 0.0f;
+          marker.color.a = 1.0;
 
-      // Set the color -- be sure to set alpha to something non-zero!
-      marker.color.r = 0.0f;
-      marker.color.g = 1.0f;
-      marker.color.b = 0.0f;
-      marker.color.a = 1.0;
-
-      marker.lifetime = ros::Duration();
-      marker_pub.publish(marker);
+          marker.lifetime = ros::Duration();
+          marker_pub.publish(marker);
+        }
     }
-}
 
-void TebVisualization::publishRobotFootprintModel(const PoseSE2& current_pose, const BaseRobotFootprintModel& robot_model, const std::string& ns,
-                                                  const std_msgs::ColorRGBA &color)
-{
-  if ( printErrorWhenNotInitialized() )
-    return;
-
-  std::vector<visualization_msgs::Marker> markers;
-  robot_model.visualizeRobot(current_pose, markers, color);
-  if (markers.empty())
-    return;
-
-  int idx = 1000000;  // avoid overshadowing by obstacles
-  for (std::vector<visualization_msgs::Marker>::iterator marker_it = markers.begin(); marker_it != markers.end(); ++marker_it, ++idx)
-  {
-    marker_it->header.frame_id = cfg_->map_frame;
-    marker_it->header.stamp = ros::Time::now();
-    marker_it->action = visualization_msgs::Marker::ADD;
-    marker_it->ns = ns;
-    marker_it->id = idx;
-    marker_it->lifetime = ros::Duration(2.0);
-    teb_marker_pub_.publish(*marker_it);
   }
+    void TebVisualization::publishRobotFootprintModel(const PoseSE2& current_pose, const BaseRobotFootprintModel& robot_model, const std::string& ns,
+                                                      const std_msgs::ColorRGBA &color)
+    {
+      if ( printErrorWhenNotInitialized() )
+        return;
 
-}
+      std::vector<visualization_msgs::Marker> markers;
+      robot_model.visualizeRobot(current_pose, markers, color);
+      if (markers.empty())
+        return;
+
+      int idx = 1000000;  // avoid overshadowing by obstacles
+      for (std::vector<visualization_msgs::Marker>::iterator marker_it = markers.begin(); marker_it != markers.end(); ++marker_it, ++idx)
+      {
+        marker_it->header.frame_id = cfg_->map_frame;
+        marker_it->header.stamp = ros::Time::now();
+        marker_it->action = visualization_msgs::Marker::ADD;
+        marker_it->ns = ns;
+        marker_it->id = idx;
+        marker_it->lifetime = ros::Duration(2.0);
+        teb_marker_pub_.publish(*marker_it);
+
+      }
+    }
+
+
 
 void TebVisualization::publishInfeasibleRobotPose(const PoseSE2& current_pose, const BaseRobotFootprintModel& robot_model)
 {

@@ -437,7 +437,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
           continue;
         }
 
-        std::cout <<"Predicted Pose[0]: \n" <<predicted_humans_poses.poses[0].pose.pose.position << '\n';
+        // std::cout <<"Predicted Pose[0]: \n" <<predicted_humans_poses.poses[0].pose.pose.position << '\n';
 
         human_plan_combined.id = predicted_humans_poses.id;
         transformed_human_plans.push_back(human_plan_combined);
@@ -636,7 +636,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
           human_plan_traj_combined.id,
           human_plan_traj_combined.optimized_trajectory);
 
-      visualization_->publishTestHumans(human_plan_traj_combined.optimized_trajectory);
+      // visualization_->publishTestHumans(human_plan_traj_combined.optimized_trajectory);
 
       human_plan_traj_combined.plan_after = human_plan_combined.plan_after;
       human_plans_traj_array.push_back(human_plan_traj_combined);
