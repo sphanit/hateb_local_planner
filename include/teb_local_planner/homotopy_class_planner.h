@@ -124,7 +124,7 @@ public:
    * @param via_points Container storing via-points (optional)
    */
   HomotopyClassPlanner(const TebConfig& cfg, ObstContainer* obstacles = NULL, RobotFootprintModelPtr robot_model = boost::make_shared<PointRobotFootprint>(),
-                       TebVisualizationPtr visualization = TebVisualizationPtr(), const ViaPointContainer* via_points = NULL);
+                       TebVisualizationPtr visualization = TebVisualizationPtr(), const ViaPointContainer* via_points = NULL,  CircularRobotFootprintPtr human_model=NULL, const std::map<uint64_t, ViaPointContainer> *humans_via_points_map=NULL);
 
   /**
    * @brief Destruct the HomotopyClassPlanner.
@@ -140,7 +140,7 @@ public:
    * @param via_points Container storing via-points (optional)
    */
   void initialize(const TebConfig& cfg, ObstContainer* obstacles = NULL, RobotFootprintModelPtr robot_model = boost::make_shared<PointRobotFootprint>(),
-                  TebVisualizationPtr visualization = TebVisualizationPtr(), const ViaPointContainer* via_points = NULL);
+                  TebVisualizationPtr visualization = TebVisualizationPtr(), const ViaPointContainer* via_points = NULL,  CircularRobotFootprintPtr human_model=NULL, const std::map<uint64_t, ViaPointContainer> *humans_via_points_map=NULL);
 
 
 
@@ -449,15 +449,8 @@ public:
    */
   bool computeStartOrientation(const TebOptimalPlannerPtr plan, const double len_orientation_vector, double& orientation);
 
-  void getFullTrajectory(std::vector<TrajectoryPointMsg> &trajectory) const
-  {
-
-  }
-
-  void getFullHumanTrajectory(const uint64_t human_id, std::vector<TrajectoryPointMsg> &human_trajectory)
-  {
-
-  }
+  virtual void getFullTrajectory(std::vector<TrajectoryPointMsg> &trajectory) const;
+  virtual void getFullHumanTrajectory(const uint64_t human_id, std::vector<TrajectoryPointMsg> &human_trajectory);
 
   /**
    * @brief Access config (read-only)
@@ -545,11 +538,13 @@ protected:
   const TebConfig* cfg_; //!< Config class that stores and manages all related parameters
   ObstContainer* obstacles_; //!< Store obstacles that are relevant for planning
   const ViaPointContainer* via_points_; //!< Store the current list of via-points
+  const std::map<uint64_t, ViaPointContainer> *humans_via_points_map_;
 
   // internal objects (memory management owned)
   TebVisualizationPtr visualization_; //!< Instance of the visualization class (local/global plan, obstacles, ...)
   TebOptimalPlannerPtr best_teb_; //!< Store the current best teb.
   RobotFootprintModelPtr robot_model_; //!< Robot model shared instance
+  CircularRobotFootprintPtr human_model_;
 
   const std::vector<geometry_msgs::PoseStamped>* initial_plan_; //!< Store the initial plan if available for a better trajectory initialization
   EquivalenceClassPtr initial_plan_eq_class_; //!< Store the equivalence class of the initial plan

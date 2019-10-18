@@ -131,7 +131,7 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
     // create the planner instance
     if (cfg_.hcp.enable_homotopy_class_planning)
     {
-      planner_ = PlannerInterfacePtr(new HomotopyClassPlanner(cfg_, &obstacles_, robot_model, visualization_, &via_points_));
+      planner_ = PlannerInterfacePtr(new HomotopyClassPlanner(cfg_, &obstacles_, robot_model, visualization_, &via_points_, human_model, &humans_via_points_map_));
       ROS_INFO("Parallel planning in distinctive topologies enabled.");
     }
     else
@@ -1373,7 +1373,7 @@ bool TebLocalPlannerROS::transformHumanPlan(
     double dist_threshold =
         std::max(costmap.getSizeInCellsX() * costmap.getResolution() / 2.0,
                  costmap.getSizeInCellsY() * costmap.getResolution() / 2.0) *
-        0.85;
+        2.0;
     double sq_dist_threshold = dist_threshold * dist_threshold;
     double x_diff, y_diff, sq_dist;
 
@@ -1390,7 +1390,7 @@ bool TebLocalPlannerROS::transformHumanPlan(
         break;
       }
     }
-
+    // start_index=0;
     // now get last point of human plan withing threshold distance from robot
     for (int i = (transformed_human_plan.size() - 1); i >= 0; i--) {
       x_diff = robot_pose.pose.position.x -
@@ -1455,7 +1455,7 @@ bool TebLocalPlannerROS::transformHumanPose(
     geometry_msgs::TransformStamped human_plan_to_global_transform;
     // tf.waitForTransform(global_frame, human_pose.header.frame_id, ros::Time(0),
                         // ros::Duration(0.5));
-    human_plan_to_global_transform = tf2.lookupTransform(global_frame, human_pose.header.frame_id, ros::Time(0),
+    human_plan_to_global_transform = tf2.lookupTransform(global_frame, human_pose.header.frame_id, ros::Time::now(),
                        ros::Duration(0.5));
     tf2::Stamped< tf2::Transform > human_plan_to_global_transform_;
     tf2::fromMsg(human_plan_to_global_transform,human_plan_to_global_transform_);

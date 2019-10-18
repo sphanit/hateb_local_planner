@@ -95,7 +95,9 @@ void TebOptimalPlanner::initialize(const TebConfig& cfg, ObstContainer* obstacle
   vel_goal_.second.angular.z = 0;
 
   robot_radius_ = robot_model_->getCircumscribedRadius();
+  std::cout << "robot_radius " <<robot_radius_<< '\n';
   human_radius_ = human_model_->getCircumscribedRadius();
+  std::cout << "human_model_ " << human_radius_<< '\n';
 
   initialized_ = true;
 }
@@ -555,7 +557,7 @@ bool TebOptimalPlanner::buildGraph(double weight_multiplier)
 
     AddEdgesTimeOptimalForHumans();
 
-    // AddEdgesKinematicsDiffDriveForHumans();
+    AddEdgesKinematicsDiffDriveForHumans();
     // AddEdgesKinematicsCarlikeForHumans();
 
     if (cfg_->hateb.use_human_robot_safety_c) {
@@ -1692,6 +1694,11 @@ void TebOptimalPlanner::AddEdgesHumanRobotTTC() {
   information_human_robot_ttc.fill(cfg_->optim.weight_human_robot_ttc);
 
   auto robot_teb_size = (int)teb_.sizePoses();
+  // static int i=0;
+  // i++;
+  // if(i>cfg_->hateb.ttcplus_timer){
+    // std::cout << "i: " << i<< '\n';
+  // i=0;
   for (auto &human_teb_kv : humans_tebs_map_) {
     auto &human_teb = human_teb_kv.second;
 
@@ -1711,6 +1718,7 @@ void TebOptimalPlanner::AddEdgesHumanRobotTTC() {
       optimizer_->addEdge(human_robot_ttc_edge);
     }
   }
+// }
 }
 
 void TebOptimalPlanner::AddEdgesHumanRobotTTClosest() {                                       //michele
@@ -1754,7 +1762,7 @@ void TebOptimalPlanner::AddEdgesHumanRobotTTCplus() {                           
     for (unsigned int i = 0;
          (i < human_teb_size - 1) && (i < robot_teb_size - 1); i++) {
 
-       EdgeHumanRobotTTCplus *human_robot_ttcplus_edge = new EdgeHumanRobotTTCplus();          //michele
+      EdgeHumanRobotTTCplus *human_robot_ttcplus_edge = new EdgeHumanRobotTTCplus();          //michele
       human_robot_ttcplus_edge->setVertex(0, teb_.PoseVertex(i));
       human_robot_ttcplus_edge->setVertex(1, teb_.PoseVertex(i + 1));
       human_robot_ttcplus_edge->setVertex(2, teb_.TimeDiffVertex(i));

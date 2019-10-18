@@ -431,7 +431,7 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig& cfg)
   hateb.ttc_threshold = cfg.ttc_threshold;
   hateb.ttclosest_threshold = cfg.ttclosest_threshold;							//michele
   hateb.ttcplus_threshold = cfg.ttcplus_threshold;
-//  human.ttcplus_timer = cfg.ttcplus_timer;
+  hateb.ttcplus_timer = cfg.ttcplus_timer;
   hateb.dir_cost_threshold = cfg.dir_cost_threshold;
   hateb.visibility_cost_threshold = cfg.visibility_cost_threshold;
   hateb.pose_prediction_reset_time = cfg.human_pose_prediction_reset_time;

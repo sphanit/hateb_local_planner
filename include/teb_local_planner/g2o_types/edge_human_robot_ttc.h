@@ -40,7 +40,7 @@
 #include <teb_local_planner/g2o_types/penalties.h>
 #include <teb_local_planner/teb_config.h>
 #include <teb_local_planner/g2o_types/base_teb_edges.h>
-
+#include <iostream>
 // #include "g2o/core/base_multi_edge.h"
 
 namespace teb_local_planner {
@@ -59,9 +59,7 @@ public:
   // }
 
   void computeError() {
-    ROS_ASSERT_MSG(cfg_ &&
-                       (radius_sum_ < std::numeric_limits<double>::infinity()),
-                   "You must call setParameters() on EdgeHumanRobotTTC()");
+    ROS_ASSERT_MSG(cfg_ && (radius_sum_ < std::numeric_limits<double>::infinity()), "You must call setParameters() on EdgeHumanRobotTTC()");
     const VertexPose *robot_bandpt =
         static_cast<const VertexPose *>(_vertices[0]);
     const VertexPose *robot_bandpt_nxt =
@@ -85,8 +83,9 @@ public:
     Eigen::Vector2d C = human_bandpt->position() - robot_bandpt->position();
 
     double ttc = std::numeric_limits<double>::infinity();
-    // int count = 0;
     double C_sq = C.dot(C);
+    // static double i=0;
+
     if (C_sq <= radius_sum_sq_) {
       ttc = 0.0;
     } else {
@@ -97,19 +96,23 @@ public:
         double f = (C_dot_V * C_dot_V) - (V_sq * (C_sq - radius_sum_sq_));
         if (f > 0) { // otherwise ttc is infinite
           // count++;
+          // i=i+1;
           ttc = (C_dot_V - std::sqrt(f)) / V_sq;
         }
       }
     }
 
     if (ttc < std::numeric_limits<double>::infinity()) {
+      	// if( i > cfg_->hateb.ttcplus_timer ){
+          // i=0;
       _error[0] = penaltyBoundFromBelow(ttc, cfg_->hateb.ttc_threshold, cfg_->optim.penalty_epsilon);
       // _error[0] = _error[0]*_error[0];
       if (cfg_->hateb.scale_human_robot_ttc_c) {
         _error[0] = _error[0] * cfg_->optim.human_robot_ttc_scale_alpha / C_sq;
       }
-
+    // }
     } else {
+      // i=0;
       // no collsion possible
       // double k = cfg_->hateb.ttc_threshold/2;
       // _error[0] = penaltyBoundFromBelow(ttc, cfg_->hateb.ttc_threshold, cfg_->optim.penalty_epsilon)/(k*k);

@@ -238,6 +238,7 @@ install(PROGRAMS
   scripts/publish_test_obstacles.py
   scripts/publish_viapoints.py
   scripts/visualize_velocity_profile.py
+  scripts/save_to_files.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

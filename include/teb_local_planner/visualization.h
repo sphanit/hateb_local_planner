@@ -296,7 +296,7 @@ protected:
   ros::Publisher humans_local_trajs_pub_;
   ros::Publisher teb_poses_pub_, teb_fp_poses_pub_; //!< Publisher for the trajectory pose sequence
   ros::Publisher humans_tebs_poses_pub_, humans_tebs_fp_poses_pub_; //!< Publisher for the trajectory pose sequence
-  ros::Publisher teb_marker_pub_; //!< Publisher for visualization markers
+  ros::Publisher teb_marker_pub_,arrow_pub; //!< Publisher for visualization markers
   ros::Publisher feedback_pub_;   //!< Publisher for the feedback message for analysis and debug purposes
   ros::Publisher robot_traj_time_pub_, robot_path_time_pub_;
   ros::Publisher human_trajs_time_pub_, human_paths_time_pub_, marker_pub;

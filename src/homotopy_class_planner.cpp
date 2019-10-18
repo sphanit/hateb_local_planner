@@ -48,9 +48,9 @@ HomotopyClassPlanner::HomotopyClassPlanner() : cfg_(NULL), obstacles_(NULL), via
 }
 
 HomotopyClassPlanner::HomotopyClassPlanner(const TebConfig& cfg, ObstContainer* obstacles, RobotFootprintModelPtr robot_model,
-                                           TebVisualizationPtr visual, const ViaPointContainer* via_points) : initial_plan_(NULL)
+                                           TebVisualizationPtr visual, const ViaPointContainer* via_points, CircularRobotFootprintPtr human_model, const std::map<uint64_t, ViaPointContainer> *humans_via_points_map) : initial_plan_(NULL)
 {
-  initialize(cfg, obstacles, robot_model, visual, via_points);
+  initialize(cfg, obstacles, robot_model, visual, via_points, human_model, humans_via_points_map);
 }
 
 HomotopyClassPlanner::~HomotopyClassPlanner()
@@ -58,12 +58,14 @@ HomotopyClassPlanner::~HomotopyClassPlanner()
 }
 
 void HomotopyClassPlanner::initialize(const TebConfig& cfg, ObstContainer* obstacles, RobotFootprintModelPtr robot_model,
-                                      TebVisualizationPtr visual, const ViaPointContainer* via_points)
+                                      TebVisualizationPtr visual, const ViaPointContainer* via_points, CircularRobotFootprintPtr human_model, const std::map<uint64_t, ViaPointContainer> *humans_via_points_map)
 {
   cfg_ = &cfg;
   obstacles_ = obstacles;
   via_points_ = via_points;
   robot_model_ = robot_model;
+  human_model_ = human_model;
+  humans_via_points_map_=humans_via_points_map;
 
   if (cfg_->hcp.simple_exploration)
     graph_search_ = boost::shared_ptr<GraphSearchInterface>(new lrKeyPointGraph(*cfg_, this));
@@ -71,6 +73,7 @@ void HomotopyClassPlanner::initialize(const TebConfig& cfg, ObstContainer* obsta
     graph_search_ = boost::shared_ptr<GraphSearchInterface>(new ProbRoadmapGraph(*cfg_, this));
 
   initialized_ = true;
+  std::cout << "I am in HCP" << '\n';
 
   setVisualization(visual);
 }
@@ -384,8 +387,8 @@ TebOptimalPlannerPtr HomotopyClassPlanner::addAndInitNewTeb(const PoseSE2& start
 {
   if(tebs_.size() >= cfg_->hcp.max_number_classes)
     return TebOptimalPlannerPtr();
-  TebOptimalPlannerPtr candidate =  TebOptimalPlannerPtr( new TebOptimalPlanner(*cfg_, obstacles_, robot_model_, visualization_));
-
+  TebOptimalPlannerPtr candidate =  TebOptimalPlannerPtr( new TebOptimalPlanner(*cfg_, obstacles_, robot_model_, visualization_,via_points_, human_model_, humans_via_points_map_));
+                                                                                              // cfg_, &obstacles_, robot_model, visualization_, &via_points_, human_model, &humans_via_points_map_))
   candidate->teb().initTrajectoryToGoal(start, goal, 0, cfg_->robot.max_vel_x, cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion);
 
   if (start_velocity)
@@ -409,7 +412,7 @@ TebOptimalPlannerPtr HomotopyClassPlanner::addAndInitNewTeb(const std::vector<ge
 {
   if(tebs_.size() >= cfg_->hcp.max_number_classes)
     return TebOptimalPlannerPtr();
-  TebOptimalPlannerPtr candidate = TebOptimalPlannerPtr( new TebOptimalPlanner(*cfg_, obstacles_, robot_model_, visualization_));
+  TebOptimalPlannerPtr candidate = TebOptimalPlannerPtr( new TebOptimalPlanner(*cfg_, obstacles_, robot_model_, visualization_,via_points_,human_model_,humans_via_points_map_));
 
   candidate->teb().initTrajectoryToGoal(initial_plan, cfg_->robot.max_vel_x,
     cfg_->trajectory.global_plan_overwrite_orientation, cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion);
@@ -804,5 +807,14 @@ bool HomotopyClassPlanner::computeStartOrientation(const TebOptimalPlannerPtr pl
   return true;
 }
 
+void HomotopyClassPlanner::getFullTrajectory(std::vector<TrajectoryPointMsg> &trajectory) const
+{
+  return;
+}
+
+void HomotopyClassPlanner::getFullHumanTrajectory(const uint64_t human_id, std::vector<TrajectoryPointMsg> &human_trajectory)
+{
+  return;
+}
 
 } // end namespace

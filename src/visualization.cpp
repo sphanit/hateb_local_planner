@@ -111,6 +111,7 @@ void TebVisualization::initialize(ros::NodeHandle& nh, const TebConfig& cfg)
   human_paths_time_pub_ =
       nh.advertise<hanp_msgs::HumanTimeToGoalArray>(HUMAN_PATHS_TIME_TOPIC, 1);
   marker_pub = nh.advertise<visualization_msgs::Marker>("human_test_marker", 1);
+  arrow_pub = nh.advertise<visualization_msgs::Marker>("human_test_arrow", 1);
 
   last_publish_robot_global_plan =
       cfg_->visualization.publish_robot_global_plan;
@@ -552,10 +553,12 @@ void TebVisualization::publishHumanTrajectories(
 }
 
 void TebVisualization::publishTestHumans(const hanp_msgs::TrackedHumansConstPtr &humans){
-  visualization_msgs::Marker marker;
+  visualization_msgs::Marker marker,arrow;
     // Set the frame ID and timestamp.  See the TF tutorials for information on these.
     marker.header.frame_id = "map";
     marker.header.stamp = ros::Time::now();
+    arrow.header.frame_id = "map";
+    arrow.header.stamp = ros::Time::now();
     for(auto &human : humans->humans)
     {
       for(auto segment : human.segments)
@@ -563,26 +566,36 @@ void TebVisualization::publishTestHumans(const hanp_msgs::TrackedHumansConstPtr 
           // Any marker sent with the same namespace and id will overwrite the old one
           marker.ns = "basic_shapes";
           marker.id = 0;
+          arrow.ns = "basic_shapes";
+          arrow.id=0;
 
           // Set the marker type.  Initially this is CUBE, and cycles between that and SPHERE, ARROW, and CYLINDER
           marker.type = shape;
+          arrow.type = visualization_msgs::Marker::ARROW;
 
           // Set the marker action.  Options are ADD, DELETE, and new in ROS Indigo: 3 (DELETEALL)
           marker.action = visualization_msgs::Marker::ADD;
+          arrow.action = visualization_msgs::Marker::ADD;
 
           // Set the pose of the marker.  This is a full 6DOF pose relative to the frame/time specified in the header
           marker.pose.position.x = segment.pose.pose.position.x;
           marker.pose.position.y = segment.pose.pose.position.y;
-          marker.pose.position.z = segment.pose.pose.position.z;
-          marker.pose.orientation.x = 0.0;
-          marker.pose.orientation.y = 0.0;
-          marker.pose.orientation.z = 0.0;
-          marker.pose.orientation.w = 1.0;
+          marker.pose.position.z = 0.9;
+          marker.pose.orientation = segment.pose.pose.orientation;
+
+          arrow.pose.position.x = segment.pose.pose.position.x;
+          arrow.pose.position.y = segment.pose.pose.position.y;
+          arrow.pose.position.z = 0.0;
+          arrow.pose.orientation = segment.pose.pose.orientation;
 
           // Set the scale of the marker -- 1x1x1 here means 1m on a side
-          marker.scale.x = 1.0;
-          marker.scale.y = 1.0;
-          marker.scale.z = 1.0;
+          marker.scale.x = 0.6;
+          marker.scale.y = 0.6;
+          marker.scale.z = 1.8;
+
+          arrow.scale.x = 0.8;
+          arrow.scale.y = 0.05;
+          arrow.scale.z = 0.05;
 
           // Set the color -- be sure to set alpha to something non-zero!
           marker.color.r = 0.0f;
@@ -590,8 +603,15 @@ void TebVisualization::publishTestHumans(const hanp_msgs::TrackedHumansConstPtr 
           marker.color.b = 0.0f;
           marker.color.a = 1.0;
 
+          arrow.color.r = 1.0f;
+          arrow.color.g = 1.0f;
+          arrow.color.b = 0.0f;
+          arrow.color.a = 1.0;
+
           marker.lifetime = ros::Duration();
+          arrow.lifetime = ros::Duration();
           marker_pub.publish(marker);
+          arrow_pub.publish(arrow);
         }
     }
 
