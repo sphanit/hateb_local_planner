@@ -216,10 +216,14 @@ bool TebOptimalPlanner::optimizeTEB(int iterations_innerloop, int iterations_out
     if (cfg_->trajectory.teb_autosize)
     {
       //teb_.autoResize(cfg_->trajectory.dt_ref, cfg_->trajectory.dt_hysteresis, cfg_->trajectory.min_samples, cfg_->trajectory.max_samples);
-      teb_.autoResize(cfg_->trajectory.dt_ref, cfg_->trajectory.dt_hysteresis, cfg_->trajectory.min_samples, cfg_->trajectory.max_samples, fast_mode);
-
+      // teb_.autoResize(cfg_->trajectory.dt_ref, cfg_->trajectory.dt_hysteresis, cfg_->trajectory.min_samples, cfg_->trajectory.max_samples, fast_mode);
+      teb_.autoResize(cfg_->trajectory.dt_ref, cfg_->trajectory.dt_hysteresis,
+                      cfg_->trajectory.min_samples);
         for (auto &human_teb_kv : humans_tebs_map_)
-          human_teb_kv.second.autoResize(cfg_->trajectory.dt_ref, cfg_->trajectory.dt_hysteresis, cfg_->trajectory.min_samples, cfg_->trajectory.max_samples, fast_mode);
+          // human_teb_kv.second.autoResize(cfg_->trajectory.dt_ref, cfg_->trajectory.dt_hysteresis, cfg_->trajectory.min_samples, cfg_->trajectory.max_samples, fast_mode);
+          human_teb_kv.second.autoResize(cfg_->trajectory.dt_ref,
+                                         cfg_->trajectory.dt_hysteresis,
+                                         cfg_->trajectory.min_samples);
     }
 
     success = buildGraph(weight_multiplier);
@@ -268,7 +272,18 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
   if (!teb_.isInit())
   {
     // init trajectory
-    teb_.initTrajectoryToGoal(initial_plan, cfg_->robot.max_vel_x, cfg_->trajectory.global_plan_overwrite_orientation, cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion);
+    // teb_.initTrajectoryToGoal(initial_plan, cfg_->robot.max_vel_x, cfg_->trajectory.global_plan_overwrite_orientation, cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion,cfg_->trajectory.teb_init_skip_dist);
+    teb_.initTEBtoGoal(initial_plan, cfg_->trajectory.dt_ref, true,
+                       cfg_->trajectory.min_samples,
+                       cfg_->trajectory.teb_init_skip_dist);
+  }
+  else if (cfg_->optim.disable_warm_start){
+    teb_.clearTimedElasticBand();
+    // teb_.initTrajectoryToGoal(initial_plan, cfg_->robot.max_vel_x, cfg_->trajectory.global_plan_overwrite_orientation, cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion,cfg_->trajectory.teb_init_skip_dist);
+    teb_.initTEBtoGoal(initial_plan, cfg_->trajectory.dt_ref, true,
+                       cfg_->trajectory.min_samples,
+                       cfg_->trajectory.teb_init_skip_dist);
+
   }
   else // warm start
   {
@@ -283,7 +298,10 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
     {
       ROS_DEBUG("New goal: distance to existing goal is higher than the specified threshold. Reinitalizing trajectories.");
       teb_.clearTimedElasticBand();
-      teb_.initTrajectoryToGoal(initial_plan, cfg_->robot.max_vel_x, true, cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion);
+      // teb_.initTrajectoryToGoal(initial_plan, cfg_->robot.max_vel_x, true, cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion);
+      teb_.initTEBtoGoal(initial_plan, cfg_->trajectory.dt_ref, true,
+                         cfg_->trajectory.min_samples,
+                         cfg_->trajectory.teb_init_skip_dist);
     }
   }
   if (start_vel)
@@ -340,15 +358,20 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
       {
         // create new human-teb for new human
         humans_tebs_map_[human_id] = TimedElasticBand();
-        humans_tebs_map_[human_id].initTrajectoryToGoal(initial_human_plan, cfg_->human.max_vel_x, true, cfg_->trajectory.human_min_samples, false, cfg_->trajectory.teb_init_skip_dist);
-
+        // humans_tebs_map_[human_id].initTrajectoryToGoal(initial_human_plan, cfg_->human.max_vel_x, true, cfg_->trajectory.human_min_samples, cfg_->trajectory.allow_init_with_backwards_motion, cfg_->trajectory.teb_init_skip_dist);
+        humans_tebs_map_[human_id].initTEBtoGoal(
+            initial_human_plan, cfg_->trajectory.dt_ref, true,
+            cfg_->trajectory.human_min_samples,
+            cfg_->trajectory.teb_init_skip_dist);
       }
       else if (cfg_->optim.disable_warm_start)
       {
         auto &human_teb = humans_tebs_map_[human_id];
         human_teb.clearTimedElasticBand();
-        human_teb.initTrajectoryToGoal(initial_human_plan, cfg_->human.max_vel_x, true, cfg_->trajectory.human_min_samples, false, cfg_->trajectory.teb_init_skip_dist);
-
+        // human_teb.initTrajectoryToGoal(initial_human_plan, cfg_->human.max_vel_x, true, cfg_->trajectory.human_min_samples, cfg_->trajectory.allow_init_with_backwards_motion, cfg_->trajectory.teb_init_skip_dist);
+        human_teb.initTEBtoGoal(initial_human_plan, cfg_->trajectory.dt_ref,
+                                true, cfg_->trajectory.human_min_samples,
+                                cfg_->trajectory.teb_init_skip_dist);
       }
 
       else
@@ -363,7 +386,10 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
         {
         ROS_DEBUG("New goal: distance to existing goal is higher than the specified threshold. Reinitializing human trajectories.");
         human_teb.clearTimedElasticBand();
-        human_teb.initTrajectoryToGoal(initial_human_plan, cfg_->human.max_vel_x, true, cfg_->trajectory.human_min_samples, false, cfg_->trajectory.teb_init_skip_dist);
+        // human_teb.initTrajectoryToGoal(initial_human_plan, cfg_->human.max_vel_x, true, cfg_->trajectory.human_min_samples, false, cfg_->trajectory.teb_init_skip_dist);
+        human_teb.initTEBtoGoal(initial_human_plan, cfg_->trajectory.dt_ref,
+                                true, cfg_->trajectory.human_min_samples,
+                                cfg_->trajectory.teb_init_skip_dist);
         }
       }
       // give start velocity for humans
@@ -451,7 +477,10 @@ bool TebOptimalPlanner::plan(const tf::Pose& start, const tf::Pose& goal, const 
   auto start_time = ros::Time::now();
   PoseSE2 start_(start);
   PoseSE2 goal_(goal);
-  return plan(start_, goal_, start_vel);
+  geometry_msgs::Twist *zero_vel;
+  const geometry_msgs::Twist *vel = start_vel ? start_vel : zero_vel;
+  auto pre_plan_time = ros::Time::now() - start_time;
+  return plan(start_, goal_, vel, free_goal_vel, pre_plan_time.toSec());
 }
 
 bool TebOptimalPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel, bool free_goal_vel, double pre_plan_time)
@@ -461,7 +490,9 @@ bool TebOptimalPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const ge
   if (!teb_.isInit())
   {
     // init trajectory
-    teb_.initTrajectoryToGoal(start, goal, 0, cfg_->robot.max_vel_x, cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion); // 0 intermediate samples, but dt=1 -> autoResize will add more samples before calling first optimization
+    // teb_.initTrajectoryToGoal(start, goal, 0, cfg_->robot.max_vel_x, cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion); // 0 intermediate samples, but dt=1 -> autoResize will add more samples before calling first optimization
+    teb_.initTEBtoGoal(start, goal, 0, 1,
+                       cfg_->trajectory.min_samples);
   }
   else // warm start
   {
@@ -471,7 +502,8 @@ bool TebOptimalPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const ge
     {
       ROS_DEBUG("New goal: distance to existing goal is higher than the specified threshold. Reinitalizing trajectories.");
       teb_.clearTimedElasticBand();
-      teb_.initTrajectoryToGoal(start, goal, 0, cfg_->robot.max_vel_x, cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion);
+      // teb_.initTrajectoryToGoal(start, goal, 0, cfg_->robot.max_vel_x, cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion);
+      teb_.initTEBtoGoal(start, goal, 0, 1, cfg_->trajectory.min_samples);
     }
   }
   if (start_vel)
@@ -605,7 +637,7 @@ bool TebOptimalPlanner::optimizeGraph(int no_iterations,bool clear_after)
     return false;
   }
 
-  if (!teb_.isInit() || teb_.sizePoses() < cfg_->trajectory.min_samples)
+  if (!teb_.isInit() || (int)teb_.sizePoses() < cfg_->trajectory.min_samples)
   {
     ROS_WARN("optimizeGraph(): TEB is empty or has too less elements. Skipping optimization.");
     if (clear_after) clearGraph();

@@ -232,7 +232,7 @@ void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand& teb, con
     pose.header.stamp = now;
     pose.pose.position.x = teb.Pose(i).x();
     pose.pose.position.y = teb.Pose(i).y();
-    pose.pose.position.z = cfg_->hcp.visualize_with_time_as_z_axis_scale*teb.getSumOfTimeDiffsUpToIdx(i);
+    pose.pose.position.z = 0;//cfg_->hcp.visualize_with_time_as_z_axis_scale*teb.getSumOfTimeDiffsUpToIdx(i);
     pose.pose.orientation = tf::createQuaternionMsgFromYaw(teb.Pose(i).theta());
     teb_path.poses.push_back(pose);
     teb_poses.poses.push_back(pose.pose);

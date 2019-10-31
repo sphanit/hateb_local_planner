@@ -41,8 +41,8 @@
 
 namespace teb_local_planner
 {
-  
-  
+
+
 template<typename BidirIter, typename Fun>
 EquivalenceClassPtr HomotopyClassPlanner::calculateEquivalenceClass(BidirIter path_start, BidirIter path_end, Fun fun_cplx_point, const ObstContainer* obstacles,
                                                                     boost::optional<TimeDiffSequence::iterator> timediff_start, boost::optional<TimeDiffSequence::iterator> timediff_end)
@@ -67,9 +67,11 @@ TebOptimalPlannerPtr HomotopyClassPlanner::addAndInitNewTeb(BidirIter path_start
 {
   TebOptimalPlannerPtr candidate = TebOptimalPlannerPtr( new TebOptimalPlanner(*cfg_, obstacles_, robot_model_));
 
-  candidate->teb().initTrajectoryToGoal(path_start, path_end, fun_position, cfg_->robot.max_vel_x, cfg_->robot.max_vel_theta,
-                                 cfg_->robot.acc_lim_x, cfg_->robot.acc_lim_theta, start_orientation, goal_orientation, cfg_->trajectory.min_samples,
-                                 cfg_->trajectory.allow_init_with_backwards_motion);
+  // candidate->teb().initTrajectoryToGoal(path_start, path_end, fun_position, cfg_->robot.max_vel_x, cfg_->robot.max_vel_theta,
+                                 // cfg_->robot.acc_lim_x, cfg_->robot.acc_lim_theta, start_orientation, goal_orientation, cfg_->trajectory.min_samples,
+                                 // cfg_->trajectory.allow_init_with_backwards_motion);
+  candidate->teb().initTEBtoGoal(path_start, path_end, fun_position, cfg_->robot.max_vel_x, cfg_->robot.max_vel_theta,
+                                 cfg_->robot.acc_lim_x, cfg_->robot.acc_lim_theta, start_orientation, goal_orientation, cfg_->trajectory.min_samples);
 
   if (start_velocity)
     candidate->setVelocityStart(*start_velocity);
@@ -86,6 +88,5 @@ TebOptimalPlannerPtr HomotopyClassPlanner::addAndInitNewTeb(BidirIter path_start
   // If the candidate constitutes no new equivalence class, return a null pointer
   return TebOptimalPlannerPtr();
 }
-  
-} // namespace teb_local_planner
 
+} // namespace teb_local_planner
