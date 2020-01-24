@@ -291,7 +291,7 @@ bool TimedElasticBand::initTEBtoGoal(BidirIter path_start, BidirIter path_end, F
 	}
 	else timestep = timestep_vel;
 
-	if (timestep<0) timestep=0.2; // TODO: this is an assumption
+	if (timestep<=0) timestep=0.2; // TODO: this is an assumption
 
 	addPoseAndTimeDiff(curr_point, atan2(diff_last[1],diff_last[0]) ,timestep);
 
@@ -308,7 +308,7 @@ bool TimedElasticBand::initTEBtoGoal(BidirIter path_start, BidirIter path_end, F
 	}
 	else timestep = timestep_vel;
 
-	if (timestep<0) timestep=0.2; // TODO: this is an assumption
+	if (timestep<=0) timestep=0.2; // TODO: this is an assumption
 
 	addPoseAndTimeDiff(curr_point, atan2(diff_last[1],diff_last[0]) ,timestep);
 

@@ -66,9 +66,11 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle& nh)
   nh.param("global_plan_prune_distance", trajectory.global_plan_prune_distance, trajectory.global_plan_prune_distance);
   nh.param("exact_arc_length", trajectory.exact_arc_length, trajectory.exact_arc_length);
   nh.param("force_reinit_new_goal_dist", trajectory.force_reinit_new_goal_dist, trajectory.force_reinit_new_goal_dist);
+  nh.param("force_reinit_new_goal_angular", trajectory.force_reinit_new_goal_angular, trajectory.force_reinit_new_goal_angular);
   nh.param("feasibility_check_no_poses", trajectory.feasibility_check_no_poses, trajectory.feasibility_check_no_poses);
   nh.param("publish_feedback", trajectory.publish_feedback, trajectory.publish_feedback);
   nh.param("min_resolution_collision_check_angular", trajectory.min_resolution_collision_check_angular, trajectory.min_resolution_collision_check_angular);
+  nh.param("control_look_ahead_poses", trajectory.control_look_ahead_poses, trajectory.control_look_ahead_poses);
   nh.param("horizon_reduction_amount", trajectory.horizon_reduction_amount, trajectory.horizon_reduction_amount);
   nh.param("teb_init_skip_dist", trajectory.teb_init_skip_dist, trajectory.teb_init_skip_dist);
   // Robot
@@ -316,6 +318,7 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig& cfg)
   trajectory.max_global_plan_lookahead_dist = cfg.max_global_plan_lookahead_dist;
   trajectory.exact_arc_length = cfg.exact_arc_length;
   trajectory.force_reinit_new_goal_dist = cfg.force_reinit_new_goal_dist;
+  trajectory.force_reinit_new_goal_angular = cfg.force_reinit_new_goal_angular;
   trajectory.feasibility_check_no_poses = cfg.feasibility_check_no_poses;
   trajectory.publish_feedback = cfg.publish_feedback;
   trajectory.horizon_reduction_amount = cfg.horizon_reduction_amount;

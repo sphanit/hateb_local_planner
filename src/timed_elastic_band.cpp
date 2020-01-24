@@ -732,6 +732,27 @@
 
 namespace teb_local_planner
 {
+namespace
+{
+  /**
+   * estimate the time to move from start to end.
+   * Assumes constant velocity for the motion.
+   */
+  double estimateDeltaT(const PoseSE2& start, const PoseSE2& end,
+                        double max_vel_x, double max_vel_theta)
+  {
+    double dt_constant_motion = 0.1;
+    if (max_vel_x > 0) {
+      double trans_dist = (end.position() - start.position()).norm();
+      dt_constant_motion = trans_dist / max_vel_x;
+    }
+    if (max_vel_theta > 0) {
+      double rot_dist = std::abs(g2o::normalize_theta(end.theta() - start.theta()));
+      dt_constant_motion = std::max(dt_constant_motion, rot_dist / max_vel_theta);
+    }
+    return dt_constant_motion;
+  }
+} // namespace
 
 
 TimedElasticBand::TimedElasticBand()
@@ -768,6 +789,7 @@ void TimedElasticBand::addPose(const Eigen::Ref<const Eigen::Vector2d>& position
 
 void TimedElasticBand::addTimeDiff(double dt, bool fixed)
 {
+  ROS_ASSERT_MSG(dt > 0., "Adding a timediff requires a positive dt");
   VertexTimeDiff* timediff_vertex = new VertexTimeDiff(dt, fixed);
   timediff_vec_.push_back( timediff_vertex );
   return;
@@ -893,6 +915,7 @@ void TimedElasticBand::setTimeDiffVertexFixed(unsigned int index, bool status)
 
 void TimedElasticBand::autoResize(double dt_ref, double dt_hysteresis, int min_samples)
 {
+  ROS_ASSERT(sizeTimeDiffs() == 0 || sizeTimeDiffs() + 1 == sizePoses());
   /// iterate through all TEB states only once and add/remove states!
   for(unsigned int i=0; i < sizeTimeDiffs(); ++i) // TimeDiff connects Point(i) with Point(i+1)
   {
@@ -917,6 +940,12 @@ void TimedElasticBand::autoResize(double dt_ref, double dt_hysteresis, int min_s
         TimeDiff(i+1) = TimeDiff(i+1) + TimeDiff(i);
         deleteTimeDiff(i);
         deletePose(i+1);
+      }
+      else
+      { // last motion should be adjusted, shift time to the interval before
+          TimeDiff(i-1) += TimeDiff(i);
+          deleteTimeDiff(i);
+          deletePose(i);
       }
     }
   }
@@ -1030,6 +1059,7 @@ bool TimedElasticBand::initTEBtoGoal(const std::vector<geometry_msgs::PoseStampe
         {
             yaw = tf::getYaw(plan[i].pose.orientation);
         }
+	//double dt = estimateDeltaT(BackPose(), intermediate_pose, max_vel_x, max_vel_theta);
         addPoseAndTimeDiff(plan[i].pose.position.x, plan[i].pose.position.y, yaw, dt);
     }
 
@@ -1042,11 +1072,13 @@ bool TimedElasticBand::initTEBtoGoal(const std::vector<geometry_msgs::PoseStampe
       while ((int)sizePoses() < min_samples-1) // subtract goal point that will be added later
       {
         // simple strategy: interpolate between the current pose and the goal
+	// double dt = estimateDeltaT(BackPose(), intermediate_pose, max_vel_x, max_vel_theta);
         addPoseAndTimeDiff( PoseSE2::average(BackPose(), goal), dt ); // let the optimier correct the timestep (TODO: better initialization
       }
     }
 
     // Now add final state with given orientation
+    //double dt = estimateDeltaT(BackPose(), goal, max_vel_x, max_vel_theta);
     addPoseAndTimeDiff(goal, dt);
     setPoseVertexFixed(sizePoses()-1,true); // GoalConf is a fixed constraint during optimization
   }

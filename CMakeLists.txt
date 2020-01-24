@@ -16,6 +16,8 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   nav_core
   nav_msgs
+  mbf_costmap_core
+  mbf_msgs
   roscpp
   std_msgs
   std_srvs
@@ -272,7 +274,12 @@ install(DIRECTORY
 #############
 ## Testing ##
 #############
-
+if (CATKIN_ENABLE_TESTING)
+  catkin_add_gtest(test_teb_basics test/teb_basics.cpp)
+  if(TARGET test_teb_basics)
+     target_link_libraries(test_teb_basics teb_local_planner)
+  endif()
+endif()
 ## Add gtest based cpp test target and link libraries
 # catkin_add_gtest(${PROJECT_NAME}-test test/test_teb_local_planner.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
