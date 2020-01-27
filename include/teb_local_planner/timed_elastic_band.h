@@ -503,7 +503,7 @@ public:
    * @param fast_mode if true, the trajectory is iterated once to insert or erase points; if false the trajectory
    *                  is repeatedly iterated until no poses are added or removed anymore
    */
-  void autoResize(double dt_ref, double dt_hysteresis, int min_samples = 3, int max_samples=1000, bool fast_mode=false);
+  void autoResize(double dt_ref, double dt_hysteresis, int min_samples = 3, int max_samples=1000, bool fast_mode=true);
 
   /**
    * @brief Set a pose vertex at pos \c index of the pose sequence to be fixed or unfixed during optimization.

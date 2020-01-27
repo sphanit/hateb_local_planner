@@ -108,14 +108,14 @@ bool TimedElasticBand::initTrajectoryToGoal(BidirIter path_start, BidirIter path
             }
             else timestep = timestep_vel;
 
-            if (timestep<0) timestep=0.2; // TODO: this is an assumption
+            if (timestep<=0) timestep=0.2; // TODO: this is an assumption
 
             double yaw = atan2(diff_last[1],diff_last[0]);
             if (backwards)
                 yaw = g2o::normalize_theta(yaw + M_PI);
             addPoseAndTimeDiff(curr_point, yaw ,timestep);
 
-            /*
+
             // TODO: the following code does not seem to hot-start the optimizer. Instead it recudes convergence time.
 
             Eigen::Vector2d diff_next = fun_position(*boost::next(path_start))-curr_point; // TODO maybe store the boost::next for the following iteration
@@ -131,14 +131,14 @@ bool TimedElasticBand::initTrajectoryToGoal(BidirIter path_start, BidirIter path
             }
             else timestep = timestep_vel;
 
-            if (timestep<0) timestep=0.2; // TODO: this is an assumption
+            if (timestep<=0) timestep=0.2; // TODO: this is an assumption
 
             yaw = atan2(diff_last[1],diff_last[0]); // TODO redundant right now, not yet finished
             if (backwards)
                 yaw = g2o::normalize_theta(yaw + M_PI);
             addPoseAndTimeDiff(curr_point, yaw ,timestep);
 
-            */
+
 
             ++idx;
       }
@@ -163,7 +163,7 @@ bool TimedElasticBand::initTrajectoryToGoal(BidirIter path_start, BidirIter path
         while (sizePoses() < min_samples-1) // subtract goal point that will be added later
         {
           // Each inserted point bisects the remaining distance. Thus the timestep is also bisected.
-          timestep /= 2;
+          // timestep /= 2;
           // simple strategy: interpolate between the current pose and the goal
           addPoseAndTimeDiff( PoseSE2::average(BackPose(), goal), timestep ); // let the optimier correct the timestep (TODO: better initialization
         }

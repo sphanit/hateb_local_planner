@@ -41,7 +41,27 @@
 
 namespace teb_local_planner
 {
-
+namespace
+{
+  /**
+   * estimate the time to move from start to end.
+   * Assumes constant velocity for the motion.
+   */
+  double estimateDeltaT(const PoseSE2& start, const PoseSE2& end,
+                        double max_vel_x, double max_vel_theta)
+  {
+    double dt_constant_motion = 0.1;
+    if (max_vel_x > 0) {
+      double trans_dist = (end.position() - start.position()).norm();
+      dt_constant_motion = trans_dist / max_vel_x;
+    }
+    if (max_vel_theta > 0) {
+      double rot_dist = std::abs(g2o::normalize_theta(end.theta() - start.theta()));
+      dt_constant_motion = std::max(dt_constant_motion, rot_dist / max_vel_theta);
+    }
+    return dt_constant_motion;
+  }
+} // namespace
 
 TimedElasticBand::TimedElasticBand()
 {
@@ -254,7 +274,7 @@ void TimedElasticBand::autoResize(double dt_ref, double dt_hysteresis, int min_s
 
     for(int i=0; i < sizeTimeDiffs(); ++i) // TimeDiff connects Point(i) with Point(i+1)
     {
-      if(TimeDiff(i) > dt_ref + dt_hysteresis && sizeTimeDiffs()<max_samples)
+      if(TimeDiff(i) > dt_ref + dt_hysteresis)// && sizeTimeDiffs()<max_samples)
       {
         //ROS_DEBUG("teb_local_planner: autoResize() inserting new bandpoint i=%u, #TimeDiffs=%lu",i,sizeTimeDiffs());
 
@@ -265,6 +285,8 @@ void TimedElasticBand::autoResize(double dt_ref, double dt_hysteresis, int min_s
         insertTimeDiff(i+1,newtime);
 
         modified = true;
+
+        ++i; // skip the newly inserted pose
       }
       else if(TimeDiff(i) < dt_ref - dt_hysteresis && sizeTimeDiffs()>min_samples) // only remove samples if size is larger than min_samples.
       {
@@ -1264,7 +1286,6 @@ bool TimedElasticBand::isTrajectoryInsideRegion(double radius, double max_dist_b
 //   }*/
 //   return false;
 // }
-//
 //
 //
 //
