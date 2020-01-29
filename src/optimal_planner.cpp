@@ -676,7 +676,7 @@ void TebOptimalPlanner::clearGraph()
    //optimizer.edges().clear(); // optimizer.clear deletes edges!!! Therefore do not run optimizer.edges().clear()
     optimizer_->vertices().clear();  // neccessary, because optimizer->clear deletes pointer-targets (therefore it deletes TEB states!)
     optimizer_->clear();
-  
+
   }
 }
 
@@ -1172,21 +1172,32 @@ void TebOptimalPlanner::AddEdgesVelocity()
       return; // if weight equals zero skip adding edges!
 
     int n = teb_.sizePoses();
+    int j = 0;
     Eigen::Matrix<double,2,2> information;
     information(0,0) = cfg_->optim.weight_max_vel_x;
     information(1,1) = cfg_->optim.weight_max_vel_theta;
     information(0,1) = 0.0;
     information(1,0) = 0.0;
 
-    for (int i=0; i < n - 1; ++i)
-    {
-      EdgeVelocity* velocity_edge = new EdgeVelocity;
-      velocity_edge->setVertex(0,teb_.PoseVertex(i));
-      velocity_edge->setVertex(1,teb_.PoseVertex(i+1));
-      velocity_edge->setVertex(2,teb_.TimeDiffVertex(i));
-      velocity_edge->setInformation(information);
-      velocity_edge->setTebConfig(*cfg_);
-      optimizer_->addEdge(velocity_edge);
+    for (auto &human_teb_kv : humans_tebs_map_) {
+      auto &human_teb = human_teb_kv.second;
+      for (int i=0; i < n - 1; ++i)
+      {
+        if(i<human_teb.sizePoses())
+          j=i;
+
+        EdgeVelocity* velocity_edge = new EdgeVelocity;
+        velocity_edge->setVertex(0,teb_.PoseVertex(i));
+        velocity_edge->setVertex(1,teb_.PoseVertex(i+1));
+        velocity_edge->setVertex(2,teb_.TimeDiffVertex(i));
+        velocity_edge->setVertex(3, human_teb.PoseVertex(j));
+        velocity_edge->setInformation(information);
+        if(i<human_teb.sizePoses())
+          velocity_edge->setParameters(*cfg_, robot_model_.get(), human_radius_);
+        else
+          velocity_edge->setParameters(*cfg_, robot_model_.get(), 0.0);
+        optimizer_->addEdge(velocity_edge);
+      }
     }
   }
   else // holonomic-robot
@@ -1195,23 +1206,32 @@ void TebOptimalPlanner::AddEdgesVelocity()
       return; // if weight equals zero skip adding edges!
 
     int n = teb_.sizePoses();
+    int j = 0;
     Eigen::Matrix<double,3,3> information;
     information.fill(0);
     information(0,0) = cfg_->optim.weight_max_vel_x;
     information(1,1) = cfg_->optim.weight_max_vel_y;
     information(2,2) = cfg_->optim.weight_max_vel_theta;
 
-    for (int i=0; i < n - 1; ++i)
-    {
-      EdgeVelocityHolonomic* velocity_edge = new EdgeVelocityHolonomic;
-      velocity_edge->setVertex(0,teb_.PoseVertex(i));
-      velocity_edge->setVertex(1,teb_.PoseVertex(i+1));
-      velocity_edge->setVertex(2,teb_.TimeDiffVertex(i));
-      velocity_edge->setInformation(information);
-      velocity_edge->setTebConfig(*cfg_);
-      optimizer_->addEdge(velocity_edge);
+    for (auto &human_teb_kv : humans_tebs_map_) {
+      auto &human_teb = human_teb_kv.second;
+      for (int i=0; i < n - 1; ++i)
+      {
+        if(i<human_teb.sizePoses())
+          j=i;
+        EdgeVelocityHolonomic* velocity_edge = new EdgeVelocityHolonomic;
+        velocity_edge->setVertex(0,teb_.PoseVertex(i));
+        velocity_edge->setVertex(1,teb_.PoseVertex(i+1));
+        velocity_edge->setVertex(2,teb_.TimeDiffVertex(i));
+        velocity_edge->setVertex(3, human_teb.PoseVertex(j));
+        velocity_edge->setInformation(information);
+        if(i<human_teb.sizePoses())
+          velocity_edge->setParameters(*cfg_, robot_model_.get(), human_radius_);
+        else
+          velocity_edge->setParameters(*cfg_, robot_model_.get(), 0.0);
+        optimizer_->addEdge(velocity_edge);
+      }
     }
-
   }
 }
 
@@ -2261,7 +2281,7 @@ bool TebOptimalPlanner::getVelocityCommand(double& vx, double& vy, double& omega
     omega = 0;
     return false;
   }
-  
+
   look_ahead_poses = std::max(1, std::min(look_ahead_poses, (int)teb_.sizePoses() - 1));
   double dt = 0.0;
   for(int counter = 0; counter < look_ahead_poses; ++counter)
