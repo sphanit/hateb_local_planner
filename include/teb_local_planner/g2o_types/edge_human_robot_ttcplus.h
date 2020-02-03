@@ -35,6 +35,7 @@
 #ifndef EDGE_HUMAN_ROBOT_TTCplus_H_
 #define EDGE_HUMAN_ROBOT_TTCplus_H_
 
+
 #include <teb_local_planner/g2o_types/vertex_pose.h>
 #include <teb_local_planner/g2o_types/vertex_timediff.h>
 #include <teb_local_planner/g2o_types/penalties.h>
@@ -73,57 +74,59 @@ public:
 
     double ttcplus = std::numeric_limits<double>::infinity();
     double C_sq = C.dot(C);
+    static double ttcplus_prev = std::numeric_limits<double>::infinity();
     static double i =0;
     static double j =0;
     static double d=20;
 
-    // C_sq = C.dot(C);
+    C_sq = C.dot(C);
 
     if (C_sq <= radius_sum_sq_) {
       ttcplus = 0.0;
     }
     else {
-
       Eigen::Vector2d V = robot_vel - human_vel;
       double C_dot_V = C.dot(V);
       if (C_dot_V > 0) { // otherwise ttcplus is infinite
         double V_sq = V.dot(V);
         double f = (C_dot_V * C_dot_V) - (V_sq * (C_sq - radius_sum_sq_));
         if (f > 0) {         // otherwise ttcplus is infinite
-        	//if(i==0){ d = C_sq;}
-        	i = i+1;
-          // std::cout << "I am here" << '\n';
-        	ttcplus = (C_dot_V - std::sqrt(f)) / V_sq;
+           ttcplus = (C_dot_V - std::sqrt(f)) / V_sq;
          }
        }
       }
 
-      // std::cout << "ttcplus" <<ttcplus<< '\n'
+      if(ttcplus < ttcplus_prev){
+      	i++;
+        j=0;
+      }
+      else{
+	      ttcplus_prev = std::numeric_limits<double>::infinity();
+        j++;
+        if(j>=100){
+          i=0;
+          j=0;
+        }
+      }
+
+      ttcplus_prev = ttcplus;
+
 
      if (ttcplus < std::numeric_limits<double>::infinity()) {
-     	if( i > cfg_->hateb.ttcplus_timer ){              // timer in tenth of second
-        // std::cout << "i "<<i << '\n';
-    	  j=j+1 ;
-    	  i=0 ;
-      _error[0] = penaltyBoundFromBelow(ttcplus, cfg_->hateb.ttcplus_threshold, cfg_->optim.penalty_epsilon);
-      // ttcplus = std::numeric_limits<double>::infinity();
-      // std::cout << "ttcplus" <<ttcplus<< '\n';
-      // std::cout << "_error[0] " <<_error[0]<< '\n';
+     	if( i >= cfg_->hateb.ttcplus_timer ){              // timer in tenth of second
+      	  _error[0] = penaltyBoundFromBelow(ttcplus, cfg_->hateb.ttcplus_threshold, cfg_->optim.penalty_epsilon);
 
-      if (cfg_->hateb.scale_human_robot_ttcplus_c) {
-        _error[0] = _error[0] * cfg_->optim.human_robot_ttcplus_scale_alpha / C_sq;
-      }
+      	  if (cfg_->hateb.scale_human_robot_ttcplus_c) {
+            _error[0] = _error[0] * cfg_->optim.human_robot_ttcplus_scale_alpha / C_sq;
+      	  }
+        }
      }
-    }
 
     else {
       // no collision possible
-    	 // if(C_sq > 2){
-        i=0;
-        j=0;
-        d=20;
+    	 if(C_sq > 4){
         _error[0] = 0.0;
-     	// }
+     	}
     }
 
      ROS_DEBUG_THROTTLE(0.5, "ttcplus value : %f", ttcplus);
