@@ -74,10 +74,8 @@ public:
 
     double ttcplus = std::numeric_limits<double>::infinity();
     double C_sq = C.dot(C);
-    static double ttcplus_prev = std::numeric_limits<double>::infinity();
     static double i =0;
     static double j =0;
-    static double d=20;
 
     C_sq = C.dot(C);
 
@@ -96,24 +94,10 @@ public:
        }
       }
 
-      if(ttcplus < ttcplus_prev){
-      	i++;
-        j=0;
-      }
-      else{
-	      ttcplus_prev = std::numeric_limits<double>::infinity();
-        j++;
-        if(j>=100){
-          i=0;
-          j=0;
-        }
-      }
-
-      ttcplus_prev = ttcplus;
-
-
      if (ttcplus < std::numeric_limits<double>::infinity()) {
-     	if( i >= cfg_->hateb.ttcplus_timer ){              // timer in tenth of second
+       i++;
+       j=0;
+     	if( i >= cfg_->hateb.ttcplus_timer ){              // timer for number of poses to check
       	  _error[0] = penaltyBoundFromBelow(ttcplus, cfg_->hateb.ttcplus_threshold, cfg_->optim.penalty_epsilon);
 
       	  if (cfg_->hateb.scale_human_robot_ttcplus_c) {
@@ -124,6 +108,11 @@ public:
 
     else {
       // no collision possible
+      j++;
+      if(j>=cfg_->hateb.ttcplus_timer*10){ //Check if the misses are consicutive for atleast 10 times of the timer
+        i=0;
+        j=0;
+      }
     	 if(C_sq > 4){
         _error[0] = 0.0;
      	}
