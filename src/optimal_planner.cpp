@@ -241,7 +241,7 @@ bool TebOptimalPlanner::optimizeTEB(int iterations_innerloop, int iterations_out
     optimized_ = true;
 
     if (compute_cost_afterwards && i==iterations_outerloop-1) // compute cost vec only in the last iteration
-      computeCurrentCost(obst_cost_scale, viapoint_cost_scale, alternative_time_cost);
+      computeCurrentCost(obst_cost_scale, viapoint_cost_scale, alternative_time_cost, op_costs);
 
     clearGraph();
 
@@ -1966,7 +1966,7 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     if (dynamic_cast<EdgeTimeOptimal *>(*it) != nullptr && !alternative_time_cost) {
       time_opt_cost += cur_cost;
       cost_ += cur_cost;
-      //std::// cout<< "EdgeTimeOptimal " << cur_cost<< '\n';
+      // std::cout<< "EdgeTimeOptimal " << cur_cost<< '\n';
       continue;
     }
 
@@ -2139,6 +2139,7 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
   }
 
   if (op_costs) {
+    // std::cout << "I entered inside the op_costs" << '\n';
     op_costs->costs.clear();
 
     teb_local_planner::OptimizationCost optc;

@@ -11,12 +11,6 @@ from hanp_msgs.msg  import HumanTrajectoryArray
 from hanp_msgs.msg  import Trajectory
 from nav_msgs.msg import Path
 
-data = { "ttg_traj":[], "ttg_path":[], "h_ttg_traj":[], "h_ttg_path":[], "g_plan":[],"l_plan":[], "l_traj":[], "h_g_plan":[], "h_l_plan":[], "h_l_traj":[]}
-
-global one_save_gr
-global one_save_gh
-global last_time
-
 def traj_ttg(msg):
     data["ttg_traj"].append(msg.time_to_goal)
 
@@ -150,7 +144,9 @@ def listener():
     one_save_gh = True
     rospy.init_node('data_saving_teb')
     last_time = rospy.Time.now()
-
+    # root = Tk()
+    # my_gui = GuessingGame(root)
+    # root.mainloop()
     # Subscribe to all topics
     rospy.Subscriber("/move_base_node/TebLocalPlannerROS/global_plan",Path,global_plan)
     rospy.Subscriber("/move_base_node/TebLocalPlannerROS/local_plan",Path,local_plan)

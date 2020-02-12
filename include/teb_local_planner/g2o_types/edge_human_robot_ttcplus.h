@@ -118,6 +118,7 @@ public:
      	}
     }
 
+    std::cout << "error_[0]"<< _error[0] << '\n';
      ROS_DEBUG_THROTTLE(0.5, "ttcplus value : %f", ttcplus);
 
      ROS_ASSERT_MSG(std::isfinite(_error[0]),
