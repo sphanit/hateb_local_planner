@@ -1924,7 +1924,7 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
          kinematics_cl_cost = 0.0, robot_vel_cost = 0.0, human_vel_cost = 0.0, robot_vel_holo_cost=0.0,robot_acc_holo_cost=0.0,
          robot_acc_cost = 0.0, human_acc_cost = 0.0, human_vel_holo_cost =0.0,human_acc_holo_cost=0.0, obst_cost = 0.0,rot_dir_cost=0.0,
          dyn_obst_cost = 0.0, via_cost = 0.0, hr_safety_cost = 0.0,
-         hh_safety_cost = 0.0, hr_ttc_cost = 0.0, hr_ttclosest_cost = 0.0 ,hr_ttcplus_cost = 0.0 ,  hr_dir_cost = 0.0, hr_visi_cost = 0.0;
+         hh_safety_cost = 0.0, hr_ttc_cost = 0.0, hr_ttclosest_cost = 0.0 ,hr_ttcplus_cost = 0.0 ,  hr_dir_cost = 0.0, hr_visi_cost = 0.0,ttcplus_error=0.0;
 
   std::vector<double> time_opt_cost_vector, kinematics_dd_cost_vector, kinematics_cl_cost_vector,
                       robot_vel_cost_vector, human_vel_cost_vector, robot_acc_cost_vector, human_acc_cost_vector,
@@ -2116,10 +2116,18 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
       continue;
     }
 
-    if (dynamic_cast<EdgeHumanRobotTTCplus *>(*it) != nullptr) {
-      hr_ttcplus_cost += cur_cost;
-      cost_ += cur_cost;
-      // std::cout << "EdgeHumanRobotTTCplus " << cur_cost<< '\n';
+    // if (dynamic_cast<EdgeHumanRobotTTCplus *>(*it) != nullptr) {
+    //   hr_ttcplus_cost += cur_cost;
+    //   cost_ += cur_cost;
+    //   // std::cout << "EdgeHumanRobotTTCplus " << cur_cost<< '\n';
+    //   continue;
+    // }
+
+    EdgeHumanRobotTTCplus *edge_human_robot_ttcplus = dynamic_cast<EdgeHumanRobotTTCplus *>(*it);
+    if (edge_human_robot_ttcplus != NULL) {
+      cost_ += edge_human_robot_ttcplus->getError().squaredNorm();
+      hr_ttcplus_cost += edge_human_robot_ttcplus->getError().squaredNorm();
+      ttcplus_error += edge_human_robot_ttcplus->getError()[0];
       continue;
     }
 

@@ -108,7 +108,7 @@ inline double penaltyBoundFromBelow(const double& var, const double& a,const dou
 {
   if (var >= a+epsilon)
   {
-    return 0.;
+    return 0.0;
   }
   else
   {
@@ -145,7 +145,7 @@ inline double penaltyBoundToIntervalDerivative(const double& var,const double& a
   }
   else
   {
-    return 1;		
+    return 1;
   }
 }
 
@@ -170,7 +170,7 @@ inline double penaltyBoundToIntervalDerivative(const double& var,const double& a
   }
   else
   {
-    return 1;		
+    return 1;
   }
 }
 

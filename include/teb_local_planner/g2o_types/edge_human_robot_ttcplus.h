@@ -79,6 +79,8 @@ public:
 
     C_sq = C.dot(C);
 
+    _error[0] = 0.0;
+
     if (C_sq <= radius_sum_sq_) {
       ttcplus = 0.0;
     }
@@ -98,7 +100,8 @@ public:
        i++;
        j=0;
      	if( i >= cfg_->hateb.ttcplus_timer ){              // timer for number of poses to check
-      	  _error[0] = penaltyBoundFromBelow(ttcplus, cfg_->hateb.ttcplus_threshold, cfg_->optim.penalty_epsilon);
+      	  _error[0] = penaltyBoundFromBelow(ttcplus, cfg_->hateb.ttcplus_threshold, cfg_->optim.penalty_epsilon)/cfg_->hateb.ttcplus_threshold;
+          // std::cout << "error_[0] after penaltybound"<< _error[0] << '\n';
 
       	  if (cfg_->hateb.scale_human_robot_ttcplus_c) {
             _error[0] = _error[0] * cfg_->optim.human_robot_ttcplus_scale_alpha / C_sq;
@@ -118,7 +121,7 @@ public:
      	}
     }
 
-    std::cout << "error_[0]"<< _error[0] << '\n';
+    // std::cout << "error_[0]"<< _error[0] << '\n';
      ROS_DEBUG_THROTTLE(0.5, "ttcplus value : %f", ttcplus);
 
      ROS_ASSERT_MSG(std::isfinite(_error[0]),
