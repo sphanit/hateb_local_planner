@@ -105,7 +105,7 @@ public:
    *        otherwise the final velocity will be zero (default: false)
    * @return \c true if planning was successful, \c false otherwise
    */
-  virtual bool plan(const std::vector<geometry_msgs::PoseStamped> &initial_plan, const geometry_msgs::Twist *start_vel = NULL, bool free_goal_vel = false, const HumanPlanVelMap *initial_human_plan_vels = NULL, teb_local_planner::OptimizationCostArray *op_costs = NULL) = 0;
+  virtual bool plan(const std::vector<geometry_msgs::PoseStamped> &initial_plan, const geometry_msgs::Twist *start_vel = NULL, bool free_goal_vel = false, const HumanPlanVelMap *initial_human_plan_vels = NULL, teb_local_planner::OptimizationCostArray *op_costs = NULL, double dt_ref=0.4, double dt_hyst=0.1) = 0;
 
   /**
    * @brief Plan a trajectory between a given start and goal pose (tf::Pose version).
@@ -118,7 +118,7 @@ public:
    *        otherwise the final velocity will be zero (default: false)
    * @return \c true if planning was successful, \c false otherwise
    */
-  virtual bool plan(const tf::Pose& start, const tf::Pose& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false) = 0;
+  virtual bool plan(const tf::Pose& start, const tf::Pose& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false,teb_local_planner::OptimizationCostArray *op_costs = NULL, double dt_ref=0.4, double dt_hyst=0.1) = 0;
 
   /**
    * @brief Plan a trajectory between a given start and goal pose.
@@ -131,7 +131,7 @@ public:
    *        otherwise the final velocity will be zero (default: false)
    * @return \c true if planning was successful, \c false otherwise
    */
-  virtual bool plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false, double pre_plan_time = 0.0) = 0;
+  virtual bool plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false, double pre_plan_time = 0.0,teb_local_planner::OptimizationCostArray *op_costs = NULL, double dt_ref = 0.4 , double dt_hyst=0.1) = 0;
 
   /**
    * @brief Get the velocity command from a previously optimized plan to control the robot at the current sampling interval.
@@ -142,7 +142,7 @@ public:
    * @param[in] look_ahead_poses index of the final pose used to compute the velocity command.
    * @return \c true if command is valid, \c false otherwise
    */
-   virtual bool getVelocityCommand(double& vx, double& vy, double& omega, int look_ahead_poses) const = 0;
+   virtual bool getVelocityCommand(double& vx, double& vy, double& omega, int look_ahead_poses, double dt_ref) const = 0;
 
 
   //@}

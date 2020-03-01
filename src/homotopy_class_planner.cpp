@@ -90,7 +90,7 @@ bool HomotopyClassPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& i
                                 const geometry_msgs::Twist* start_vel,
                                 bool free_goal_vel,
                                 const HumanPlanVelMap *initial_human_plan_vels,
-                                teb_local_planner::OptimizationCostArray *op_costs)
+                                teb_local_planner::OptimizationCostArray *op_costs, double dt_ref, double dt_hyst)
 {
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
   auto start_time = ros::Time::now();
@@ -101,19 +101,20 @@ bool HomotopyClassPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& i
   PoseSE2 start(initial_plan.front().pose);
   PoseSE2 goal(initial_plan.back().pose);
   auto pre_plan_time = ros::Time::now() - start_time;
-  return plan(start, goal, start_vel, free_goal_vel, pre_plan_time.toSec());
+  return plan(start, goal, start_vel, free_goal_vel, pre_plan_time.toSec(), op_costs, dt_ref, dt_hyst);
 }
 
 
-bool HomotopyClassPlanner::plan(const tf::Pose& start, const tf::Pose& goal, const geometry_msgs::Twist* start_vel, bool free_goal_vel)
+bool HomotopyClassPlanner::plan(const tf::Pose& start, const tf::Pose& goal, const geometry_msgs::Twist* start_vel, bool free_goal_vel, teb_local_planner::OptimizationCostArray *op_costs, double dt_ref, double dt_hyst)
 {
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
   PoseSE2 start_pose(start);
   PoseSE2 goal_pose(goal);
-  return plan(start_pose, goal_pose, start_vel, free_goal_vel);
+  double pre_plan_time = 0.0;
+  return plan(start_pose, goal_pose, start_vel, free_goal_vel, pre_plan_time, op_costs, dt_ref, dt_hyst);
 }
 
-bool HomotopyClassPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel, bool free_goal_vel, double pre_plan_time)
+bool HomotopyClassPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel, bool free_goal_vel, double pre_plan_time, teb_local_planner::OptimizationCostArray *op_costs, double dt_ref, double dt_hyst)
 {
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
   auto start_time = ros::Time::now();
@@ -125,7 +126,7 @@ bool HomotopyClassPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const
 
   // Init new TEBs based on newly explored homotopy classes
   auto hex_start_time = ros::Time::now();
-  exploreEquivalenceClassesAndInitTebs(start, goal, cfg_->obstacles.min_obstacle_dist, start_vel);
+  exploreEquivalenceClassesAndInitTebs(start, goal, cfg_->obstacles.min_obstacle_dist, start_vel, dt_ref);
   auto hex_time = ros::Time::now() - hex_start_time;
 
   // update via-points if activated
@@ -135,7 +136,7 @@ bool HomotopyClassPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const
 
   // Optimize all trajectories in alternative homotopy classes
   auto teb_start_time = ros::Time::now();
-  optimizeAllTEBs(cfg_->optim.no_inner_iterations, cfg_->optim.no_outer_iterations);
+  optimizeAllTEBs(cfg_->optim.no_inner_iterations, cfg_->optim.no_outer_iterations, dt_ref, dt_hyst);
   auto teb_time = ros::Time::now() - teb_start_time;
 
   auto other_start_time = ros::Time::now();
@@ -158,7 +159,7 @@ bool HomotopyClassPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const
   return true;
 }
 
-bool HomotopyClassPlanner::getVelocityCommand(double& vx, double& vy, double& omega, int look_ahead_poses) const
+bool HomotopyClassPlanner::getVelocityCommand(double& vx, double& vy, double& omega, int look_ahead_poses, double dt_ref) const
 {
   TebOptimalPlannerConstPtr best_teb = bestTeb();
   if (!best_teb)
@@ -169,7 +170,7 @@ bool HomotopyClassPlanner::getVelocityCommand(double& vx, double& vy, double& om
     return false;
   }
 
-  return best_teb->getVelocityCommand(vx, vy, omega, look_ahead_poses);
+  return best_teb->getVelocityCommand(vx, vy, omega, look_ahead_poses, dt_ref);
 }
 
 
@@ -362,7 +363,7 @@ void HomotopyClassPlanner::updateReferenceTrajectoryViaPoints(bool all_trajector
 }
 
 
-void HomotopyClassPlanner::exploreEquivalenceClassesAndInitTebs(const PoseSE2& start, const PoseSE2& goal, double dist_to_obst, const geometry_msgs::Twist* start_vel)
+void HomotopyClassPlanner::exploreEquivalenceClassesAndInitTebs(const PoseSE2& start, const PoseSE2& goal, double dist_to_obst, const geometry_msgs::Twist* start_vel, double dt_ref)
 {
   // first process old trajectories
   renewAndAnalyzeOldTebs(cfg_->hcp.delete_detours_backwards);
@@ -370,7 +371,7 @@ void HomotopyClassPlanner::exploreEquivalenceClassesAndInitTebs(const PoseSE2& s
   // inject initial plan if available and not yet captured
   if (initial_plan_)
   {
-    initial_plan_teb_ = addAndInitNewTeb(*initial_plan_, start_vel);
+    initial_plan_teb_ = addAndInitNewTeb(*initial_plan_, start_vel, dt_ref);
   }
   else
   {
@@ -379,18 +380,18 @@ void HomotopyClassPlanner::exploreEquivalenceClassesAndInitTebs(const PoseSE2& s
   }
 
   // now explore new homotopy classes and initialize tebs if new ones are found. The appropriate createGraph method is chosen via polymorphism.
-  graph_search_->createGraph(start,goal,dist_to_obst,cfg_->hcp.obstacle_heading_threshold, start_vel);
+  graph_search_->createGraph(start,goal,dist_to_obst,cfg_->hcp.obstacle_heading_threshold, start_vel, dt_ref);
 }
 
 
-TebOptimalPlannerPtr HomotopyClassPlanner::addAndInitNewTeb(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_velocity)
+TebOptimalPlannerPtr HomotopyClassPlanner::addAndInitNewTeb(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_velocity, double dt_ref)
 {
   if(tebs_.size() >= cfg_->hcp.max_number_classes)
     return TebOptimalPlannerPtr();
   TebOptimalPlannerPtr candidate =  TebOptimalPlannerPtr( new TebOptimalPlanner(*cfg_, obstacles_, robot_model_, visualization_,via_points_, human_model_, humans_via_points_map_));
                                                                                               // cfg_, &obstacles_, robot_model, visualization_, &via_points_, human_model, &humans_via_points_map_))
   // candidate->teb().initTrajectoryToGoal(start, goal, 0, cfg_->robot.max_vel_x, cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion);
-  candidate->teb().initTEBtoGoal(start, goal, 0, cfg_->trajectory.dt_ref, cfg_->trajectory.min_samples);
+  candidate->teb().initTEBtoGoal(start, goal, 0, dt_ref, cfg_->trajectory.min_samples);
   if (start_velocity)
     candidate->setVelocityStart(*start_velocity);
 
@@ -408,7 +409,7 @@ TebOptimalPlannerPtr HomotopyClassPlanner::addAndInitNewTeb(const PoseSE2& start
 }
 
 
-TebOptimalPlannerPtr HomotopyClassPlanner::addAndInitNewTeb(const std::vector<geometry_msgs::PoseStamped>& initial_plan, const geometry_msgs::Twist* start_velocity)
+TebOptimalPlannerPtr HomotopyClassPlanner::addAndInitNewTeb(const std::vector<geometry_msgs::PoseStamped>& initial_plan, const geometry_msgs::Twist* start_velocity, double dt_ref)
 {
   if(tebs_.size() >= cfg_->hcp.max_number_classes)
     return TebOptimalPlannerPtr();
@@ -416,7 +417,7 @@ TebOptimalPlannerPtr HomotopyClassPlanner::addAndInitNewTeb(const std::vector<ge
 
   // candidate->teb().initTrajectoryToGoal(initial_plan, cfg_->robot.max_vel_x,
     // cfg_->trajectory.global_plan_overwrite_orientation, cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion);
-    candidate->teb().initTEBtoGoal(*initial_plan_, cfg_->trajectory.dt_ref, true, cfg_->trajectory.min_samples);
+    candidate->teb().initTEBtoGoal(*initial_plan_, dt_ref, true, cfg_->trajectory.min_samples);
   if (start_velocity)
     candidate->setVelocityStart(*start_velocity);
 
@@ -456,7 +457,7 @@ void HomotopyClassPlanner::updateAllTEBs(const PoseSE2* start, const PoseSE2* go
 }
 
 
-void HomotopyClassPlanner::optimizeAllTEBs(int iter_innerloop, int iter_outerloop)
+void HomotopyClassPlanner::optimizeAllTEBs(int iter_innerloop, int iter_outerloop, double dt_ref, double dt_hyst)
 {
   teb_local_planner::OptimizationCostArray *op_costs = NULL;
 
@@ -471,9 +472,7 @@ void HomotopyClassPlanner::optimizeAllTEBs(int iter_innerloop, int iter_outerloo
     boost::thread_group teb_threads;
     for (TebOptPlannerContainer::iterator it_teb = tebs_.begin(); it_teb != tebs_.end(); ++it_teb)
     {
-      teb_threads.create_thread( boost::bind(&TebOptimalPlanner::optimizeTEB, it_teb->get(), iter_innerloop, iter_outerloop,
-                                             true, cfg_->hcp.selection_obst_cost_scale, cfg_->hcp.selection_viapoint_cost_scale,
-                                             cfg_->hcp.selection_alternative_time_cost, op_costs) );
+      teb_threads.create_thread( boost::bind(&TebOptimalPlanner::optimizeTEB, it_teb->get(), iter_innerloop, iter_outerloop,true, cfg_->hcp.selection_obst_cost_scale, cfg_->hcp.selection_viapoint_cost_scale, cfg_->hcp.selection_alternative_time_cost, op_costs) );
     }
     teb_threads.join_all();
   }
@@ -482,7 +481,7 @@ void HomotopyClassPlanner::optimizeAllTEBs(int iter_innerloop, int iter_outerloo
     for (TebOptPlannerContainer::iterator it_teb = tebs_.begin(); it_teb != tebs_.end(); ++it_teb)
     {
       it_teb->get()->optimizeTEB(iter_innerloop,iter_outerloop, true, cfg_->hcp.selection_obst_cost_scale,
-                                 cfg_->hcp.selection_viapoint_cost_scale, cfg_->hcp.selection_alternative_time_cost,op_costs); // compute cost as well inside optimizeTEB (last argument = true)
+                                 cfg_->hcp.selection_viapoint_cost_scale, cfg_->hcp.selection_alternative_time_cost,op_costs,dt_ref,dt_hyst); // compute cost as well inside optimizeTEB (last argument = true)
     }
   }
 }

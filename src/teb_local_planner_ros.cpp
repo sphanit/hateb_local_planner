@@ -45,6 +45,7 @@
 #define APPROACH_SRV_NAME "set_approach_id"
 #define OP_COSTS_TOPIC "optimization_costs"
 #define ROB_POS_TOPIC "Robot_Pose"
+#define HUMAN_POS_SUB_TOPIC "/tracked_humans"
 #define DEFAULT_HUMAN_SEGMENT hanp_msgs::TrackedSegmentType::TORSO
 #define THROTTLE_RATE 5.0 // seconds
 
@@ -60,7 +61,6 @@
 
 // pluginlib macros
 #include <pluginlib/class_list_macros.h>
-
 #include "g2o/core/sparse_optimizer.h"
 #include "g2o/core/block_solver.h"
 #include "g2o/core/factory.h"
@@ -68,7 +68,6 @@
 #include "g2o/core/optimization_algorithm_levenberg.h"
 #include "g2o/solvers/csparse/linear_solver_csparse.h"
 #include "g2o/solvers/cholmod/linear_solver_cholmod.h"
-
 
 // register this planner both as a BaseLocalPlanner and as a MBF's CostmapController plugin
 PLUGINLIB_EXPORT_CLASS(teb_local_planner::TebLocalPlannerROS, nav_core::BaseLocalPlanner)
@@ -210,6 +209,8 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
     op_costs_pub_ = nh.advertise<teb_local_planner::OptimizationCostArray>( OP_COSTS_TOPIC, 1);
 
     robot_pose_pub_ = nh.advertise<geometry_msgs::Pose>(ROB_POS_TOPIC, 1);
+    human_pos_sub_ = nh.subscribe(HUMAN_POS_SUB_TOPIC, 1, &TebLocalPlannerROS::CheckDist, this);
+
 
     time_to_goal_pub_ = nh.advertise<std_msgs::Float64>("time_to_goal",100);
 
@@ -218,6 +219,7 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
     last_omega_sign_change_ = ros::Time::now() - ros::Duration(cfg_.optim.omega_chage_time_seperation);
 
     last_omega_ = 0.0;
+    isDistunderThreshold = false;
 
     // set initialized flag
     initialized_ = true;
@@ -255,6 +257,53 @@ bool TebLocalPlannerROS::setPlan(const std::vector<geometry_msgs::PoseStamped>& 
   return true;
 }
 
+void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_humans){
+  /* Code block for changing dynamic reconfigure
+  // dynamic_reconfigure::ReconfigureRequest srv_req;
+  // dynamic_reconfigure::ReconfigureResponse srv_resp;
+  // dynamic_reconfigure::DoubleParameter double_param;
+  // dynamic_reconfigure::IntParameter int_param;
+  // dynamic_reconfigure::Config conf;
+  //
+  // int_param.name = "planning_mode";
+  // int_param.value = 0;
+  // conf.ints.push_back(int_param);
+  //
+  // srv_req.config = conf;
+
+  // system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ weight_viapoint 1.0");
+  */
+
+  tracked_humans_ = tracked_humans;
+  std::vector<double> human_dists;
+
+  auto xpos = robot_pos_msg.position.x;
+  auto ypos = robot_pos_msg.position.y;
+  // auto robot_radius = 0.300;
+
+  for(auto &human: tracked_humans_.humans){
+    for (auto &segment : human.segments){
+      human_dists.push_back(std::hypot(segment.pose.pose.position.x-xpos, segment.pose.pose.position.y-ypos));
+    }
+
+  }
+
+
+  for(auto &dist: human_dists){
+    // std::cout << "dist " << dist << '\n';
+    if(dist<=2.0){
+      isDistunderThreshold = true;}
+      // system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ weight_viapoint 1.0");
+    else{
+      isDistunderThreshold = false;
+      // system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ weight_viapoint 0.05");
+    }
+  }
+}
+
+// bool TebLocalPlannerROS::isunderThresholdDist(bool set){
+//       return set;
+//   }
 
 bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
 {
@@ -301,7 +350,6 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   geometry_msgs::PoseStamped robot_pose;
   costmap_ros_->getRobotPose(robot_pose);
   robot_pose_ = PoseSE2(robot_pose.pose);
-  geometry_msgs::Pose robot_pos_msg;
   robot_pose_.toPoseMsg(robot_pos_msg);
   robot_pose_pub_.publish(robot_pos_msg);
   auto pose_get_time = ros::Time::now() - pose_get_start_time;
@@ -444,11 +492,13 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
 
     if (predict_humans_client_ && predict_humans_client_.call(predict_srv)) {
       tf2::Stamped<tf2::Transform> tf_human_plan_to_global;
+      // std::cout << "predict_srv.response.predicted_humans_poses "<< predict_srv.response.predicted_humans_poses[0].poses<< '\n';
       for (auto predicted_humans_poses :
            predict_srv.response.predicted_humans_poses) {
         // transform human plans
         HumanPlanCombined human_plan_combined;
         auto &transformed_vel = predicted_humans_poses.start_velocity;
+        std::cout << "predicted_humans_poses.start_velocity " <<predicted_humans_poses.start_velocity<< '\n';
         if (!transformHumanPlan(*tf_, robot_pose, *costmap_, global_frame_,
                                 predicted_humans_poses.poses,
                                 human_plan_combined, transformed_vel,
@@ -618,7 +668,16 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   // bool success = planner_->plan(robot_pose_, robot_goal_, robot_vel_, cfg_.goal_tolerance.free_goal_vel); // straight line init
   teb_local_planner::OptimizationCostArray op_costs;
   // std::cout << "I am in Planner" << '\n';
-  bool success = planner_->plan(transformed_plan, &robot_vel_, cfg_.goal_tolerance.free_goal_vel, &transformed_human_plan_vel_map, &op_costs);
+
+  double dt_resize=cfg_.trajectory.dt_ref;
+  double dt_hyst_resize=cfg_.trajectory.dt_hysteresis;
+
+  if(isDistunderThreshold){
+      dt_resize = 0.2;
+      dt_hyst_resize = 0.1;
+    }
+
+  bool success = planner_->plan(transformed_plan, &robot_vel_, cfg_.goal_tolerance.free_goal_vel, &transformed_human_plan_vel_map, &op_costs, dt_resize, dt_hyst_resize);
   // std::cout << "I am out of Planner" << '\n';
 
   if (!success)
@@ -715,7 +774,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   // Get the velocity command for this sampling interval
   auto vel_start_time = ros::Time::now();
   // std::cout << "I am going into planner_->getVelocityCommand in computeVelocityCommands" << '\n';
-  if (!planner_->getVelocityCommand(cmd_vel.twist.linear.x, cmd_vel.twist.linear.y, cmd_vel.twist.angular.z, cfg_.trajectory.control_look_ahead_poses))
+  if (!planner_->getVelocityCommand(cmd_vel.twist.linear.x, cmd_vel.twist.linear.y, cmd_vel.twist.angular.z, cfg_.trajectory.control_look_ahead_poses, dt_resize))
   {
     planner_->clearPlanner();
     ROS_WARN("TebLocalPlannerROS: velocity command invalid. Resetting planner...");
@@ -741,7 +800,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     if (!std::isfinite(cmd_vel.twist.angular.z))
     {
       cmd_vel.twist.linear.x = cmd_vel.twist.linear.y = cmd_vel.twist.angular.z = 0;
-      last_cmd_ = cmd_vel.twist;  	    
+      last_cmd_ = cmd_vel.twist;
       planner_->clearPlanner();
       ROS_WARN("TebLocalPlannerROS: Resulting steering angle is not finite. Resetting planner...");
       ++no_infeasible_plans_; // increase number of infeasible solutions in a row
@@ -1375,6 +1434,7 @@ bool TebLocalPlannerROS::transformHumanPlan(
     tf2::Stamped<tf2::Transform> tf_pose_stamped;
     geometry_msgs::PoseStamped transformed_pose;
     tf2::Transform tf_pose;
+    // std::cout << "human_plan.size() " <<human_plan.size()<< '\n';
     for (auto &human_pose : human_plan) {
       tf2::fromMsg(human_pose.pose.pose, tf_pose);
       tf_pose_stamped.setData(human_plan_to_global_transform_ * tf_pose);
@@ -2100,7 +2160,8 @@ bool TebLocalPlannerROS::optimizeStandalone(
 
   // get the velocity command for this sampling interval
   auto vel_start_time = ros::Time::now();
-  if (!planner_->getVelocityCommand(cmd_vel.linear.x, cmd_vel.linear.y, cmd_vel.angular.z, cfg_.trajectory.control_look_ahead_poses)) {
+  double dt_resize = 0.4;
+  if (!planner_->getVelocityCommand(cmd_vel.linear.x, cmd_vel.linear.y, cmd_vel.angular.z, cfg_.trajectory.control_look_ahead_poses, dt_resize)) {
     res.message += feasible ? "\nhowever," : "\nand";
     res.message += " velocity command is invalid";
   }

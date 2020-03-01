@@ -163,7 +163,9 @@ public:
                     const geometry_msgs::Twist* start_vel = NULL,
                     bool free_goal_vel = false,
                     const HumanPlanVelMap *initial_human_plan_vels =  NULL,
-                    teb_local_planner::OptimizationCostArray *op_costs = NULL);
+                    teb_local_planner::OptimizationCostArray *op_costs = NULL,
+                    double dt_ref=0.4,
+                    double dt_hyst=0.1);
 
   /**
    * @brief Plan a trajectory between a given start and goal pose (tf::Pose version).
@@ -176,7 +178,7 @@ public:
    *		      otherwise the final velocity will be zero (default: false)
    * @return \c true if planning was successful, \c false otherwise
    */
-  virtual bool plan(const tf::Pose& start, const tf::Pose& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false);
+  virtual bool plan(const tf::Pose& start, const tf::Pose& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false, teb_local_planner::OptimizationCostArray *op_costs=NULL, double dt_ref=0.4, double dt_hyst=0.1);
 
   /**
    * @brief Plan a trajectory between a given start and goal pose.
@@ -189,7 +191,7 @@ public:
    *		      otherwise the final velocity will be zero (default: false)
    * @return \c true if planning was successful, \c false otherwise
    */
-  virtual bool plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false,  double pre_plan_time=0.0);
+  virtual bool plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false,  double pre_plan_time=0.0, teb_local_planner::OptimizationCostArray *op_costs=NULL, double dt_ref = 0.4, double dt_hyst=0.1);
 
   /**
    * @brief Get the velocity command from a previously optimized plan to control the robot at the current sampling interval.
@@ -200,7 +202,7 @@ public:
    * @param[in] look_ahead_poses index of the final pose used to compute the velocity command.
    * @return \c true if command is valid, \c false otherwise
    */
-  virtual bool getVelocityCommand(double& vx, double& vy, double& omega, int look_ahead_poses) const;
+  virtual bool getVelocityCommand(double& vx, double& vy, double& omega, int look_ahead_poses, double dt_ref) const;
 
   /**
    * @brief Access current best trajectory candidate (that relates to the "best" homotopy class).
@@ -284,7 +286,7 @@ public:
    * @param dist_to_obst Allowed distance to obstacles: if not satisfying, the path will be rejected (note, this is not the distance used for optimization).
    * @param @param start_velocity start velocity (optional)
    */
-  void exploreEquivalenceClassesAndInitTebs(const PoseSE2& start, const PoseSE2& goal, double dist_to_obst, const geometry_msgs::Twist* start_vel);
+  void exploreEquivalenceClassesAndInitTebs(const PoseSE2& start, const PoseSE2& goal, double dist_to_obst, const geometry_msgs::Twist* start_vel, double dt_ref);
 
   /**
    * @brief Add a new Teb to the internal trajectory container, if this teb constitutes a new equivalence class. Initialize it using a generic 2D reference path
@@ -301,7 +303,7 @@ public:
    * @return Shared pointer to the newly created teb optimal planner
    */
   template<typename BidirIter, typename Fun>
-  TebOptimalPlannerPtr addAndInitNewTeb(BidirIter path_start, BidirIter path_end, Fun fun_position, double start_orientation, double goal_orientation, const geometry_msgs::Twist* start_velocity);
+  TebOptimalPlannerPtr addAndInitNewTeb(BidirIter path_start, BidirIter path_end, Fun fun_position, double start_orientation, double goal_orientation, const geometry_msgs::Twist* start_velocity, double dt_ref);
 
   /**
    * @brief Add a new Teb to the internal trajectory container, if this teb constitutes a new equivalence class. Initialize it with a simple straight line between a given start and goal
@@ -310,7 +312,7 @@ public:
    * @param start_velocity start velocity (optional)
    * @return Shared pointer to the newly created teb optimal planner
    */
-  TebOptimalPlannerPtr addAndInitNewTeb(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_velocity);
+  TebOptimalPlannerPtr addAndInitNewTeb(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_velocity, double dt_ref);
 
   /**
    * @brief Add a new Teb to the internal trajectory container , if this teb constitutes a new equivalence class. Initialize it using a PoseStamped container
@@ -318,7 +320,7 @@ public:
    * @param start_velocity start velocity (optional)
    * @return Shared pointer to the newly created teb optimal planner
    */
-  TebOptimalPlannerPtr addAndInitNewTeb(const std::vector<geometry_msgs::PoseStamped>& initial_plan, const geometry_msgs::Twist* start_velocity);
+  TebOptimalPlannerPtr addAndInitNewTeb(const std::vector<geometry_msgs::PoseStamped>& initial_plan, const geometry_msgs::Twist* start_velocity, double dt_ref);
 
   /**
    * @brief Update TEBs with new pose, goal and current velocity.
@@ -336,7 +338,7 @@ public:
    * @param iter_innerloop Number of inner iterations (see TebOptimalPlanner::optimizeTEB())
    * @param iter_outerloop Number of outer iterations (see TebOptimalPlanner::optimizeTEB())
    */
-  void optimizeAllTEBs(int iter_innerloop, int iter_outerloop);
+  void optimizeAllTEBs(int iter_innerloop, int iter_outerloop, double dt_ref, double dt_hyst);
 
   /**
    * @brief Returns a shared pointer to the TEB related to the initial plan

@@ -26,7 +26,7 @@ def callback(msg):
     ax.clear()
     ax.plot(data)
     plt.draw()
-    plt.pause(0.00000000001)
+    plt.pause(0.05)
 
 def timerCB(event):
     global last

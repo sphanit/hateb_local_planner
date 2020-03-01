@@ -103,8 +103,8 @@ public:
        r_dt_miss = 0;
        i++;
        j=0;
-       std::cout << "time " << dt_robot->dt() << '\n';
-     	if( r_dt >= (cfg_->hateb.ttcplus_timer/1000.0) ){              // timer for number of poses to check
+       // std::cout << "time " << dt_robot->dt() << '\n';
+     	if( r_dt >= (cfg_->hateb.ttcplus_timer) ){              // timer for number of poses to check
       	  _error[0] = penaltyBoundFromBelow(ttcplus, cfg_->hateb.ttcplus_threshold, cfg_->optim.penalty_epsilon)/cfg_->hateb.ttcplus_threshold;
           // std::cout << "error_[0] after penaltybound"<< _error[0] << '\n';
 
@@ -118,7 +118,7 @@ public:
       // no collision possible
       j++;
       r_dt_miss += dt_robot->dt();
-      if(r_dt_miss>=(cfg_->hateb.ttcplus_timer/1000.0)*5){ //Check if the misses are consecutive for atleast 10 times of the timer
+      if(r_dt_miss>=(cfg_->hateb.ttcplus_timer)*5){ //Check if the misses are consecutive for atleast 10 times of the timer
         i=0;
         j=0;
         r_dt=0;

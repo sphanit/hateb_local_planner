@@ -195,7 +195,14 @@ boost::shared_ptr<g2o::SparseOptimizer> TebOptimalPlanner::initOptimizer()
 }
 
 bool TebOptimalPlanner::optimizeTEB(int iterations_innerloop, int iterations_outerloop, bool compute_cost_afterwards,
-                                    double obst_cost_scale, double viapoint_cost_scale, bool alternative_time_cost, teb_local_planner::OptimizationCostArray *op_costs)
+                                    double obst_cost_scale, double viapoint_cost_scale, bool alternative_time_cost, teb_local_planner::OptimizationCostArray *op_costs){
+
+  optimizeTEB(iterations_innerloop,iterations_outerloop,compute_cost_afterwards,obst_cost_scale,viapoint_cost_scale,alternative_time_cost,op_costs,cfg_->trajectory.dt_ref,cfg_->trajectory.dt_hysteresis);
+
+}
+
+bool TebOptimalPlanner::optimizeTEB(int iterations_innerloop, int iterations_outerloop, bool compute_cost_afterwards,
+                                    double obst_cost_scale, double viapoint_cost_scale, bool alternative_time_cost, teb_local_planner::OptimizationCostArray *op_costs, double dt_ref, double dt_hyst)
 {
   if (cfg_->optim.optimization_activate==false)
     return false;
@@ -217,12 +224,12 @@ bool TebOptimalPlanner::optimizeTEB(int iterations_innerloop, int iterations_out
     {
       //teb_.autoResize(cfg_->trajectory.dt_ref, cfg_->trajectory.dt_hysteresis, cfg_->trajectory.min_samples, cfg_->trajectory.max_samples);
       // teb_.autoResize(cfg_->trajectory.dt_ref, cfg_->trajectory.dt_hysteresis, cfg_->trajectory.min_samples, cfg_->trajectory.max_samples, fast_mode);
-      teb_.autoResize(cfg_->trajectory.dt_ref, cfg_->trajectory.dt_hysteresis,
+      teb_.autoResize(dt_ref, dt_hyst,
                       cfg_->trajectory.min_samples);
         for (auto &human_teb_kv : humans_tebs_map_)
           // human_teb_kv.second.autoResize(cfg_->trajectory.dt_ref, cfg_->trajectory.dt_hysteresis, cfg_->trajectory.min_samples, cfg_->trajectory.max_samples, fast_mode);
-          human_teb_kv.second.autoResize(cfg_->trajectory.dt_ref,
-                                         cfg_->trajectory.dt_hysteresis,
+          human_teb_kv.second.autoResize(dt_ref,
+                                         dt_hyst,
                                          cfg_->trajectory.min_samples);
     }
 
@@ -265,7 +272,7 @@ void TebOptimalPlanner::setVelocityGoal(const geometry_msgs::Twist& vel_goal)
   vel_goal_.second = vel_goal;
 }
 
-bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan, const geometry_msgs::Twist* start_vel, bool free_goal_vel, const HumanPlanVelMap *initial_human_plan_vel_map, teb_local_planner::OptimizationCostArray *op_costs)
+bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan, const geometry_msgs::Twist* start_vel, bool free_goal_vel, const HumanPlanVelMap *initial_human_plan_vel_map, teb_local_planner::OptimizationCostArray *op_costs, double dt_ref, double dt_hyst)
 {
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
   auto prep_start_time = ros::Time::now();
@@ -273,14 +280,14 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
   {
     // init trajectory
     // teb_.initTrajectoryToGoal(initial_plan, cfg_->robot.max_vel_x, cfg_->trajectory.global_plan_overwrite_orientation, cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion,cfg_->trajectory.teb_init_skip_dist);
-    teb_.initTEBtoGoal(initial_plan, cfg_->trajectory.dt_ref, true,
+    teb_.initTEBtoGoal(initial_plan, dt_ref, true,
                        cfg_->trajectory.min_samples,
                        cfg_->trajectory.teb_init_skip_dist);
   }
   else if (cfg_->optim.disable_warm_start){
     teb_.clearTimedElasticBand();
     // teb_.initTrajectoryToGoal(initial_plan, cfg_->robot.max_vel_x, cfg_->trajectory.global_plan_overwrite_orientation, cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion,cfg_->trajectory.teb_init_skip_dist);
-    teb_.initTEBtoGoal(initial_plan, cfg_->trajectory.dt_ref, true,
+    teb_.initTEBtoGoal(initial_plan, dt_ref, true,
                        cfg_->trajectory.min_samples,
                        cfg_->trajectory.teb_init_skip_dist);
 
@@ -301,7 +308,7 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
       ROS_DEBUG("New goal: distance to existing goal is higher than the specified threshold. Reinitalizing trajectories.");
       teb_.clearTimedElasticBand();
       // teb_.initTrajectoryToGoal(initial_plan, cfg_->robot.max_vel_x, true, cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion);
-      teb_.initTEBtoGoal(initial_plan, cfg_->trajectory.dt_ref, true,
+      teb_.initTEBtoGoal(initial_plan, dt_ref, true,
                          cfg_->trajectory.min_samples,
                          cfg_->trajectory.teb_init_skip_dist);
     }
@@ -362,7 +369,7 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
         humans_tebs_map_[human_id] = TimedElasticBand();
         // humans_tebs_map_[human_id].initTrajectoryToGoal(initial_human_plan, cfg_->human.max_vel_x, true, cfg_->trajectory.human_min_samples, cfg_->trajectory.allow_init_with_backwards_motion, cfg_->trajectory.teb_init_skip_dist);
         humans_tebs_map_[human_id].initTEBtoGoal(
-            initial_human_plan, cfg_->trajectory.dt_ref, true,
+            initial_human_plan, dt_ref, true,
             cfg_->trajectory.human_min_samples,
             cfg_->trajectory.teb_init_skip_dist);
       }
@@ -371,7 +378,7 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
         auto &human_teb = humans_tebs_map_[human_id];
         human_teb.clearTimedElasticBand();
         // human_teb.initTrajectoryToGoal(initial_human_plan, cfg_->human.max_vel_x, true, cfg_->trajectory.human_min_samples, cfg_->trajectory.allow_init_with_backwards_motion, cfg_->trajectory.teb_init_skip_dist);
-        human_teb.initTEBtoGoal(initial_human_plan, cfg_->trajectory.dt_ref,
+        human_teb.initTEBtoGoal(initial_human_plan, dt_ref,
                                 true, cfg_->trajectory.human_min_samples,
                                 cfg_->trajectory.teb_init_skip_dist);
       }
@@ -389,7 +396,7 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
         ROS_DEBUG("New goal: distance to existing goal is higher than the specified threshold. Reinitializing human trajectories.");
         human_teb.clearTimedElasticBand();
         // human_teb.initTrajectoryToGoal(initial_human_plan, cfg_->human.max_vel_x, true, cfg_->trajectory.human_min_samples, false, cfg_->trajectory.teb_init_skip_dist);
-        human_teb.initTEBtoGoal(initial_human_plan, cfg_->trajectory.dt_ref,
+        human_teb.initTEBtoGoal(initial_human_plan, dt_ref,
                                 true, cfg_->trajectory.human_min_samples,
                                 cfg_->trajectory.teb_init_skip_dist);
         }
@@ -445,7 +452,7 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
 
   // now optimize
   auto opt_start_time = ros::Time::now();
-  bool teb_opt_result = optimizeTEB(cfg_->optim.no_inner_iterations, cfg_->optim.no_outer_iterations, true, 1.0, 1.0, false, op_costs);
+  bool teb_opt_result = optimizeTEB(cfg_->optim.no_inner_iterations, cfg_->optim.no_outer_iterations, true, 1.0, 1.0, false, op_costs, dt_ref, dt_hyst);
 
   if (op_costs) {
     teb_local_planner::OptimizationCost op_cost;
@@ -474,7 +481,7 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
 }
 
 
-bool TebOptimalPlanner::plan(const tf::Pose& start, const tf::Pose& goal, const geometry_msgs::Twist* start_vel, bool free_goal_vel)
+bool TebOptimalPlanner::plan(const tf::Pose& start, const tf::Pose& goal, const geometry_msgs::Twist* start_vel, bool free_goal_vel, teb_local_planner::OptimizationCostArray *op_costs, double dt_ref, double dt_hyst)
 {
   auto start_time = ros::Time::now();
   PoseSE2 start_(start);
@@ -482,10 +489,10 @@ bool TebOptimalPlanner::plan(const tf::Pose& start, const tf::Pose& goal, const 
   geometry_msgs::Twist *zero_vel;
   const geometry_msgs::Twist *vel = start_vel ? start_vel : zero_vel;
   auto pre_plan_time = ros::Time::now() - start_time;
-  return plan(start_, goal_, vel, free_goal_vel, pre_plan_time.toSec());
+  return plan(start_, goal_, vel, free_goal_vel, pre_plan_time.toSec(), op_costs, dt_ref, dt_hyst);
 }
 
-bool TebOptimalPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel, bool free_goal_vel, double pre_plan_time)
+bool TebOptimalPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel, bool free_goal_vel, double pre_plan_time, teb_local_planner::OptimizationCostArray *op_costs, double dt_ref, double dt_hyst)
 {
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
   auto prep_start_time = ros::Time::now();
@@ -521,7 +528,7 @@ bool TebOptimalPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const ge
 
   auto opt_start_time = ros::Time::now();
   bool teb_opt_result = optimizeTEB(cfg_->optim.no_inner_iterations,
-                                    cfg_->optim.no_outer_iterations);
+                                    cfg_->optim.no_outer_iterations,true, 1.0, 1.0, false, op_costs, dt_ref,dt_hyst);
   auto opt_time = ros::Time::now() - opt_start_time;
 
   auto total_time = ros::Time::now() - prep_start_time;
@@ -2280,7 +2287,7 @@ void TebOptimalPlanner::extractVelocity(const PoseSE2& pose1, const PoseSE2& pos
   omega = orientdiff/dt;
 }
 
-bool TebOptimalPlanner::getVelocityCommand(double& vx, double& vy, double& omega, int look_ahead_poses) const
+bool TebOptimalPlanner::getVelocityCommand(double& vx, double& vy, double& omega, int look_ahead_poses, double dt_ref) const
 {
   if (teb_.sizePoses()<2)
   {
@@ -2296,7 +2303,7 @@ bool TebOptimalPlanner::getVelocityCommand(double& vx, double& vy, double& omega
   for(int counter = 0; counter < look_ahead_poses; ++counter)
   {
     dt += teb_.TimeDiff(counter);
-    if(dt >= cfg_->trajectory.dt_ref * look_ahead_poses)  // TODO: change to look-ahead time? Refine trajectory?
+    if(dt >= dt_ref * look_ahead_poses)  // TODO: change to look-ahead time? Refine trajectory?
     {
         look_ahead_poses = counter + 1;
         break;

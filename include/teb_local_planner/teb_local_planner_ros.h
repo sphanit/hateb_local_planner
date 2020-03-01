@@ -67,6 +67,7 @@
 
 // human data
 #include <hanp_prediction/HumanPosePredict.h>
+#include <hanp_prediction/human_pose_prediction.h>
 #include <std_srvs/SetBool.h>
 #include <std_srvs/Empty.h>
 
@@ -103,7 +104,7 @@ namespace teb_local_planner
   * interfaces, so the teb_local_planner plugin can be used both in move_base and move_base_flex (MBF).
   * @todo Escape behavior, more efficient obstacle handling
   */
-class TebLocalPlannerROS : public nav_core::BaseLocalPlanner, public mbf_costmap_core::CostmapController 
+class TebLocalPlannerROS : public nav_core::BaseLocalPlanner, public mbf_costmap_core::CostmapController
 {
 
 public:
@@ -436,6 +437,10 @@ protected:
 
   void validateFootprints(double opt_inscribed_radius, double costmap_inscribed_radius, double min_obst_dist);
 
+  // bool isunderThresholdDist(bool set);
+
+  void CheckDist(const hanp_msgs::TrackedHumans &tracked_humans);
+
   // /**
   //  * @brief Transformed human poses to planning frame
   //  */
@@ -528,10 +533,14 @@ private:
 
   void resetHumansPrediction();
   ros::Time last_call_time_;
+  hanp_msgs::TrackedHumans tracked_humans_;
+  geometry_msgs::Pose robot_pos_msg;
+  bool isDistunderThreshold;
 
   ros::Time last_omega_sign_change_;
   double last_omega_;
 
+  ros::Subscriber human_pos_sub_;
   ros::Publisher op_costs_pub_,robot_pose_pub_,time_to_goal_pub_;
 
 public:

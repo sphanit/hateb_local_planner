@@ -184,7 +184,8 @@ public:
                     const geometry_msgs::Twist *start_vel = NULL,
                     bool free_goal_vel = false,
                     const HumanPlanVelMap *initial_human_plan_vels = NULL,
-                    teb_local_planner::OptimizationCostArray *op_costs = NULL);
+                    teb_local_planner::OptimizationCostArray *op_costs = NULL,
+                    double dt_ref = 0.4, double dt_hyst=0.1);
 
   /**
    * @brief Plan a trajectory between a given start and goal pose (tf::Pose version)
@@ -202,7 +203,7 @@ public:
    *		      otherwise the final velocity will be zero (default: false)
    * @return \c true if planning was successful, \c false otherwise
    */
-  virtual bool plan(const tf::Pose& start, const tf::Pose& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false);
+  virtual bool plan(const tf::Pose& start, const tf::Pose& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false, teb_local_planner::OptimizationCostArray *op_costs =NULL, double dt_ref=0.4, double dt_hyst=0.1);
 
   /**
    * @brief Plan a trajectory between a given start and goal pose
@@ -220,7 +221,7 @@ public:
    *		      otherwise the final velocity will be zero (default: false)
    * @return \c true if planning was successful, \c false otherwise
    */
-  virtual bool plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false, double pre_plan_time = 0.0);
+  virtual bool plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel = NULL, bool free_goal_vel=false, double pre_plan_time = 0.0, teb_local_planner::OptimizationCostArray *op_costs=NULL, double dt_ref = 0.4, double dt_hyst=0.1);
 
 
   /**
@@ -231,7 +232,7 @@ public:
    * @param[out] omega rotational velocity [rad/s]
    * @return \c true if command is valid, \c false otherwise
    */
-   virtual bool getVelocityCommand(double& vx, double& vy, double& omega, int look_ahead_poses) const;
+   virtual bool getVelocityCommand(double& vx, double& vy, double& omega, int look_ahead_poses, double dt_ref) const;
 
   /**
    * @brief Optimize a previously initialized trajectory (actual TEB optimization loop).
@@ -266,7 +267,17 @@ public:
                    double obst_cost_scale = 1.0,
                    double viapoint_cost_scale = 1.0,
                    bool alternative_time_cost = false,
-                   teb_local_planner::OptimizationCostArray *op_costs = NULL);
+                   teb_local_planner::OptimizationCostArray *op_costs = NULL,
+                   double dt_ref = 0.4,
+                   double dt_hyst = 0.1);
+
+ bool optimizeTEB(int iterations_innerloop,
+                  int iterations_outerloop,
+                  bool compute_cost_afterwards = true,
+                  double obst_cost_scale = 1.0,
+                  double viapoint_cost_scale = 1.0,
+                  bool alternative_time_cost = false,
+                  teb_local_planner::OptimizationCostArray *op_costs = NULL);
 
   //@}
 
@@ -734,6 +745,7 @@ protected:
   std::map<uint64_t, TimedElasticBand> humans_tebs_map_;
   geometry_msgs::PoseStamped approach_pose_;
   VertexPose *approach_pose_vertex;
+  // double dt_ref_def, dt_hyst_def;
 
   RobotFootprintModelPtr robot_model_; //!< Robot model
   CircularRobotFootprintPtr human_model_;
