@@ -104,7 +104,7 @@ public:
     double func_theta = 1.0;
     if (human_radius_>0.0){
       func = std::min(1.0,std::max(std::pow(10,(d-2)),0.1)); // a = 4.64 to set the min value at 0.5m
-      func_theta = std::min(1.0,std::max(std::pow(10,(d-3)),0.01)); // a = 4.64 to set the min value at 0.5m
+      func_theta = std::min(1.0,std::max(std::pow(10,(d-2)),0.1)); // a = 4.64 to set the min value at 0.5m
       // if(d <=2.0 && cfg_->optim.weight_viapoint!=10.0)
       //   system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ weight_viapoint 10.0");
       // else if(cfg_->optim.weight_viapoint!=0.05)
@@ -283,7 +283,7 @@ public:
 
     if (human_radius_>0.0){
       func = std::min(1.0,std::max(std::pow(10,(d-2)),0.1)); // a = 4.64 to set the min value at 0.5m
-      func_theta = std::min(1.0,std::max(std::pow(10,(d-3)),0.01)); // a = 4.64 to set the min value at 0.5m
+      func_theta = std::min(1.0,std::max(std::pow(10,(d-2)),0.1)); // a = 4.64 to set the min value at 0.5m
       // if(d <=2.0 && cfg_->optim.weight_viapoint!=10.0)
       //   system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ weight_viapoint 10.0");
       // else if(cfg_->optim.weight_viapoint!=0.05)

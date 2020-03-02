@@ -68,6 +68,7 @@
 #include "g2o/core/optimization_algorithm_levenberg.h"
 #include "g2o/solvers/csparse/linear_solver_csparse.h"
 #include "g2o/solvers/cholmod/linear_solver_cholmod.h"
+#include <string>
 
 // register this planner both as a BaseLocalPlanner and as a MBF's CostmapController plugin
 PLUGINLIB_EXPORT_CLASS(teb_local_planner::TebLocalPlannerROS, nav_core::BaseLocalPlanner)
@@ -220,6 +221,8 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
 
     last_omega_ = 0.0;
     isDistunderThreshold = false;
+    change_mode = false;
+    human_still = false;
 
     // set initialized flag
     initialized_ = true;
@@ -283,15 +286,30 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
 
   for(auto &human: tracked_humans_.humans){
     for (auto &segment : human.segments){
-      human_dists.push_back(std::hypot(segment.pose.pose.position.x-xpos, segment.pose.pose.position.y-ypos));
+      if(segment.type==DEFAULT_HUMAN_SEGMENT)
+        human_dists.push_back(std::hypot(segment.pose.pose.position.x-xpos, segment.pose.pose.position.y-ypos));
     }
-
   }
+
+  for(int i=0;i<prev_tracked_humans_.humans.size();i++){
+    for (int j=0;j<prev_tracked_humans_.humans[i].segments.size();j++){
+      if(prev_tracked_humans_.humans[i].segments[j].type==DEFAULT_HUMAN_SEGMENT){
+        double hum_move_dist = std::hypot(tracked_humans_.humans[i].segments[j].pose.pose.position.x-prev_tracked_humans_.humans[i].segments[j].pose.pose.position.x,
+                                          tracked_humans_.humans[i].segments[j].pose.pose.position.y-prev_tracked_humans_.humans[i].segments[j].pose.pose.position.y);
+
+        if(hum_move_dist<0.1)
+          human_still=true;
+        else
+          human_still=false;
+      }
+    }
+  }
+  prev_tracked_humans_ = tracked_humans_;
 
 
   for(auto &dist: human_dists){
     // std::cout << "dist " << dist << '\n';
-    if(dist<=2.0){
+    if(dist<=2.5){
       isDistunderThreshold = true;}
       // system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ weight_viapoint 1.0");
     else{
@@ -352,6 +370,25 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   robot_pose_ = PoseSE2(robot_pose.pose);
   robot_pose_.toPoseMsg(robot_pos_msg);
   robot_pose_pub_.publish(robot_pos_msg);
+  // std::cout << "last_robot_pose" <<last_robot_pose<< '\n';
+  if(std::hypot(robot_pose.pose.position.x-last_robot_pose.position.x, robot_pose.pose.position.y-last_robot_pose.position.y)>0.02){
+    last_position_time = ros::Time::now();
+    // if(change_mode<4)
+    //   change_mode=0;
+    // std::cout << "distance now" << std::hypot(robot_pose.pose.position.x-last_robot_pose.position.x, robot_pose.pose.position.y-last_robot_pose.position.y)<< '\n';
+  }
+  last_robot_pose  = robot_pose.pose;
+
+  if((ros::Time::now()-last_position_time).toSec()>=2.0){
+    if(human_still && isDistunderThreshold){
+      if(change_mode==0)
+        ROS_INFO("I am stuck because of human, Changing to VelObs mode");
+      change_mode++;
+    }
+    // ROS_INFO_ONCE("I am stuck")
+    // std::cout << "(ros::Time::now()-last_position_time).toSec() " <<(ros::Time::now()-last_position_time).toSec() << '\n';
+  }
+
   auto pose_get_time = ros::Time::now() - pose_get_start_time;
 
   // Get robot velocity
@@ -401,6 +438,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     && (!cfg_.goal_tolerance.complete_global_plan || via_points_.size() == 0))
   {
     goal_reached_ = true;
+    change_mode = 0;
     return mbf_msgs::ExePathResult::SUCCESS;
   }
 
@@ -463,7 +501,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     break;
   case 1: {
     hanp_prediction::HumanPosePredict predict_srv;
-    if (cfg_.hateb.use_external_prediction) {
+    if (cfg_.hateb.use_external_prediction && change_mode<1) {
       if (cfg_.hateb.predict_human_behind_robot) {
         predict_srv.request.type =
             //hanp_prediction::HumanPosePredictRequest::BEHIND_ROBOT;
@@ -472,7 +510,8 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
         predict_srv.request.type =
             hanp_prediction::HumanPosePredictRequest::EXTERNAL;
       }
-    } else {
+    }
+    else {
       double traj_size = 10, predict_time = 5.0; // TODO: make these values configurable
       for (double i = 1.0; i <= traj_size; ++i) {
         predict_srv.request.predict_times.push_back(predict_time *

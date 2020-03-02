@@ -533,9 +533,11 @@ private:
 
   void resetHumansPrediction();
   ros::Time last_call_time_;
-  hanp_msgs::TrackedHumans tracked_humans_;
-  geometry_msgs::Pose robot_pos_msg;
+  hanp_msgs::TrackedHumans tracked_humans_,prev_tracked_humans_;
+  geometry_msgs::Pose robot_pos_msg, last_robot_pose;
   bool isDistunderThreshold;
+  ros::Time last_position_time;
+  int change_mode,human_still;
 
   ros::Time last_omega_sign_change_;
   double last_omega_;
