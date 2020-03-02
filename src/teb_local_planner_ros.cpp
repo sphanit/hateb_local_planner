@@ -466,7 +466,8 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     if (cfg_.hateb.use_external_prediction) {
       if (cfg_.hateb.predict_human_behind_robot) {
         predict_srv.request.type =
-            hanp_prediction::HumanPosePredictRequest::BEHIND_ROBOT;
+            //hanp_prediction::HumanPosePredictRequest::BEHIND_ROBOT;
+            hanp_prediction::HumanPosePredictRequest::PREDICTED_GOAL;
       } else {
         predict_srv.request.type =
             hanp_prediction::HumanPosePredictRequest::EXTERNAL;
@@ -498,7 +499,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
         // transform human plans
         HumanPlanCombined human_plan_combined;
         auto &transformed_vel = predicted_humans_poses.start_velocity;
-        std::cout << "predicted_humans_poses.start_velocity " <<predicted_humans_poses.start_velocity<< '\n';
+        //std::cout << "predicted_humans_poses.start_velocity " <<predicted_humans_poses.start_velocity<< '\n';
         if (!transformHumanPlan(*tf_, robot_pose, *costmap_, global_frame_,
                                 predicted_humans_poses.poses,
                                 human_plan_combined, transformed_vel,
