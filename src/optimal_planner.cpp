@@ -324,6 +324,7 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
   auto human_prep_time_start = ros::Time::now();
   humans_vel_start_.clear();
   humans_vel_goal_.clear();
+  human_nominal_vels.clear();
 
   double current_human_robot_min_dist = std::numeric_limits<double>::max();
 
@@ -346,6 +347,7 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
     for (auto &initial_human_plan_vel_kv : *initial_human_plan_vel_map) {
       auto &human_id = initial_human_plan_vel_kv.first;
       auto &initial_human_plan = initial_human_plan_vel_kv.second.plan;
+      human_nominal_vels.push_back(initial_human_plan_vel_kv.second.nominal_vel);
 
       // erase human-teb if human plan is empty
       if (initial_human_plan.empty()) {
@@ -1254,7 +1256,9 @@ void TebOptimalPlanner::AddEdgesVelocityForHumans() {
     information(1, 1) = cfg_->optim.weight_max_human_vel_theta;
     information(2, 2) = cfg_->optim.weight_nominal_human_vel_x;
 
+    int itr_idx = 0 ;
     for (auto &human_teb_kv : humans_tebs_map_) {
+      // human_nominal_vels[itr_idx]
       auto &human_teb = human_teb_kv.second;
 
       int n = human_teb.sizePoses();
@@ -1265,9 +1269,10 @@ void TebOptimalPlanner::AddEdgesVelocityForHumans() {
         human_velocity_edge->setVertex(1, human_teb.PoseVertex(i + 1));
         human_velocity_edge->setVertex(2, human_teb.TimeDiffVertex(i));
         human_velocity_edge->setInformation(information);
-        human_velocity_edge->setTebConfig(*cfg_);
+        human_velocity_edge->setParameters(*cfg_, human_nominal_vels[itr_idx]);
         optimizer_->addEdge(human_velocity_edge);
       }
+      itr_idx++;
     }
   }
   else // holonomic-human
@@ -1283,6 +1288,7 @@ void TebOptimalPlanner::AddEdgesVelocityForHumans() {
     information(2,2) = cfg_->optim.weight_max_human_vel_theta;
     information(3,3) = cfg_->optim.weight_nominal_human_vel_x;
 
+    int itr_idx = 0 ;
     for (auto &human_teb_kv : humans_tebs_map_) {
       auto &human_teb = human_teb_kv.second;
 
@@ -1294,9 +1300,11 @@ void TebOptimalPlanner::AddEdgesVelocityForHumans() {
         human_velocity_edge->setVertex(1,human_teb.PoseVertex(i+1));
         human_velocity_edge->setVertex(2,human_teb.TimeDiffVertex(i));
         human_velocity_edge->setInformation(information);
-        human_velocity_edge->setTebConfig(*cfg_);
+        human_velocity_edge->setParameters(*cfg_, human_nominal_vels[itr_idx]);
+        // human_velocity_edge->setTebConfig(*cfg_);
         optimizer_->addEdge(human_velocity_edge);
       }
+      itr_idx++;
     }
   }
 }

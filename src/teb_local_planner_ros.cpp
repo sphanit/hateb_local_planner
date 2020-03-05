@@ -261,21 +261,21 @@ bool TebLocalPlannerROS::setPlan(const std::vector<geometry_msgs::PoseStamped>& 
 }
 
 void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_humans){
-  /* Code block for changing dynamic reconfigure
+  //Code block for changing dynamic reconfigure
   // dynamic_reconfigure::ReconfigureRequest srv_req;
   // dynamic_reconfigure::ReconfigureResponse srv_resp;
   // dynamic_reconfigure::DoubleParameter double_param;
   // dynamic_reconfigure::IntParameter int_param;
   // dynamic_reconfigure::Config conf;
   //
-  // int_param.name = "planning_mode";
-  // int_param.value = 0;
-  // conf.ints.push_back(int_param);
+  // double_param.name = "nominal_human_vel_x";
+  // double_param.value = 0.5;
+  // conf.doubles.push_back(double_param);
   //
   // srv_req.config = conf;
+  // ros::service::call("/move_base_node/TebLocalPlannerROS/", srv_req, srv_resp);
+  // system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ nominal_human_vel_x 0.5");
 
-  // system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ weight_viapoint 1.0");
-  */
 
   tracked_humans_ = tracked_humans;
   std::vector<double> human_dists;
@@ -284,12 +284,33 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
   auto ypos = robot_pos_msg.position.y;
   // auto robot_radius = 0.300;
 
+  int itr_idx = 0;
   for(auto &human: tracked_humans_.humans){
-    for (auto &segment : human.segments){
-      if(segment.type==DEFAULT_HUMAN_SEGMENT)
-        human_dists.push_back(std::hypot(segment.pose.pose.position.x-xpos, segment.pose.pose.position.y-ypos));
+    if(human_vels.size()< human.track_id){
+      std::vector<double> h_vels;
+      human_vels.push_back(h_vels);
+      human_nominal_vels.push_back(0.0);
     }
+    for (auto &segment : human.segments){
+      if(segment.type==DEFAULT_HUMAN_SEGMENT){
+        human_dists.push_back(std::hypot(segment.pose.pose.position.x-xpos, segment.pose.pose.position.y-ypos));
+        human_vels[itr_idx].push_back(std::hypot(segment.twist.twist.linear.x, segment.twist.twist.linear.x));
+
+        auto n = human_vels[itr_idx].size();
+        float average = 0.0f;
+        if (n != 0) {
+          average = accumulate( human_vels[itr_idx].begin(), human_vels[itr_idx].end(), 0.0) / n;
+        }
+        human_nominal_vels[itr_idx] = average;
+        // std::cout << "average " <<average<< '\n';
+
+        if(n>10)
+          human_vels[itr_idx].erase(human_vels[itr_idx].begin());
+        }
+    }
+    itr_idx++;
   }
+  ROS_INFO_ONCE("human_vels.size(), %d ", (int)human_vels.size());
 
   for(int i=0;i<prev_tracked_humans_.humans.size();i++){
     for (int j=0;j<prev_tracked_humans_.humans[i].segments.size();j++){
@@ -310,11 +331,12 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
   for(auto &dist: human_dists){
     // std::cout << "dist " << dist << '\n';
     if(dist<=2.5){
-      isDistunderThreshold = true;}
-      // system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ weight_viapoint 1.0");
+      isDistunderThreshold = true;
+      // system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ nominal_human_vel_x 0.5");
+      }
     else{
       isDistunderThreshold = false;
-      // system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ weight_viapoint 0.05");
+      // system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ nominal_human_vel_x 0.5");
     }
   }
 }
@@ -557,6 +579,8 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
         PlanStartVelGoalVel plan_start_vel_goal_vel;
         plan_start_vel_goal_vel.plan = human_plan_combined.plan_to_optimize;
         plan_start_vel_goal_vel.start_vel = transformed_vel.twist;
+        // std::cout << "human_nominal_vels[predicted_humans_poses.id-1] " <<human_nominal_vels[predicted_humans_poses.id-1]<< '\n';
+        plan_start_vel_goal_vel.nominal_vel = std::max(0.3,human_nominal_vels[predicted_humans_poses.id-1]);
         if (human_plan_combined.plan_after.size() > 0) {
           plan_start_vel_goal_vel.goal_vel = transformed_vel.twist;
         }
@@ -611,6 +635,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
 
           PlanStartVelGoalVel plan_start_vel_goal_vel;
           plan_start_vel_goal_vel.plan.push_back(transformed_human_pose);
+          plan_start_vel_goal_vel.nominal_vel = std::max(0.3,human_nominal_vels[predicted_humans_poses.id-1]);
           transformed_human_plan_vel_map[predicted_humans_poses.id] =
               plan_start_vel_goal_vel;
 

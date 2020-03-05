@@ -538,6 +538,8 @@ private:
   bool isDistunderThreshold;
   ros::Time last_position_time;
   int change_mode,human_still;
+  std::vector<std::vector<double>> human_vels;
+  std::vector<double> human_nominal_vels;
 
   ros::Time last_omega_sign_change_;
   double last_omega_;

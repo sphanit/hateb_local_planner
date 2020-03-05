@@ -65,6 +65,7 @@ typedef struct {
   std::vector<geometry_msgs::PoseStamped> plan;
   geometry_msgs::Twist start_vel;
   geometry_msgs::Twist goal_vel;
+  double nominal_vel;
 } PlanStartVelGoalVel;
 
 using HumanPlanVelMap = std::map<uint64_t, PlanStartVelGoalVel>;

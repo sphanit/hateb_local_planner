@@ -376,10 +376,10 @@ public:
     _error[0] = penaltyBoundToInterval(vx, -cfg_->human.max_vel_x_backwards, cfg_->human.max_vel_x, cfg_->optim.penalty_epsilon);
     _error[1] = penaltyBoundToInterval(vy, cfg_->human.max_vel_y, 0.0); // we do not apply the penalty epsilon here, since the velocity could be close to zero
     _error[2] = penaltyBoundToInterval(omega, cfg_->human.max_vel_theta,cfg_->optim.penalty_epsilon);
-
+    // std::cout << "nominal_vel " <<nominal_vel_<< '\n';
     if (cfg_->hateb.use_human_elastic_vel)
     {
-      double vel_diff = std::abs(cfg_->human.nominal_vel_x - vel);
+      double vel_diff = std::abs(nominal_vel_ - vel);
       _error[3] = vel_diff;
     }
     else
@@ -391,6 +391,12 @@ public:
                    "EdgeVelocityHolonomicHuman::computeError() _error[0]=%f _error[1]=%f _error[2]=%f _error[3]=%f\n",_error[0],_error[1],_error[2],_error[3]);
   }
 
+  void setParameters(const TebConfig &cfg, const double nominal_vel) {
+    cfg_ = &cfg;
+    nominal_vel_ = nominal_vel;
+  }
+protected:
+  double nominal_vel_ = 0.0;
 
 public:
 
@@ -437,7 +443,7 @@ public:
 
     if (cfg_->hateb.use_human_elastic_vel)
     {
-      double vel_diff = std::abs(cfg_->human.nominal_vel_x - vel);
+      double vel_diff = std::abs(nominal_vel_ - vel);
       _error[2] = vel_diff;
     }
     else
@@ -447,6 +453,14 @@ public:
 
     ROS_ASSERT_MSG(std::isfinite(_error[0]), "EdgeVelocityHuman::computeError() _error[0]=%f _error[1]=%f\n", _error[0], _error[1]);
   }
+
+  void setParameters(const TebConfig &cfg, const double nominal_vel) {
+    cfg_ = &cfg;
+    nominal_vel_ = nominal_vel;
+  }
+
+protected:
+  double nominal_vel_ = 0.0;
   //
   // ErrorVector &getError() {
   //   computeError();
