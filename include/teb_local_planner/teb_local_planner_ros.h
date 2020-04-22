@@ -103,7 +103,7 @@ namespace teb_local_planner
   * interfaces, so the teb_local_planner plugin can be used both in move_base and move_base_flex (MBF).
   * @todo Escape behavior, more efficient obstacle handling
   */
-class TebLocalPlannerROS : public nav_core::BaseLocalPlanner, public mbf_costmap_core::CostmapController 
+class TebLocalPlannerROS : public nav_core::BaseLocalPlanner, public mbf_costmap_core::CostmapController
 {
 
 public:
@@ -533,6 +533,11 @@ private:
   double last_omega_;
 
   ros::Publisher op_costs_pub_,robot_pose_pub_,time_to_goal_pub_;
+  ros::Subscriber tracked_humans_sub_;
+
+  std::vector<geometry_msgs::Point> human_prev_pos_costmap;
+
+  void addHumansCostmap(const hanp_msgs::TrackedHumans &tracked_humans);
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

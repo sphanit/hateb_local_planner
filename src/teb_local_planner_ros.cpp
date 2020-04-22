@@ -47,6 +47,7 @@
 #define ROB_POS_TOPIC "Robot_Pose"
 #define DEFAULT_HUMAN_SEGMENT hanp_msgs::TrackedSegmentType::TORSO
 #define THROTTLE_RATE 5.0 // seconds
+#define HUMANS_SUB_TOPIC "tracked_humans"
 
 #include <teb_local_planner/teb_local_planner_ros.h>
 
@@ -192,6 +193,9 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
 
     // setup callback for custom via-points
     via_points_sub_ = nh.subscribe("via_points", 1, &TebLocalPlannerROS::customViaPointsCB, this);
+
+    //subscribe to tracked humans
+    tracked_humans_sub_ = nh.subscribe(HUMANS_SUB_TOPIC, 1, &TebLocalPlannerROS::addHumansCostmap, this);
 
     // initialize failure detector
     ros::NodeHandle nh_move_base("~");
@@ -741,7 +745,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     if (!std::isfinite(cmd_vel.twist.angular.z))
     {
       cmd_vel.twist.linear.x = cmd_vel.twist.linear.y = cmd_vel.twist.angular.z = 0;
-      last_cmd_ = cmd_vel.twist;  	    
+      last_cmd_ = cmd_vel.twist;
       planner_->clearPlanner();
       ROS_WARN("TebLocalPlannerROS: Resulting steering angle is not finite. Resetting planner...");
       ++no_infeasible_plans_; // increase number of infeasible solutions in a row
@@ -1699,6 +1703,46 @@ void TebLocalPlannerROS::configureBackupModes(std::vector<geometry_msgs::PoseSta
 
 }
 
+void TebLocalPlannerROS::addHumansCostmap(const hanp_msgs::TrackedHumans &tracked_humans){
+
+    std::vector<double> hum_xpos;
+    std::vector<double> hum_ypos;
+
+    for(int i=0;i<tracked_humans.humans.size();i++){
+      for (int j=0;j<tracked_humans.humans[i].segments.size();j++){
+        if(tracked_humans.humans[i].segments[j].type==DEFAULT_HUMAN_SEGMENT){
+          hum_xpos.push_back(tracked_humans.humans[i].segments[j].pose.pose.position.x);
+          hum_ypos.push_back(tracked_humans.humans[i].segments[j].pose.pose.position.y);
+        }
+      }
+    }
+    auto human_radius = 0.08;
+
+    for(int i=0;i<hum_xpos.size();i++){
+    geometry_msgs::Point v1,v2,v3,v4;
+    v1.x = hum_xpos[i]-human_radius,v1.y=hum_ypos[i]-human_radius,v1.z=0.0;
+    v2.x = hum_xpos[i]-human_radius,v2.y=hum_ypos[i]+human_radius,v2.z=0.0;
+    v3.x = hum_xpos[i]+human_radius,v3.y=hum_ypos[i]+human_radius,v3.z=0.0;
+    v4.x = hum_xpos[i]+human_radius,v4.y=hum_ypos[i]-human_radius,v4.z=0.0;
+
+
+    std::vector<geometry_msgs::Point> human_pos_costmap;
+    human_pos_costmap.push_back(v1);
+    human_pos_costmap.push_back(v2);
+    human_pos_costmap.push_back(v3);
+    human_pos_costmap.push_back(v4);
+
+    if(!human_prev_pos_costmap.empty()){
+      costmap_->setConvexPolygonCost(human_prev_pos_costmap, 0.0);
+    }
+    human_prev_pos_costmap = human_pos_costmap;
+
+    bool set_success = false;
+    set_success = costmap_->setConvexPolygonCost(human_pos_costmap, 255);
+    // ROS_INFO("Success :robot_pos_costmap %d",set_success);
+
+  }
+}
 
 void TebLocalPlannerROS::customObstacleCB(const costmap_converter::ObstacleArrayMsg::ConstPtr& obst_msg)
 {
