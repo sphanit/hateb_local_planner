@@ -100,6 +100,7 @@ void TebOptimalPlanner::initialize(const TebConfig& cfg, ObstContainer* obstacle
   std::cout << "human_model_ " << human_radius_<< '\n';
 
   initialized_ = true;
+  isMode = 0;
 }
 
 
@@ -274,6 +275,7 @@ void TebOptimalPlanner::setVelocityGoal(const geometry_msgs::Twist& vel_goal)
 
 bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan, const geometry_msgs::Twist* start_vel, bool free_goal_vel, const HumanPlanVelMap *initial_human_plan_vel_map, teb_local_planner::OptimizationCostArray *op_costs, double dt_ref, double dt_hyst)
 {
+  // std::cout << "I am in the traj plan function" << '\n';
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
   auto prep_start_time = ros::Time::now();
   if (!teb_.isInit())
@@ -325,6 +327,7 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
   humans_vel_start_.clear();
   humans_vel_goal_.clear();
   human_nominal_vels.clear();
+  isMode = 0;
 
   double current_human_robot_min_dist = std::numeric_limits<double>::max();
 
@@ -348,7 +351,7 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
       auto &human_id = initial_human_plan_vel_kv.first;
       auto &initial_human_plan = initial_human_plan_vel_kv.second.plan;
       human_nominal_vels.push_back(initial_human_plan_vel_kv.second.nominal_vel);
-
+      isMode = initial_human_plan_vel_kv.second.isMode;
       // erase human-teb if human plan is empty
       if (initial_human_plan.empty()) {
         auto itr = humans_tebs_map_.find(human_id);
@@ -1722,20 +1725,27 @@ void TebOptimalPlanner::AddEdgesPreferRotDir()
 void TebOptimalPlanner::AddEdgesHumanRobotSafety() {
   auto robot_teb_size = (int)teb_.sizePoses();
 
+  double min_dist_ = cfg_->human.min_human_robot_dist;
+  double weight_safety = cfg_->optim.weight_human_robot_safety;
+  if(isMode==1){
+    // min_dist_ = 0.2;
+    weight_safety = 5.0;
+  }
+
   for (auto &human_teb_kv : humans_tebs_map_) {
     auto &human_teb = human_teb_kv.second;
 
     for (unsigned int i = 0;
          (i < human_teb.sizePoses()) && (i < robot_teb_size); i++) {
       Eigen::Matrix<double, 1, 1> information_human_robot;
-      information_human_robot.fill(cfg_->optim.weight_human_robot_safety);
+      information_human_robot.fill(weight_safety);
 
       EdgeHumanRobotSafety *human_robot_safety_edge = new EdgeHumanRobotSafety;
       human_robot_safety_edge->setVertex(0, teb_.PoseVertex(i));
       human_robot_safety_edge->setVertex(1, human_teb.PoseVertex(i));
       human_robot_safety_edge->setInformation(information_human_robot);
       human_robot_safety_edge->setParameters(*cfg_, robot_model_.get(),
-                                             human_radius_);
+                                             human_radius_, min_dist_);
       optimizer_->addEdge(human_robot_safety_edge);
     }
   }
@@ -1902,6 +1912,10 @@ void TebOptimalPlanner::AddVertexEdgesApproach() {
     ROS_ERROR("approch pose vertex does not exist");
     return;
   }
+  double min_dist_ = cfg_->human.min_human_robot_dist;
+  if(isMode==1){
+    min_dist_ = 0.2;
+  }
 
   Eigen::Matrix<double, 1, 1> information_approach;
   information_approach.fill(cfg_->optim.weight_obstacle);
@@ -1911,7 +1925,7 @@ void TebOptimalPlanner::AddVertexEdgesApproach() {
     approach_edge->setVertex(0, teb_pose);
     approach_edge->setVertex(1, approach_pose_vertex);
     approach_edge->setInformation(information_approach);
-    approach_edge->setParameters(*cfg_, robot_model_.get(), human_radius_);
+    approach_edge->setParameters(*cfg_, robot_model_.get(), human_radius_, min_dist_);
     optimizer_->addEdge(approach_edge);
   }
 }

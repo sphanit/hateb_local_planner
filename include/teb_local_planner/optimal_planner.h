@@ -758,6 +758,7 @@ protected:
   bool optimized_; //!< This variable is \c true as long as the last optimization has been completed successful
   double human_radius_, robot_radius_;
   std::vector<double> human_nominal_vels;
+  int isMode;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

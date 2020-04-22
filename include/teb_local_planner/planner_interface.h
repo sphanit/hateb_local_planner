@@ -66,6 +66,7 @@ typedef struct {
   geometry_msgs::Twist start_vel;
   geometry_msgs::Twist goal_vel;
   double nominal_vel;
+  int isMode;
 } PlanStartVelGoalVel;
 
 using HumanPlanVelMap = std::map<uint64_t, PlanStartVelGoalVel>;

@@ -63,7 +63,8 @@ public:
     double dist = robot_model_->calculateDistance(robot_bandpt->pose(), obs_) - human_radius_;
 
     ROS_DEBUG_THROTTLE(0.5, "human robot dist = %f", dist);
-    _error[0] = penaltyBoundFromBelow(dist, cfg_->human.min_human_robot_dist, cfg_->optim.penalty_epsilon);
+
+    _error[0] = penaltyBoundFromBelow(dist, min_dist_ , cfg_->optim.penalty_epsilon);
 
     ROS_ASSERT_MSG(std::isfinite(_error[0]), "EdgeHumanRobotSafety::computeError() _error[0]=%f\n", _error[0]);
   }
@@ -76,16 +77,18 @@ public:
     human_radius_ = human_radius;
   }
 
-  void setParameters(const TebConfig &cfg, const BaseRobotFootprintModel *robot_model, const double human_radius) {
+  void setParameters(const TebConfig &cfg, const BaseRobotFootprintModel *robot_model, const double human_radius, const double min_dist) {
     cfg_ = &cfg;
     robot_model_ = robot_model;
     human_radius_ = human_radius;
+    min_dist_ = min_dist;
   }
 
 protected:
   const BaseRobotFootprintModel *robot_model_;
   Obstacle *obs_ = new PointObstacle();
   double human_radius_ = std::numeric_limits<double>::infinity();
+  double min_dist_ = 0.0;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

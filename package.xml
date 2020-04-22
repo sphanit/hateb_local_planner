@@ -47,6 +47,7 @@
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
   <depend>hanp_msgs</depend>
+  <depend>humans_nav</depend>
   <depend>hanp_prediction</depend>
   <depend>std_srvs</depend>
   <depend>visualization_msgs</depend>

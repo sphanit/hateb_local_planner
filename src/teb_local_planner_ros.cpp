@@ -41,6 +41,7 @@
   "/human_pose_prediction/reset_external_paths"
 #define PUBLISH_MARKERS_SRV_NAME                                               \
   "/human_pose_prediction/publish_prediction_markers"
+#define HUMAN_GOAL_SRV_NAME "/setGoalHuman_call"
 #define OPTIMIZE_SRV_NAME "optimize"
 #define APPROACH_SRV_NAME "set_approach_id"
 #define OP_COSTS_TOPIC "optimization_costs"
@@ -203,6 +204,7 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
     predict_humans_client_ = nh.serviceClient<hanp_prediction::HumanPosePredict>(PREDICT_SERVICE_NAME, true);
     reset_humans_prediction_client_ = nh.serviceClient<std_srvs::Empty>(RESET_PREDICTION_SERVICE_NAME, true);
     publish_predicted_markers_client_ = nh.serviceClient<std_srvs::SetBool>(PUBLISH_MARKERS_SRV_NAME, true);
+    human_goal_client_ = nh.serviceClient<std_srvs::Trigger>(HUMAN_GOAL_SRV_NAME);
 
     optimize_server_ = nh.advertiseService(OPTIMIZE_SRV_NAME, &TebLocalPlannerROS::optimizeStandalone, this);
     approach_server_ = nh.advertiseService(APPROACH_SRV_NAME, &TebLocalPlannerROS::setApproachID, this);
@@ -212,7 +214,6 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
     robot_pose_pub_ = nh.advertise<geometry_msgs::Pose>(ROB_POS_TOPIC, 1);
     human_pos_sub_ = nh.subscribe(HUMAN_POS_SUB_TOPIC, 1, &TebLocalPlannerROS::CheckDist, this);
 
-
     time_to_goal_pub_ = nh.advertise<std_msgs::Float64>("time_to_goal",100);
 
     last_call_time_ = ros::Time::now() - ros::Duration(cfg_.hateb.pose_prediction_reset_time);
@@ -221,8 +222,11 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
 
     last_omega_ = 0.0;
     isDistunderThreshold = false;
-    change_mode = false;
+    isDistMax = true;
+    change_mode = 0;
+    isMode = 0;
     human_still = false;
+    flag = false;
 
     // set initialized flag
     initialized_ = true;
@@ -282,6 +286,9 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
 
   auto xpos = robot_pos_msg.position.x;
   auto ypos = robot_pos_msg.position.y;
+  std::vector<double> hum_xpos;
+  std::vector<double> hum_ypos;
+
   // auto robot_radius = 0.300;
 
   int itr_idx = 0;
@@ -317,8 +324,10 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
       if(prev_tracked_humans_.humans[i].segments[j].type==DEFAULT_HUMAN_SEGMENT){
         double hum_move_dist = std::hypot(tracked_humans_.humans[i].segments[j].pose.pose.position.x-prev_tracked_humans_.humans[i].segments[j].pose.pose.position.x,
                                           tracked_humans_.humans[i].segments[j].pose.pose.position.y-prev_tracked_humans_.humans[i].segments[j].pose.pose.position.y);
+        hum_xpos.push_back(tracked_humans_.humans[i].segments[j].pose.pose.position.x);
+        hum_ypos.push_back(tracked_humans_.humans[i].segments[j].pose.pose.position.y);
 
-        if(hum_move_dist<0.1)
+        if(hum_move_dist<0.001)
           human_still=true;
         else
           human_still=false;
@@ -338,6 +347,39 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
       isDistunderThreshold = false;
       // system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ nominal_human_vel_x 0.5");
     }
+    if(dist>=10.0){
+      isDistMax = true;
+    }
+    else{
+      isDistMax = false;
+    }
+  }
+
+    auto human_radius = 0.08;
+
+    for(int i=0;i<hum_xpos.size();i++){
+    geometry_msgs::Point v1,v2,v3,v4;
+    v1.x = hum_xpos[i]-human_radius,v1.y=hum_ypos[i]-human_radius,v1.z=0.0;
+    v2.x = hum_xpos[i]-human_radius,v2.y=hum_ypos[i]+human_radius,v2.z=0.0;
+    v3.x = hum_xpos[i]+human_radius,v3.y=hum_ypos[i]+human_radius,v3.z=0.0;
+    v4.x = hum_xpos[i]+human_radius,v4.y=hum_ypos[i]-human_radius,v4.z=0.0;
+
+
+    std::vector<geometry_msgs::Point> human_pos_costmap;
+    human_pos_costmap.push_back(v1);
+    human_pos_costmap.push_back(v2);
+    human_pos_costmap.push_back(v3);
+    human_pos_costmap.push_back(v4);
+
+    if(!human_prev_pos_costmap.empty()){
+      costmap_->setConvexPolygonCost(human_prev_pos_costmap, 0.0);
+    }
+    human_prev_pos_costmap = human_pos_costmap;
+
+    bool set_success = false;
+    set_success = costmap_->setConvexPolygonCost(human_pos_costmap, 255);
+    // ROS_INFO("Success :robot_pos_costmap %d",set_success);
+
   }
 }
 
@@ -393,7 +435,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   robot_pose_.toPoseMsg(robot_pos_msg);
   robot_pose_pub_.publish(robot_pos_msg);
   // std::cout << "last_robot_pose" <<last_robot_pose<< '\n';
-  if(std::hypot(robot_pose.pose.position.x-last_robot_pose.position.x, robot_pose.pose.position.y-last_robot_pose.position.y)>0.02){
+  if(std::hypot(robot_pose.pose.position.x-last_robot_pose.position.x, robot_pose.pose.position.y-last_robot_pose.position.y)>0.05){
     last_position_time = ros::Time::now();
     // if(change_mode<4)
     //   change_mode=0;
@@ -406,6 +448,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
       if(change_mode==0)
         ROS_INFO("I am stuck because of human, Changing to VelObs mode");
       change_mode++;
+      isMode = 1;
     }
     // ROS_INFO_ONCE("I am stuck")
     // std::cout << "(ros::Time::now()-last_position_time).toSec() " <<(ros::Time::now()-last_position_time).toSec() << '\n';
@@ -461,6 +504,8 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   {
     goal_reached_ = true;
     change_mode = 0;
+    isMode  = 0;
+    flag = false;
     return mbf_msgs::ExePathResult::SUCCESS;
   }
 
@@ -522,13 +567,23 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   case 0:
     break;
   case 1: {
+
     hanp_prediction::HumanPosePredict predict_srv;
     if (cfg_.hateb.use_external_prediction && change_mode<1) {
-      if (cfg_.hateb.predict_human_behind_robot) {
+
+      std_srvs::Trigger g_srv;
+      human_goal_client_.call(g_srv);
+      if(g_srv.response.success && !flag)
+        flag = true;
+
+      if (cfg_.hateb.predict_human_behind_robot && !flag) {
         predict_srv.request.type =
-            //hanp_prediction::HumanPosePredictRequest::BEHIND_ROBOT;
-            hanp_prediction::HumanPosePredictRequest::PREDICTED_GOAL;
+            hanp_prediction::HumanPosePredictRequest::BEHIND_ROBOT;
+            // hanp_prediction::HumanPosePredictRequest::PREDICTED_GOAL;
+            if(isDistMax)
+              break;
       } else {
+        // std::cout << "I am in rthe external prediction" << '\n';
         predict_srv.request.type =
             hanp_prediction::HumanPosePredictRequest::EXTERNAL;
       }
@@ -581,6 +636,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
         plan_start_vel_goal_vel.start_vel = transformed_vel.twist;
         // std::cout << "human_nominal_vels[predicted_humans_poses.id-1] " <<human_nominal_vels[predicted_humans_poses.id-1]<< '\n';
         plan_start_vel_goal_vel.nominal_vel = std::max(0.3,human_nominal_vels[predicted_humans_poses.id-1]);
+        plan_start_vel_goal_vel.isMode = isMode;
         if (human_plan_combined.plan_after.size() > 0) {
           plan_start_vel_goal_vel.goal_vel = transformed_vel.twist;
         }
@@ -636,6 +692,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
           PlanStartVelGoalVel plan_start_vel_goal_vel;
           plan_start_vel_goal_vel.plan.push_back(transformed_human_pose);
           plan_start_vel_goal_vel.nominal_vel = std::max(0.3,human_nominal_vels[predicted_humans_poses.id-1]);
+          plan_start_vel_goal_vel.isMode = isMode;
           transformed_human_plan_vel_map[predicted_humans_poses.id] =
               plan_start_vel_goal_vel;
 
@@ -1247,9 +1304,10 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
 
     //we'll discard points on the plan that are outside the local costmap
     double dist_threshold = std::max(costmap.getSizeInCellsX() * costmap.getResolution() / 2.0,
-                                     costmap.getSizeInCellsY() * costmap.getResolution() / 2.0);
-    dist_threshold *= 0.85; // just consider 85% of the costmap size to better incorporate point obstacle that are
+                                     costmap.getSizeInCellsY() * costmap.getResolution() / 2.0)*2.0;
+    // dist_threshold *= 0.85; // just consider 85% of the costmap size to better incorporate point obstacle that are
                            // located on the border of the local costmap
+    dist_threshold *= 0.9;
 
 
     int i = 0;
@@ -1272,7 +1330,7 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
         sq_dist = new_sq_dist;
         i = j;
       }
-      sq_dist = new_sq_dist;
+      // sq_dist = new_sq_dist;
 
       const geometry_msgs::PoseStamped &pose = global_plan[i];
       // tf2::fromMsg(pose, tf_pose);
@@ -1284,6 +1342,7 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
 
       transformed_plan_combined.plan_before.push_back(newer_pose);
     }
+    // std::cout << "i before start: " <<i<< '\n';
 
     double plan_length = 0; // check cumulative Euclidean distance along the plan
 
@@ -1304,6 +1363,9 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
       // caclulate distance to previous pose
       if (i>0 && max_plan_length>0)
         plan_length += distance_points2d(global_plan[i-1].pose.position, global_plan[i].pose.position);
+      // std::cout << "plan length : " << plan_length << '\n';
+
+      // std::cout << "i :" <<i << '\n';
 
       ++i;
     }
@@ -1522,6 +1584,9 @@ bool TebLocalPlannerROS::transformHumanPlan(
         std::max(costmap.getSizeInCellsX() * costmap.getResolution() / 2.0,
                  costmap.getSizeInCellsY() * costmap.getResolution() / 2.0) *
         2.0;
+    // std::cout << "dist_threshold " << dist_threshold << '\n';
+    dist_threshold *= 0.9;
+
     double sq_dist_threshold = dist_threshold * dist_threshold;
     double x_diff, y_diff, sq_dist;
 
@@ -2049,7 +2114,6 @@ void TebLocalPlannerROS::resetHumansPrediction() {
 bool TebLocalPlannerROS::optimizeStandalone(
     teb_local_planner::Optimize::Request &req,
     teb_local_planner::Optimize::Response &res) {
-      std::cout << "I am in TebLocalPlannerROS::optimizeStandalone" << '\n';
   ROS_INFO("optimize service called");
   auto start_time = ros::Time::now();
 
