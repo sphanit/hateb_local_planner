@@ -1152,7 +1152,7 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
         sq_dist = new_sq_dist;
         i = j;
       }
-      sq_dist = new_sq_dist;
+     // sq_dist = new_sq_dist;
 
       const geometry_msgs::PoseStamped &pose = global_plan[i];
       // tf2::fromMsg(pose, tf_pose);
