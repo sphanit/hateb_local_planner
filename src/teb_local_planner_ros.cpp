@@ -356,6 +356,8 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
   }
 
     auto human_radius = 0.08;
+    if(isMode==1)
+      human_radius = 0.3;
 
     for(int i=0;i<hum_xpos.size();i++){
     geometry_msgs::Point v1,v2,v3,v4;
@@ -794,7 +796,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   double dt_resize=cfg_.trajectory.dt_ref;
   double dt_hyst_resize=cfg_.trajectory.dt_hysteresis;
 
-  if(isDistunderThreshold){
+  if(isDistunderThreshold && isMode==0){
       dt_resize = 0.2;
       dt_hyst_resize = 0.1;
     }
