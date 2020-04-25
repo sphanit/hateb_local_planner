@@ -47,7 +47,7 @@
 #define ROB_POS_TOPIC "Robot_Pose"
 #define DEFAULT_HUMAN_SEGMENT hanp_msgs::TrackedSegmentType::TORSO
 #define THROTTLE_RATE 5.0 // seconds
-#define HUMANS_SUB_TOPIC "tracked_humans"
+#define HUMANS_SUB_TOPIC "/tracked_humans"
 
 #include <teb_local_planner/teb_local_planner_ros.h>
 
@@ -195,7 +195,7 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
     via_points_sub_ = nh.subscribe("via_points", 1, &TebLocalPlannerROS::customViaPointsCB, this);
 
     //subscribe to tracked humans
-    tracked_humans_sub_ = nh.subscribe(HUMANS_SUB_TOPIC, 1, &TebLocalPlannerROS::addHumansCostmap, this);
+    tracked_humans_sub_ = nh.subscribe(HUMANS_SUB_TOPIC, 1, &TebLocalPlannerROS::CheckDist, this);
 
     // initialize failure detector
     ros::NodeHandle nh_move_base("~");
@@ -216,12 +216,15 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
     robot_pose_pub_ = nh.advertise<geometry_msgs::Pose>(ROB_POS_TOPIC, 1);
 
     time_to_goal_pub_ = nh.advertise<std_msgs::Float64>("time_to_goal",100);
+    min_dist_human_pub_ = nh.advertise<std_msgs::Float64>("min_dist_human",100);
 
     last_call_time_ = ros::Time::now() - ros::Duration(cfg_.hateb.pose_prediction_reset_time);
 
     last_omega_sign_change_ = ros::Time::now() - ros::Duration(cfg_.optim.omega_chage_time_seperation);
 
     last_omega_ = 0.0;
+
+    min_dist_human = std::numeric_limits<double>::infinity();
 
     // set initialized flag
     initialized_ = true;
@@ -1703,20 +1706,104 @@ void TebLocalPlannerROS::configureBackupModes(std::vector<geometry_msgs::PoseSta
 
 }
 
-void TebLocalPlannerROS::addHumansCostmap(const hanp_msgs::TrackedHumans &tracked_humans){
+void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_humans){
+  //Code block for changing dynamic reconfigure
+  // dynamic_reconfigure::ReconfigureRequest srv_req;
+  // dynamic_reconfigure::ReconfigureResponse srv_resp;
+  // dynamic_reconfigure::DoubleParameter double_param;
+  // dynamic_reconfigure::IntParameter int_param;
+  // dynamic_reconfigure::Config conf;
+  //
+  // double_param.name = "nominal_human_vel_x";
+  // double_param.value = 0.5;
+  // conf.doubles.push_back(double_param);
+  //
+  // srv_req.config = conf;
+  // ros::service::call("/move_base_node/TebLocalPlannerROS/", srv_req, srv_resp);
+  // system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ nominal_human_vel_x 0.5");
 
-    std::vector<double> hum_xpos;
-    std::vector<double> hum_ypos;
 
-    for(int i=0;i<tracked_humans.humans.size();i++){
-      for (int j=0;j<tracked_humans.humans[i].segments.size();j++){
-        if(tracked_humans.humans[i].segments[j].type==DEFAULT_HUMAN_SEGMENT){
-          hum_xpos.push_back(tracked_humans.humans[i].segments[j].pose.pose.position.x);
-          hum_ypos.push_back(tracked_humans.humans[i].segments[j].pose.pose.position.y);
-        }
-      }
+  // tracked_humans_ = tracked_humans;
+  std::vector<double> human_dists;
+
+  auto xpos = robot_pos_msg.position.x;
+  auto ypos = robot_pos_msg.position.y;
+  std::vector<double> hum_xpos;
+  std::vector<double> hum_ypos;
+
+  // auto robot_radius = 0.300;
+
+  int itr_idx = 0;
+  for(auto &human: tracked_humans.humans){
+    // if(human_vels.size()< human.track_id){
+    //   std::vector<double> h_vels;
+    //   human_vels.push_back(h_vels);
+    //   human_nominal_vels.push_back(0.0);
+    // }
+    for (auto &segment : human.segments){
+      if(segment.type==DEFAULT_HUMAN_SEGMENT){
+        human_dists.push_back(std::hypot(segment.pose.pose.position.x-xpos, segment.pose.pose.position.y-ypos));
+        // human_vels[itr_idx].push_back(std::hypot(segment.twist.twist.linear.x, segment.twist.twist.linear.x));
+
+        // auto n = human_vels[itr_idx].size();
+        // float average = 0.0f;
+        // if (n != 0) {
+        //   average = accumulate( human_vels[itr_idx].begin(), human_vels[itr_idx].end(), 0.0) / n;
+        // }
+        // human_nominal_vels[itr_idx] = average;
+        // // std::cout << "average " <<average<< '\n';
+        //
+        // if(n>10)
+        //   human_vels[itr_idx].erase(human_vels[itr_idx].begin());
+        // }
     }
-    auto human_radius = 0.25;
+    itr_idx++;
+  }
+  // ROS_INFO_ONCE("human_vels.size(), %d ", (int)human_vels.size());
+  //
+  // for(int i=0;i<prev_tracked_humans_.humans.size();i++){
+  //   for (int j=0;j<prev_tracked_humans_.humans[i].segments.size();j++){
+  //     if(prev_tracked_humans_.humans[i].segments[j].type==DEFAULT_HUMAN_SEGMENT){
+  //       double hum_move_dist = std::hypot(tracked_humans.humans[i].segments[j].pose.pose.position.x-prev_tracked_humans_.humans[i].segments[j].pose.pose.position.x,
+  //                                         tracked_humans.humans[i].segments[j].pose.pose.position.y-prev_tracked_humans_.humans[i].segments[j].pose.pose.position.y);
+  //       hum_xpos.push_back(tracked_humans.humans[i].segments[j].pose.pose.position.x);
+  //       hum_ypos.push_back(tracked_humans.humans[i].segments[j].pose.pose.position.y);
+  //
+  //       if(hum_move_dist<0.001)
+  //         human_still=true;
+  //       else
+  //         human_still=false;
+  //     }
+  //   }
+  // }
+  // prev_tracked_humans_ = tracked_humans;
+
+
+  for(auto &dist: human_dists){
+    // // std::cout << "dist " << dist << '\n';
+    // if(dist<=2.5){
+    //   isDistunderThreshold = true;
+    //   // system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ nominal_human_vel_x 0.5");
+    //   }
+    // else{
+    //   isDistunderThreshold = false;
+    //   // system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ nominal_human_vel_x 0.5");
+    // }
+    // if(dist>=10.0){
+    //   isDistMax = true;
+    // }
+    // else{
+    //   isDistMax = false;
+    // }
+
+    if(min_dist_human>dist)
+      min_dist_human = dist;
+    min_dist_human_pub_.publish(min_dist_human);
+  }
+
+    auto human_radius = 0.3;
+    // if(isMode==1)
+    //   human_radius = 0.3;
 
     for(int i=0;i<hum_xpos.size();i++){
     geometry_msgs::Point v1,v2,v3,v4;
