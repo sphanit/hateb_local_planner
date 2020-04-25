@@ -535,6 +535,8 @@ private:
   ros::Publisher op_costs_pub_,robot_pose_pub_,time_to_goal_pub_, min_dist_human_pub_;
   ros::Subscriber tracked_humans_sub_;
   double min_dist_human;
+  geometry_msgs::Pose robot_pos_msg;
+  
 
   std::vector<geometry_msgs::Point> human_prev_pos_costmap;
 

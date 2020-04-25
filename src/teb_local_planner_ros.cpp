@@ -308,7 +308,6 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   geometry_msgs::PoseStamped robot_pose;
   costmap_ros_->getRobotPose(robot_pose);
   robot_pose_ = PoseSE2(robot_pose.pose);
-  geometry_msgs::Pose robot_pos_msg;
   robot_pose_.toPoseMsg(robot_pos_msg);
   robot_pose_pub_.publish(robot_pos_msg);
   auto pose_get_time = ros::Time::now() - pose_get_start_time;
@@ -1755,7 +1754,8 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
         //
         // if(n>10)
         //   human_vels[itr_idx].erase(human_vels[itr_idx].begin());
-        // }
+        }
+
     }
     itr_idx++;
   }
