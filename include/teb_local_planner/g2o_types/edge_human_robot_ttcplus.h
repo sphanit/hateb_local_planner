@@ -35,6 +35,7 @@
 #ifndef EDGE_HUMAN_ROBOT_TTCplus_H_
 #define EDGE_HUMAN_ROBOT_TTCplus_H_
 
+
 #include <teb_local_planner/g2o_types/vertex_pose.h>
 #include <teb_local_planner/g2o_types/vertex_timediff.h>
 #include <teb_local_planner/g2o_types/penalties.h>
@@ -75,57 +76,60 @@ public:
     double C_sq = C.dot(C);
     static double i =0;
     static double j =0;
-    static double d=20;
+    static double r_dt = 0;
+    static double r_dt_miss = 0;
 
-    // C_sq = C.dot(C);
+    C_sq = C.dot(C);
 
+    _error[0] = 0.0;
+    // std::cout << "dt_robot->dt()" << dt_robot->dt() << '\n';
     if (C_sq <= radius_sum_sq_) {
       ttcplus = 0.0;
     }
     else {
-
       Eigen::Vector2d V = robot_vel - human_vel;
       double C_dot_V = C.dot(V);
       if (C_dot_V > 0) { // otherwise ttcplus is infinite
         double V_sq = V.dot(V);
         double f = (C_dot_V * C_dot_V) - (V_sq * (C_sq - radius_sum_sq_));
         if (f > 0) {         // otherwise ttcplus is infinite
-        	//if(i==0){ d = C_sq;}
-        	i = i+1;
-          // std::cout << "I am here" << '\n';
-        	ttcplus = (C_dot_V - std::sqrt(f)) / V_sq;
+           ttcplus = (C_dot_V - std::sqrt(f)) / V_sq;
          }
        }
       }
 
-      // std::cout << "ttcplus" <<ttcplus<< '\n'
-
      if (ttcplus < std::numeric_limits<double>::infinity()) {
-     	if( i > cfg_->hateb.ttcplus_timer ){              // timer in tenth of second
-        // std::cout << "i "<<i << '\n';
-    	  j=j+1 ;
-    	  i=0 ;
-      _error[0] = penaltyBoundFromBelow(ttcplus, cfg_->hateb.ttcplus_threshold, cfg_->optim.penalty_epsilon);
-      // ttcplus = std::numeric_limits<double>::infinity();
-      // std::cout << "ttcplus" <<ttcplus<< '\n';
-      // std::cout << "_error[0] " <<_error[0]<< '\n';
+       r_dt += dt_robot->dt();
+       r_dt_miss = 0;
+       i++;
+       j=0;
+       // std::cout << "time " << dt_robot->dt() << '\n';
+     	if( r_dt >= (cfg_->hateb.ttcplus_timer) ){              // timer for number of poses to check
+      	  _error[0] = penaltyBoundFromBelow(ttcplus, cfg_->hateb.ttcplus_threshold, cfg_->optim.penalty_epsilon)/cfg_->hateb.ttcplus_threshold;
+          // std::cout << "error_[0] after penaltybound"<< _error[0] << '\n';
 
-      if (cfg_->hateb.scale_human_robot_ttcplus_c) {
-        _error[0] = _error[0] * cfg_->optim.human_robot_ttcplus_scale_alpha / C_sq;
-      }
+      	  if (cfg_->hateb.scale_human_robot_ttcplus_c) {
+            _error[0] = _error[0] * cfg_->optim.human_robot_ttcplus_scale_alpha / C_sq;
+      	  }
+        }
      }
-    }
 
     else {
       // no collision possible
-    	 // if(C_sq > 2){
+      j++;
+      r_dt_miss += dt_robot->dt();
+      if(r_dt_miss>=(cfg_->hateb.ttcplus_timer)*5){ //Check if the misses are consecutive for atleast 10 times of the timer
         i=0;
         j=0;
-        d=20;
+        r_dt=0;
+        r_dt_miss=0;
+      }
+    	 if(C_sq > 4){
         _error[0] = 0.0;
-     	// }
+     	}
     }
 
+    // std::cout << "error_[0]"<< _error[0] << '\n';
      ROS_DEBUG_THROTTLE(0.5, "ttcplus value : %f", ttcplus);
 
      ROS_ASSERT_MSG(std::isfinite(_error[0]),

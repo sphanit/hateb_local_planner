@@ -1716,7 +1716,7 @@ void TebLocalPlannerROS::addHumansCostmap(const hanp_msgs::TrackedHumans &tracke
         }
       }
     }
-    auto human_radius = 0.08;
+    auto human_radius = 0.25;
 
     for(int i=0;i<hum_xpos.size();i++){
     geometry_msgs::Point v1,v2,v3,v4;
