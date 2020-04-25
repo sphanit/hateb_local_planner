@@ -215,6 +215,7 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
     human_pos_sub_ = nh.subscribe(HUMAN_POS_SUB_TOPIC, 1, &TebLocalPlannerROS::CheckDist, this);
 
     time_to_goal_pub_ = nh.advertise<std_msgs::Float64>("time_to_goal",100);
+    min_dist_human_pub_ = nh.advertise<std_msgs::Float64>("min_dist_human",100);
 
     last_call_time_ = ros::Time::now() - ros::Duration(cfg_.hateb.pose_prediction_reset_time);
 
@@ -230,6 +231,8 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
 
     // set initialized flag
     initialized_ = true;
+
+    min_dist_human = std::numeric_limits<double>::infinity();
 
     ROS_DEBUG("teb_local_planner plugin initialized.");
   }
@@ -353,6 +356,10 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
     else{
       isDistMax = false;
     }
+
+    if(min_dist_human>dist)
+      min_dist_human = dist;
+    min_dist_human_pub_.publish(min_dist_human);
   }
 
     auto human_radius = 0.08;
