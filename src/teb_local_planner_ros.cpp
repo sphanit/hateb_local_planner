@@ -330,7 +330,7 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
         hum_xpos.push_back(tracked_humans_.humans[i].segments[j].pose.pose.position.x);
         hum_ypos.push_back(tracked_humans_.humans[i].segments[j].pose.pose.position.y);
 
-        if(hum_move_dist<0.001)
+        if(hum_move_dist<0.0001)
           human_still=true;
         else
           human_still=false;
@@ -1003,6 +1003,7 @@ bool TebLocalPlannerROS::isGoalReached()
     planner_->clearPlanner();
     resetHumansPrediction();
     return true;
+    min_dist_human = std::numeric_limits<double>::infinity();
   }
   return false;
 }
