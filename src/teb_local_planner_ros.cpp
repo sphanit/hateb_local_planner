@@ -350,7 +350,7 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
       isDistunderThreshold = false;
       // system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ nominal_human_vel_x 0.5");
     }
-    if(dist>=10.0){
+    if(dist>=20.0){
       isDistMax = true;
     }
     else{
@@ -1002,8 +1002,8 @@ bool TebLocalPlannerROS::isGoalReached()
     ROS_INFO("GOAL Reached!");
     planner_->clearPlanner();
     resetHumansPrediction();
-    return true;
     min_dist_human = std::numeric_limits<double>::infinity();
+    return true;
   }
   return false;
 }
