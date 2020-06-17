@@ -46,6 +46,7 @@
 #define APPROACH_SRV_NAME "set_approach_id"
 #define OP_COSTS_TOPIC "optimization_costs"
 #define ROB_POS_TOPIC "Robot_Pose"
+#define ROB_VEL_TOPIC "robot_vel"
 #define HUMAN_POS_SUB_TOPIC "/tracked_humans"
 #define DEFAULT_HUMAN_SEGMENT hanp_msgs::TrackedSegmentType::TORSO
 #define THROTTLE_RATE 5.0 // seconds
@@ -212,6 +213,7 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
     op_costs_pub_ = nh.advertise<teb_local_planner::OptimizationCostArray>( OP_COSTS_TOPIC, 1);
 
     robot_pose_pub_ = nh.advertise<geometry_msgs::Pose>(ROB_POS_TOPIC, 1);
+    robot_vel_pub_ = nh.advertise<geometry_msgs::Twist>(ROB_VEL_TOPIC, 1);
     human_pos_sub_ = nh.subscribe(HUMAN_POS_SUB_TOPIC, 1, &TebLocalPlannerROS::CheckDist, this);
 
     time_to_goal_pub_ = nh.advertise<std_msgs::Float64>("time_to_goal",100);
@@ -473,6 +475,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   robot_vel_.linear.y = robot_vel_tf.pose.position.y;
   robot_vel_.angular.z = tf2::getYaw(robot_vel_tf.pose.orientation);
   auto vel_get_time = ros::Time::now() - vel_get_start_time;
+  robot_vel_pub_.publish(robot_vel_);
 
   // prune global plan to cut off parts of the past (spatially before the robot)
   auto prune_start_time = ros::Time::now();

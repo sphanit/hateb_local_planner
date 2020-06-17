@@ -28,7 +28,6 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros
   hanp_msgs
   hanp_prediction
-  humans_nav
   visualization_msgs
 )
 message(STATUS "System: ${CMAKE_SYSTEM}")
@@ -132,7 +131,7 @@ add_service_files(
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
    DEPENDENCIES
-   geometry_msgs std_msgs costmap_converter hanp_msgs humans_nav
+   geometry_msgs std_msgs costmap_converter hanp_msgs 
 )
 
 #add dynamic reconfigure api
@@ -170,7 +169,6 @@ catkin_package(
         tf2
         tf2_ros
         hanp_msgs
-	humans_nav
 	visualization_msgs
   DEPENDS SUITESPARSE G2O
 )

@@ -2079,7 +2079,7 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     }
 
     if (dynamic_cast<EdgeAccelerationHolonomicHuman *>(*it) != nullptr) {
-      human_acc_cost += cur_cost;
+      human_acc_holo_cost += cur_cost;
       cost_ += cur_cost;
       // std::cout << "EdgeAccelerationHolonomicHuman " << cur_cost<< '\n';
       continue;
@@ -2194,19 +2194,19 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::ROBOT_VEL;
-    optc.cost = robot_vel_cost;
+    optc.cost = robot_vel_holo_cost;
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::HUMAN_VEL;
-    optc.cost = human_vel_cost;
+    optc.cost = human_vel_holo_cost;
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::ROBOT_ACC;
-    optc.cost = robot_acc_cost;
+    optc.cost = robot_acc_holo_cost;
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::HUMAN_ACC;
-    optc.cost = human_acc_cost;
+    optc.cost = human_acc_holo_cost;
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::OBSTACLE;

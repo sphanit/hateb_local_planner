@@ -553,7 +553,7 @@ private:
   double last_omega_, min_dist_human;
 
   ros::Subscriber human_pos_sub_;
-  ros::Publisher op_costs_pub_,robot_pose_pub_,time_to_goal_pub_, min_dist_human_pub_;
+  ros::Publisher op_costs_pub_,robot_pose_pub_,time_to_goal_pub_, min_dist_human_pub_, robot_vel_pub_;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
