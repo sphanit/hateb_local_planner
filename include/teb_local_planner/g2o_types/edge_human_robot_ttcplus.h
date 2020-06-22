@@ -74,8 +74,8 @@ public:
 
     double ttcplus = std::numeric_limits<double>::infinity();
     double C_sq = C.dot(C);
-    static double i =0;
-    static double j =0;
+    static double i = 0;
+    static double j = 0;
     static double r_dt = 0;
     static double r_dt_miss = 0;
 
@@ -105,7 +105,8 @@ public:
        j=0;
        // std::cout << "time " << dt_robot->dt() << '\n';
      	if( r_dt >= (cfg_->hateb.ttcplus_timer) ){              // timer for number of poses to check
-      	  _error[0] = penaltyBoundFromBelow(ttcplus, cfg_->hateb.ttcplus_threshold, cfg_->optim.penalty_epsilon)/cfg_->hateb.ttcplus_threshold;
+      	  //_error[0] = penaltyBoundFromBelow(ttcplus, cfg_->hateb.ttcplus_threshold, cfg_->optim.penalty_epsilon)/cfg_->hateb.ttcplus_threshold;
+      	  _error[0] = penaltyBoundFromBelow(ttcplus, cfg_->hateb.ttcplus_threshold, cfg_->optim.penalty_epsilon);
           // std::cout << "error_[0] after penaltybound"<< _error[0] << '\n';
 
       	  if (cfg_->hateb.scale_human_robot_ttcplus_c) {

@@ -1739,7 +1739,8 @@ void TebOptimalPlanner::AddEdgesHumanRobotSafety() {
          (i < human_teb.sizePoses()) && (i < robot_teb_size); i++) {
       Eigen::Matrix<double, 1, 1> information_human_robot;
       information_human_robot.fill(weight_safety);
-
+      // const VertexPose *robot_bandpt = static_cast<const VertexPose *>(teb_.PoseVertex(i));
+      // std::cout << "teb_.Pose: "<<i <<" "<<robot_bandpt->pose() << '\n';
       EdgeHumanRobotSafety *human_robot_safety_edge = new EdgeHumanRobotSafety;
       human_robot_safety_edge->setVertex(0, teb_.PoseVertex(i));
       human_robot_safety_edge->setVertex(1, human_teb.PoseVertex(i));
@@ -1961,6 +1962,9 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
                       hh_safety_cost_vector, hr_ttc_cost_vector, hr_ttclosest_cost_vector, hr_ttcplus_cost_vector,
                       hr_dir_cost_vector, hr_visi_cost_vector;
 
+  bool f1=false,f2=false,f3=false,f4=false,f5=false;
+  double ttc_first, ttcplus_first, obs_first, safety_first, visible_first;
+
   if (alternative_time_cost)
   {
     cost_ += teb_.getSumOfAllTimeDiffs();
@@ -1970,8 +1974,9 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
 
   // now we need pointers to all edges -> calculate error for each edge-type
   // since we aren't storing edge pointers, we need to check every edge
+  int i=0;
   for (std::vector<g2o::OptimizableGraph::Edge*>::const_iterator it = optimizer_->activeEdges().begin(); it!= optimizer_->activeEdges().end(); it++)
-  {
+  { i++;
     double cur_cost = (*it)->chi2();
 
     // if (dynamic_cast<EdgeObstacle*>(*it) != nullptr
@@ -2089,6 +2094,10 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
       cur_cost *= obst_cost_scale;
       obst_cost += cur_cost;
       cost_ += cur_cost;
+      if(!f5){
+        obs_first = cur_cost;
+        f5=true;
+      }
       // std::cout << "EdgeObstacle " << cur_cost<< '\n';
       continue;
     }
@@ -2120,6 +2129,18 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     if (dynamic_cast<EdgeHumanRobotSafety *>(*it) != nullptr) {
       hr_safety_cost += cur_cost;
       cost_ += cur_cost;
+      if(!f1){
+        safety_first = cur_cost;
+        f1=true;
+      }
+      // EdgeHumanRobotSafety *edge_human_robot_safety = dynamic_cast<EdgeHumanRobotSafety *>(*it);
+      // const VertexPose *robot_bandpt = static_cast<const VertexPose *>(edge_human_robot_safety->vertex(0));
+      // std::cout << "edge_human_robot_safety->vertices() "<<robot_bandpt->pose()<< '\n';
+      // std::cout << "i " << i<< '\n';
+      // std::cout << "teb_.size() " <<teb_.sizePoses()<< '\n';
+      // std::cout << "teb_.Pose(0) "<<teb_.Pose(0) << '\n';
+      // std::cout << "teb_.Pose(1) "<<teb_.Pose(1) << '\n';
+      // std::cout << "teb_.Pose(2) "<<teb_.Pose(2) << '\n';
       // std::cout << "EdgeHumanRobotSafety " << cur_cost<< '\n';
       continue;
     }
@@ -2135,6 +2156,10 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
       hr_ttc_cost += cur_cost;
       cost_ += cur_cost;
       // std::cout << "EdgeHumanRobotTTC " << cur_cost<< '\n';
+      if(!f2){
+        ttc_first = cur_cost;
+        f2=true;
+      }
       continue;
     }
 
@@ -2157,6 +2182,14 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
       cost_ += edge_human_robot_ttcplus->getError().squaredNorm();
       hr_ttcplus_cost += edge_human_robot_ttcplus->getError().squaredNorm();
       ttcplus_error += edge_human_robot_ttcplus->getError()[0];
+      if(!f3){
+        ttcplus_first = hr_ttcplus_cost;
+        f3=true;
+      }
+      // std::cout << "i " << i<< '\n';
+      // std::cout << "teb_.size() " <<teb_.sizePoses()<< '\n';
+      // std::cout << "EdgeHumanRobotTTCplus " << hr_ttcplus_cost<< '\n';
+
       continue;
     }
 
@@ -2171,8 +2204,18 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
         hr_visi_cost += cur_cost;
         cost_ += cur_cost;
         // std::cout << "EdgeHumanRobotVisibility " << cur_cost<< '\n';
+        if(!f4){
+          visible_first = cur_cost;
+          f4=true;
+        }
         continue;
     }
+
+    // {std::cout << "i " << i<< '\n';
+      // std::cout << "hr_ttcplus_cost: " << hr_ttcplus_cost <<'\n';
+      // std::cout << "hr_safety_cost: " << hr_safety_cost <<'\n';
+
+    // }
   }
 
   if (op_costs) {
@@ -2210,7 +2253,8 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::OBSTACLE;
-    optc.cost = obst_cost;
+    // optc.cost = obst_cost;
+    optc.cost = obs_first;
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::DYNAMIC_OBSTACLE;
@@ -2222,7 +2266,8 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_SAFETY;
-    optc.cost = hr_safety_cost;
+    // optc.cost = hr_safety_cost;
+    optc.cost = safety_first;
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::HUMAN_HUMAN_SAFETY;
@@ -2230,7 +2275,8 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_TTC;
-    optc.cost = hr_ttc_cost;
+    // optc.cost = hr_ttc_cost;
+    optc.cost = ttc_first;
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_TTClosest;                //michele
@@ -2238,7 +2284,8 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_TTCplus;                //michele
-    optc.cost = hr_ttcplus_cost;
+    // optc.cost = hr_ttcplus_cost;
+    optc.cost = ttcplus_first;
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_DIR;
@@ -2246,7 +2293,8 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_VISIBILITY;
-    optc.cost = hr_visi_cost;
+    // optc.cost = hr_visi_cost;
+    optc.cost = visible_first;
     op_costs->costs.push_back(optc);
   }
 

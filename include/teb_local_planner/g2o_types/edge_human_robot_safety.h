@@ -61,6 +61,7 @@ public:
     static_cast<PointObstacle *>(obs_)->setCentroid(human_bandpt->x(), human_bandpt->y());
 
     double dist = robot_model_->calculateDistance(robot_bandpt->pose(), obs_) - human_radius_;
+    // std::cout << "robot_bandpt->pose() "<<robot_bandpt->pose() << '\n';
 
     ROS_DEBUG_THROTTLE(0.5, "human robot dist = %f", dist);
 

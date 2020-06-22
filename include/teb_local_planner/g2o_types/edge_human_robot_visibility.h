@@ -59,11 +59,12 @@ public:
     Eigen::Vector2d d_rtoh = human_bandpt->position() - robot_bandpt->position();
     Eigen::Vector2d d_htor = robot_bandpt->position() - human_bandpt->position();
     Eigen::Vector2d humanLookAt = {cos(human_bandpt->theta()), sin(human_bandpt->theta())};
-    double deltaPsi = fabs(acos(humanLookAt.dot(d_htor) / (humanLookAt.norm() + d_htor.norm())));
+    double deltaPsi = fabs(acos(humanLookAt.dot(d_htor) / (humanLookAt.norm() * d_htor.norm())));
     //ROS_DEBUG_THROTTLE(0.5, "robot_human_angle deg : %f", deltaPsi * 180 / M_PI);
     double c_visibility;
     if (deltaPsi >= cfg_->human.fov * M_PI / 180){
-        c_visibility = deltaPsi * ((cos(d_rtoh.x()) + 1) * (cos(d_rtoh.y()) + 1));
+      // c_visibility = deltaPsi * ((cos(d_rtoh.x()) + 1) * (cos(d_rtoh.y()) + 1));
+        c_visibility = deltaPsi * ((2*std::pow(2,-(std::pow(d_rtoh.x(),2)))) + (2*std::pow(2,-(std::pow(d_rtoh.y(),2)))));
     }else{
         c_visibility = 0.;
     }
