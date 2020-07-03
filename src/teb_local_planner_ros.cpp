@@ -366,7 +366,7 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
 
     auto human_radius = 0.08;
     if(isMode==1)
-      human_radius = 0.3;
+      human_radius = 0.08;
 
     for(int i=0;i<hum_xpos.size();i++){
     geometry_msgs::Point v1,v2,v3,v4;

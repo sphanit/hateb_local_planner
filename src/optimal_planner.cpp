@@ -2275,8 +2275,8 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_TTC;
-    // optc.cost = hr_ttc_cost;
-    optc.cost = ttc_first;
+    optc.cost = hr_ttc_cost;
+    // optc.cost = ttc_first;
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_TTClosest;                //michele
@@ -2284,8 +2284,8 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_TTCplus;                //michele
-    // optc.cost = hr_ttcplus_cost;
-    optc.cost = ttcplus_first;
+    optc.cost = hr_ttcplus_cost;
+    // optc.cost = ttcplus_first;
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_DIR;
@@ -2293,8 +2293,8 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     op_costs->costs.push_back(optc);
 
     optc.type = teb_local_planner::OptimizationCost::HUMAN_ROBOT_VISIBILITY;
-    // optc.cost = hr_visi_cost;
-    optc.cost = visible_first;
+    optc.cost = hr_visi_cost;
+    // optc.cost = visible_first;
     op_costs->costs.push_back(optc);
   }
 
