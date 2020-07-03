@@ -64,7 +64,7 @@ public:
     double c_visibility;
     if (deltaPsi >= cfg_->human.fov * M_PI / 180){
       // c_visibility = deltaPsi * ((cos(d_rtoh.x()) + 1) * (cos(d_rtoh.y()) + 1));
-        c_visibility = deltaPsi * ((2*std::pow(2,-(std::pow(d_rtoh.x(),2)))) + (2*std::pow(2,-(std::pow(d_rtoh.y(),2)))));
+        c_visibility = 5*((std::pow(2,-(std::pow(d_rtoh.x(),2)))) * (std::pow(2,-(std::pow(d_rtoh.y(),2)))));
     }else{
         c_visibility = 0.;
     }
