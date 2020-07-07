@@ -161,8 +161,8 @@ public:
   void publishLocalPlanAndPoses(const TimedElasticBand &teb, const BaseRobotFootprintModel &robot_model, const double fp_size, const std_msgs::ColorRGBA &color = toColorMsg(0.5, 0.0, 0.8, 0.0)) const;
   void publishHumanLocalPlansAndPoses(const std::map<uint64_t, TimedElasticBand> &humans_tebs_map, const BaseRobotFootprintModel &human_model, const double fp_size, const std_msgs::ColorRGBA &color= toColorMsg(0.5, 0.0, 0.8, 0.0)) const;
 
-  void publishTrajectory(const PlanTrajCombined &plan_traj_combined) const;
-  void publishHumanTrajectories(const std::vector<HumanPlanTrajCombined> &humans_plans_combined) const;
+  void publishTrajectory(const PlanTrajCombined &plan_traj_combined);
+  void publishHumanTrajectories(const std::vector<HumanPlanTrajCombined> &humans_plans_combined);
 
   /**
    * @brief Publish the visualization of the robot model
@@ -302,6 +302,8 @@ protected:
   ros::Publisher human_trajs_time_pub_, human_paths_time_pub_, marker_pub;
   ros::Subscriber tracked_humans_sub_;
   uint32_t shape = visualization_msgs::Marker::CYLINDER;
+  std::vector<double> vel_robot, vel_human;
+
 
   const TebConfig* cfg_; //!< Config class that stores and manages all related parameters
 
@@ -315,6 +317,7 @@ protected:
       last_publish_human_local_plan_fp_poses;
 
   mutable int last_robot_fp_poses_idx_, last_human_fp_poses_idx_;
+
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

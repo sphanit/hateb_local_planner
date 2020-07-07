@@ -226,12 +226,14 @@ void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand& teb, con
 
   // fill path msgs with teb configurations
   double pose_time = 0.0;
+  // std::vector<double> pose_times;
   for (int i=0; i < teb.sizePoses(); i++) {
     geometry_msgs::PoseStamped pose;
     pose.header.frame_id = frame_id;
     pose.header.stamp = now;
     pose.pose.position.x = teb.Pose(i).x();
     pose.pose.position.y = teb.Pose(i).y();
+    // pose_times.push_back(teb.TimeDiff(i));
     pose.pose.position.z = 0;//cfg_->hcp.visualize_with_time_as_z_axis_scale*teb.getSumOfTimeDiffsUpToIdx(i);
     pose.pose.orientation = tf::createQuaternionMsgFromYaw(teb.Pose(i).theta());
     teb_path.poses.push_back(pose);
@@ -265,6 +267,8 @@ void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand& teb, con
           marker.header.stamp = ros::Time::now();
           marker.action = visualization_msgs::Marker::ADD;
           marker.ns = ROBOT_FP_POSES_NS;
+          marker.pose.position.z = vel_robot[idx]/2;
+          marker.scale.z = vel_robot[idx];
           marker.id = idx++;
           marker.color.a = 1.0;
           marker.color.r = idx/fp_size;
@@ -273,8 +277,8 @@ void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand& teb, con
           marker.color.b = 1.0;
           marker.scale.x = 0.2;
           marker.scale.y = 0.2;
-          marker.scale.z = 0.5;
-          marker.lifetime = ros::Duration(2.0);
+          // marker.scale.z = 0.5;
+          // marker.lifetime = ros::Duration(2.0);
           teb_fp_poses.markers.push_back(marker);
         }
       }
@@ -295,11 +299,12 @@ void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand& teb, con
 }
 
 void TebVisualization::publishTrajectory(
-    const PlanTrajCombined &plan_traj_combined) const {
+    const PlanTrajCombined &plan_traj_combined) {
   if (printErrorWhenNotInitialized() ||
       !cfg_->visualization.publish_robot_local_plan) {
     return;
   }
+  vel_robot.clear();
 
   auto frame_id = cfg_->map_frame;
   auto now = ros::Time::now();
@@ -333,6 +338,9 @@ void TebVisualization::publishTrajectory(
     trajectory_point.transform.translation.z = traj_point.pose.position.z;
     trajectory_point.transform.rotation = traj_point.pose.orientation;
     trajectory_point.velocity = traj_point.velocity;
+    auto r_vel = std::hypot(traj_point.velocity.linear.x, traj_point.velocity.linear.y);
+
+    vel_robot.push_back(r_vel);
     trajectory_point.time_from_start = traj_point.time_from_start;
     trajectory.points.push_back(trajectory_point);
   }
@@ -434,6 +442,8 @@ void TebVisualization::publishHumanLocalPlansAndPoses(
           human_marker.header.stamp = ros::Time::now();
           human_marker.action = visualization_msgs::Marker::ADD;
           human_marker.ns = HUMAN_FP_POSES_NS;
+          human_marker.pose.position.z = vel_human[idx]/2;
+          human_marker.scale.z = vel_human[idx];
           human_marker.id = idx++;
           human_marker.color.a = 1.0;
           human_marker.color.r = idx/fp_size;
@@ -442,8 +452,8 @@ void TebVisualization::publishHumanLocalPlansAndPoses(
           human_marker.color.b = 1.0;
           human_marker.scale.x = 0.2;
           human_marker.scale.y = 0.2;
-          human_marker.scale.z = 0.5;
-          human_marker.lifetime = ros::Duration(2.0);
+          // human_marker.scale.z = 0.5;
+          // human_marker.lifetime = ros::Duration(2.0);
           humans_teb_fp_poses.markers.push_back(human_marker);
         }
       }
@@ -465,11 +475,12 @@ void TebVisualization::publishHumanLocalPlansAndPoses(
 
 void TebVisualization::publishHumanTrajectories(
     const std::vector<HumanPlanTrajCombined> &humans_plans_traj_combined)
-    const {
+    {
   if (printErrorWhenNotInitialized() ||
       !cfg_->visualization.publish_human_local_plans) {
     return;
   }
+  vel_human.clear();
 
   auto now = ros::Time::now();
   auto frame_id = cfg_->map_frame;
@@ -522,6 +533,9 @@ void TebVisualization::publishHumanTrajectories(
       hanp_trajectory_point.transform.rotation =
           human_traj_point.pose.orientation;
       hanp_trajectory_point.velocity = human_traj_point.velocity;
+      auto h_vel = std::hypot(human_traj_point.velocity.linear.x, human_traj_point.velocity.linear.y);
+      vel_human.push_back(h_vel);
+
       // std::cout <<human_traj_point.velocity  << '\n';
       hanp_trajectory_point.time_from_start = human_traj_point.time_from_start;
       hanp_trajectory.trajectory.points.push_back(hanp_trajectory_point);

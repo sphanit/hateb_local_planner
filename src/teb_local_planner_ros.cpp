@@ -2257,14 +2257,7 @@ bool TebLocalPlannerROS::optimizeStandalone(
     return true;
   }
   auto plan_time = ros::Time::now() - plan_start_time;
-
-  // now visualize everything
   auto viz_start_time = ros::Time::now();
-  planner_->visualize();
-  visualization_->publishObstacles(obstacles_);
-  visualization_->publishViaPoints(via_points_);
-  visualization_->publishGlobalPlan(global_plan_);
-  visualization_->publishHumanGlobalPlans(transformed_human_plans);
 
   PlanTrajCombined plan_traj_combined;
   plan_traj_combined.plan_before = transformed_plan_combined.plan_before;
@@ -2284,11 +2277,20 @@ bool TebLocalPlannerROS::optimizeStandalone(
     human_plans_traj_array.push_back(human_plan_traj_combined);
   }
   visualization_->publishHumanTrajectories(human_plans_traj_array);
+  // now visualize everything
+  planner_->visualize();
+  visualization_->publishObstacles(obstacles_);
+  visualization_->publishViaPoints(via_points_);
+  visualization_->publishGlobalPlan(global_plan_);
+  visualization_->publishHumanGlobalPlans(transformed_human_plans);
+  
   auto viz_time = ros::Time::now() - viz_start_time;
 
   res.success = true;
   res.message = "planning successful";
   geometry_msgs::Twist cmd_vel;
+
+
 
   // check feasibility of robot plan
   auto fsb_start_time = ros::Time::now();
