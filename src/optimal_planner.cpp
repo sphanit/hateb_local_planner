@@ -115,6 +115,7 @@ void TebOptimalPlanner::visualize()
     return;
 
   double fp_size= 0.0;
+  fp_size = teb_.sizePoses();
 
   for (auto &human_teb_kv : humans_tebs_map_) {
       auto &human_teb = human_teb_kv.second;

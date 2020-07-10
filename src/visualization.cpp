@@ -206,7 +206,7 @@ void TebVisualization::publishHumanGlobalPlans(
     humans_global_plans_pub_.publish(human_path_array);
   }
 }
-void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand& teb, const BaseRobotFootprintModel &robot_model, const double fp_size, const std_msgs::ColorRGBA &color) const
+void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand& teb, const BaseRobotFootprintModel &robot_model, const double fp_size, const std_msgs::ColorRGBA &color)
 {
   if (printErrorWhenNotInitialized() || (!cfg_->visualization.publish_robot_local_plan && !cfg_->visualization.publish_robot_local_plan_poses && !cfg_->visualization.publish_robot_local_plan_fp_poses))
     return;
@@ -270,11 +270,11 @@ void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand& teb, con
           marker.pose.position.z = vel_robot[idx]/2;
           marker.scale.z = vel_robot[idx];
           marker.id = idx++;
-          marker.color.a = 1.0;
-          marker.color.r = idx/fp_size;
-          // std::cout << "itr/fp_size " << idx/fp_size<< '\n';
-          marker.color.g = 0.196;
-          marker.color.b = 1.0;
+          marker.color.a = 0.5;
+          setMarkerColour(marker, (double)idx, fp_size);
+          // marker.color.r = idx/fp_size;
+          // marker.color.g = 0.196;
+          // marker.color.b = 1.0;
           marker.scale.x = 0.2;
           marker.scale.y = 0.2;
           // marker.scale.z = 0.5;
@@ -384,7 +384,7 @@ void TebVisualization::publishTrajectory(
 
 void TebVisualization::publishHumanLocalPlansAndPoses(
     const std::map<uint64_t, TimedElasticBand> &humans_tebs_map,
-    const BaseRobotFootprintModel &human_model, const double fp_size, const std_msgs::ColorRGBA &color) const {
+    const BaseRobotFootprintModel &human_model, const double fp_size, const std_msgs::ColorRGBA &color) {
   if (printErrorWhenNotInitialized() || humans_tebs_map.empty() ||
       (!cfg_->visualization.publish_human_local_plans &&
        !cfg_->visualization.publish_human_local_plan_poses &&
@@ -445,11 +445,11 @@ void TebVisualization::publishHumanLocalPlansAndPoses(
           human_marker.pose.position.z = vel_human[idx]/2;
           human_marker.scale.z = vel_human[idx];
           human_marker.id = idx++;
-          human_marker.color.a = 1.0;
-          human_marker.color.r = idx/fp_size;
-          // std::cout << "itr/fp_size " << idx/fp_size<< '\n';
-          human_marker.color.g = 0.196;
-          human_marker.color.b = 1.0;
+          human_marker.color.a = 0.5;
+          setMarkerColour(human_marker, (double)idx, fp_size);
+          // human_marker.color.r = idx/fp_size;
+          // human_marker.color.g = 0.196;
+          // human_marker.color.b = 1.0;
           human_marker.scale.x = 0.2;
           human_marker.scale.y = 0.2;
           // human_marker.scale.z = 0.5;
@@ -653,6 +653,42 @@ void TebVisualization::publishTestHumans(const hanp_msgs::TrackedHumansConstPtr 
     }
 
   }
+
+  void TebVisualization::setMarkerColour(visualization_msgs::Marker &marker, double itr, double n){
+    double N = n/11;
+
+      if(itr>=N && itr < 3*N){
+
+        marker.color.r = (3*N-itr)/(2*N);
+        marker.color.g = 1.0;
+        marker.color.b = 0;
+      }
+      else if(itr>=3*N && itr < 5*N){
+
+        marker.color.r = 0;
+        marker.color.g = 1.0;
+        marker.color.b = (itr-3*N)/(2*N);
+      }
+      else if(itr>=5*N && itr < 7*N){
+
+        marker.color.r = 0;
+        marker.color.g = (7*N-itr)/(2*N);
+        marker.color.b = 1.0;
+      }
+      else if(itr>=7*N && itr < 9*N){
+
+        marker.color.r = (itr-7*N)/(2*N);
+        marker.color.g = 0;
+        marker.color.b = 1.0;
+      }
+      else if(itr>=9*N && itr <= n){
+        marker.color.r = 1.0;
+        marker.color.g = 0;
+        marker.color.b = (11*N-itr)/(2*N);
+      }
+
+  }
+
     void TebVisualization::publishRobotFootprintModel(const PoseSE2& current_pose, const BaseRobotFootprintModel& robot_model, const std::string& ns,
                                                       const std_msgs::ColorRGBA &color)
     {

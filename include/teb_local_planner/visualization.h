@@ -158,8 +158,8 @@ public:
    * and the pose sequence to  \e ../../teb_poses.
    * @param teb const reference to a Timed_Elastic_Band
    */
-  void publishLocalPlanAndPoses(const TimedElasticBand &teb, const BaseRobotFootprintModel &robot_model, const double fp_size, const std_msgs::ColorRGBA &color = toColorMsg(0.5, 0.0, 0.8, 0.0)) const;
-  void publishHumanLocalPlansAndPoses(const std::map<uint64_t, TimedElasticBand> &humans_tebs_map, const BaseRobotFootprintModel &human_model, const double fp_size, const std_msgs::ColorRGBA &color= toColorMsg(0.5, 0.0, 0.8, 0.0)) const;
+  void publishLocalPlanAndPoses(const TimedElasticBand &teb, const BaseRobotFootprintModel &robot_model, const double fp_size, const std_msgs::ColorRGBA &color = toColorMsg(0.5, 0.0, 0.8, 0.0));
+  void publishHumanLocalPlansAndPoses(const std::map<uint64_t, TimedElasticBand> &humans_tebs_map, const BaseRobotFootprintModel &human_model, const double fp_size, const std_msgs::ColorRGBA &color= toColorMsg(0.5, 0.0, 0.8, 0.0));
 
   void publishTrajectory(const PlanTrajCombined &plan_traj_combined);
   void publishHumanTrajectories(const std::vector<HumanPlanTrajCombined> &humans_plans_combined);
@@ -279,6 +279,7 @@ public:
   static std_msgs::ColorRGBA toColorMsg(double a, double r, double g, double b);
 
   void publishTestHumans(const std::vector<TrajectoryPointMsg> &plan);
+  void setMarkerColour(visualization_msgs::Marker &marker, double itr, double n);
 
 protected:
 

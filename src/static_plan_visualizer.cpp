@@ -70,7 +70,7 @@ void StaticPlanVisualization::UpdateGoalsAndOptimize(const geometry_msgs::PointS
   robot_goal_.pose.position = robot_goal_point.point;
   robot_goal_.header = robot_goal_point.header;
   robot_goal_.pose.orientation = robot_start_pose.pose.orientation;
-  std::cout << "robot start" << robot_start_pose<< '\n';
+  // std::cout << "robot start" << robot_start_pose<< '\n';
   auto now = ros::Time::now();
   nav_msgs::GetPlan human_plan_srv, robot_plan_srv;
   hanp_msgs::HumanPathArray hum_path_arr;
@@ -148,25 +148,40 @@ void StaticPlanVisualization::UpdateGoalsAndOptimize(const geometry_msgs::PointS
   }
 }
 
-bool StaticPlanVisualization::optimize_srv(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res){
+bool StaticPlanVisualization::optimize_srv(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res){
     if(got_human_plan && got_robot_plan){
       teb_local_planner::Optimize optim_srv;
 
       optim_srv.request.robot_plan = robot_plan;
-      optim_srv.request.human_path_array = humans_plans;
+      if(req.data)
+        optim_srv.request.human_path_array = humans_plans;
+      else{
+        nav_msgs::GetPlan human_plan_srv, robot_plan_srv;
+        hanp_msgs::HumanPathArray hum_path_arr;
+        hum_path_arr.header.frame_id = "map";
+        hum_path_arr.header.stamp = ros::Time::now();
+
+        hanp_msgs::HumanPath temp;
+        temp.header = humans_start_poses[0].header;
+        temp.id = 1;
+        temp.path.poses.push_back(humans_start_poses[0]);
+        hum_path_arr.paths.push_back(temp);
+
+        optim_srv.request.human_path_array = hum_path_arr;
+        }
 
       if(optimize_client.call(optim_srv)){
-	if(optim_srv.response.success){
-	  res.success = true;
-	  res.message = optim_srv.response.message;
-	  std::cout << optim_srv.response.message << '\n';
-	}
-	else{
-	  res.success = false;
-	  res.message = "Optimization failed..!!";
-	  ROS_INFO("Optimization failed !!");
-	}
-      }
+      	if(optim_srv.response.success){
+      	  res.success = true;
+      	  res.message = optim_srv.response.message;
+      	  std::cout << optim_srv.response.message << '\n';
+      	}
+      	else{
+      	  res.success = false;
+      	  res.message = "Optimization failed..!!";
+      	  ROS_INFO("Optimization failed !!");
+      	}
+            }
   }
 
     return true;

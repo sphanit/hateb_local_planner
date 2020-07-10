@@ -25,6 +25,7 @@
 
  #include <teb_local_planner/Optimize.h>
  #include <std_srvs/Trigger.h>
+ #include <std_srvs/SetBool.h>
  #include <std_srvs/TriggerRequest.h>
  #include <std_srvs/TriggerResponse.h>
 
@@ -42,7 +43,7 @@ namespace teb_local_planner{
 
      void UpdateGoalsAndOptimize(const geometry_msgs::PointStamped &robot_goal_point);
 
-     bool optimize_srv(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+     bool optimize_srv(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
 
 
    private:
