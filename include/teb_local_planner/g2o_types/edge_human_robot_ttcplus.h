@@ -119,7 +119,7 @@ public:
       // no collision possible
       j++;
       r_dt_miss += dt_robot->dt();
-      if(r_dt_miss>=(cfg_->hateb.ttcplus_timer)*5){ //Check if the misses are consecutive for atleast 10 times of the timer
+      if(r_dt_miss>=(cfg_->hateb.ttcplus_timer)){ //Check if the misses are consecutive for atleast 10 times of the timer
         i=0;
         j=0;
         r_dt=0;

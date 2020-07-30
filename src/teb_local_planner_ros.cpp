@@ -806,10 +806,11 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   double dt_resize=cfg_.trajectory.dt_ref;
   double dt_hyst_resize=cfg_.trajectory.dt_hysteresis;
 
-  if(isDistunderThreshold && isMode==0){
-      dt_resize = 0.2;
-      dt_hyst_resize = 0.1;
-    }
+  // Uncomment the below lines of code for intermediate band tightness change
+  // if(isDistunderThreshold && isMode==0){
+  //     dt_resize = 0.2;
+  //     dt_hyst_resize = 0.1;
+  //   }
 
   bool success = planner_->plan(transformed_plan, &robot_vel_, cfg_.goal_tolerance.free_goal_vel, &transformed_human_plan_vel_map, &op_costs, dt_resize, dt_hyst_resize);
   // std::cout << "I am out of Planner" << '\n';
@@ -2283,7 +2284,7 @@ bool TebLocalPlannerROS::optimizeStandalone(
   visualization_->publishViaPoints(via_points_);
   visualization_->publishGlobalPlan(global_plan_);
   visualization_->publishHumanGlobalPlans(transformed_human_plans);
-  
+
   auto viz_time = ros::Time::now() - viz_start_time;
 
   res.success = true;
