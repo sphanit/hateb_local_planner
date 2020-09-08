@@ -77,11 +77,12 @@ public:
     Eigen::Vector2d d_rtoh = human_bandpt->position() - robot_bandpt->position();
     Eigen::Vector2d d_htor = robot_bandpt->position() - human_bandpt->position();
 
-    double dir_cost = (std::max(robot_vel.dot(d_rtoh), 0.0) - std::max(human_vel.dot(d_htor), 0.0)) / d_rtoh.dot(d_rtoh);
+    double dir_cost = (std::max(robot_vel.dot(d_rtoh), 0.001) + std::max(human_vel.dot(d_htor), 0.001)) / d_rtoh.dot(d_rtoh);
+    // double dir_cost = (robot_vel-human_vel).norm()/ d_rtoh.norm();
     // std::cout << "dir_cost "  << dir_cost << '\n';
     ROS_DEBUG_THROTTLE(0.5, "dir_cost value : %f", dir_cost);
 
-    _error[0] = penaltyBoundFromBelow(dir_cost, cfg_->hateb.dir_cost_threshold, cfg_->optim.penalty_epsilon);
+    _error[0] = penaltyBoundFromAbove(dir_cost, cfg_->hateb.dir_cost_threshold, cfg_->optim.penalty_epsilon);
 
     ROS_ASSERT_MSG(std::isfinite(_error[0]), "EdgeHumanRobot::computeError() _error[0]=%f\n", _error[0]);
   }

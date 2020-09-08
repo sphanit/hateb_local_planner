@@ -382,13 +382,13 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
     human_pos_costmap.push_back(v3);
     human_pos_costmap.push_back(v4);
 
-    if(!human_prev_pos_costmap.empty()){
-      costmap_->setConvexPolygonCost(human_prev_pos_costmap, 0.0);
-    }
-    human_prev_pos_costmap = human_pos_costmap;
-
-    bool set_success = false;
-    set_success = costmap_->setConvexPolygonCost(human_pos_costmap, 255);
+    // if(!human_prev_pos_costmap.empty()){
+    //   costmap_->setConvexPolygonCost(human_prev_pos_costmap, 0.0);
+    // }
+    // human_prev_pos_costmap = human_pos_costmap;
+    //
+    // bool set_success = false;
+    // set_success = costmap_->setConvexPolygonCost(human_pos_costmap, 255);
     // ROS_INFO("Success :robot_pos_costmap %d",set_success);
 
   }
@@ -2247,9 +2247,11 @@ bool TebLocalPlannerROS::optimizeStandalone(
   // now perform the actual planning
   auto plan_start_time = ros::Time::now();
   geometry_msgs::Twist robot_vel_twist;
+  teb_local_planner::OptimizationCostArray op_costs;
+
   bool success = planner_->plan(transformed_plan, &robot_vel_,
                                 cfg_.goal_tolerance.free_goal_vel,
-                                &transformed_human_plan_vel_map);
+                                &transformed_human_plan_vel_map,&op_costs);
   if (!success) {
     planner_->clearPlanner();
     res.success = false;

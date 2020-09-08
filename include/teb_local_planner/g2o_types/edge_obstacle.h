@@ -100,6 +100,7 @@ public:
       // necessary to increase weight_obstacle and/or the inflation_weight
       // when using larger exponents.
       _error[0] = cfg_->obstacles.min_obstacle_dist * std::pow(_error[0] / cfg_->obstacles.min_obstacle_dist, cfg_->optim.obstacle_cost_exponent);
+      // _error[0] = penaltyBoundFromBelowExp(dist, cfg_->obstacles.min_obstacle_dist, cfg_->optim.penalty_epsilon,cfg_->obstacles.obstacle_cost_mult);
     }
 
     ROS_ASSERT_MSG(std::isfinite(_error[0]), "EdgeObstacle::computeError() _error[0]=%f\n",_error[0]);

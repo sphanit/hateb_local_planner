@@ -41,6 +41,8 @@
 #include <map>
 #include <memory>
 #include <limits>
+#include <fstream>
+#include <iostream>
 
 
 namespace teb_local_planner
@@ -2203,6 +2205,7 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     if (dynamic_cast<EdgeHumanRobotDirectional *>(*it) != nullptr) {
       hr_dir_cost += cur_cost;
       cost_ += cur_cost;
+      hr_dir_cost_vector.push_back(cur_cost);
       // std::cout << "EdgeHumanRobotDirectional " << cur_cost<< '\n';
       continue;
     }
@@ -2228,6 +2231,18 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
   if (op_costs) {
     // std::cout << "I entered inside the op_costs" << '\n';
     op_costs->costs.clear();
+
+    // std::ofstream outdata;
+    // outdata.open("/home/ptsingaman/ros_ws/Navigation_planner_melodic/dir_data.dat");
+    // if( !outdata ){
+    //   ROS_INFO("Cannot open the file to write");
+    // }
+    //
+    // for(int indx=0;indx<hr_dir_cost_vector.size();indx++){
+    //   outdata << hr_dir_cost_vector[indx] << std::endl;
+    //   // std::cout << "dir_cost" << hr_dir_cost_vector[indx]<< '\n';
+    // }
+    // outdata.close();
 
     teb_local_planner::OptimizationCost optc;
 

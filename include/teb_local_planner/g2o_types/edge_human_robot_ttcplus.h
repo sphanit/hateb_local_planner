@@ -71,6 +71,10 @@ public:
 
     Eigen::Vector2d C = human_bandpt->position() - robot_bandpt->position();
 
+    Eigen::Vector2d d_rtoh = human_bandpt->position() - robot_bandpt->position();
+    Eigen::Vector2d d_htor = robot_bandpt->position() - human_bandpt->position();
+    // double dir_cost = (std::max(robot_vel.dot(d_rtoh), 0.0) + std::max(human_vel.dot(d_htor), 0.0)) / d_rtoh.dot(d_rtoh);
+
 
     double ttcplus = std::numeric_limits<double>::infinity();
     double C_sq = C.dot(C);
@@ -119,7 +123,7 @@ public:
       // no collision possible
       j++;
       r_dt_miss += dt_robot->dt();
-      if(r_dt_miss>=(cfg_->hateb.ttcplus_timer)){ //Check if the misses are consecutive for atleast 10 times of the timer
+      if(r_dt_miss>=5*(cfg_->hateb.ttcplus_timer)){ //Check if the misses are consecutive for atleast 10 times of the timer
         i=0;
         j=0;
         r_dt=0;
@@ -128,6 +132,7 @@ public:
     	 if(C_sq > 4){
         _error[0] = 0.0;
      	}
+      // _error[0] = penaltyBoundFromAbove(dir_cost, cfg_->hateb.dir_cost_threshold, cfg_->optim.penalty_epsilon);
     }
 
     // std::cout << "error_[0]"<< _error[0] << '\n';

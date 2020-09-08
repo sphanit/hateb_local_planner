@@ -111,8 +111,8 @@ public:
       //   system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ weight_viapoint 0.05");
     }
 
-    double vel_linear = cfg_->robot.max_vel_x * (func);
-    double vel_theta = cfg_->robot.max_vel_theta * (func_theta);
+    double vel_linear = cfg_->robot.max_vel_x;// * (func);
+    double vel_theta = cfg_->robot.max_vel_theta;// * (func_theta);
     // Until here
 
     const Eigen::Vector2d deltaS = conf2->estimate().position() - conf1->estimate().position();
@@ -290,9 +290,9 @@ public:
       //   system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ weight_viapoint 0.05");
     }
 
-    double vel_linear_x = cfg_->robot.max_vel_x * (func);
-    double vel_linear_y = cfg_->robot.max_vel_y * (func);
-    double vel_theta = cfg_->robot.max_vel_theta * (func_theta);
+    double vel_linear_x = cfg_->robot.max_vel_x;// * (func);
+    double vel_linear_y = cfg_->robot.max_vel_y;// * (func);
+    double vel_theta = cfg_->robot.max_vel_theta;// * (func_theta);
     // Until here
 
     Eigen::Vector2d deltaS = conf2->position() - conf1->position();
