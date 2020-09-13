@@ -123,15 +123,15 @@ public:
       // no collision possible
       j++;
       r_dt_miss += dt_robot->dt();
-      if(r_dt_miss>=5*(cfg_->hateb.ttcplus_timer)){ //Check if the misses are consecutive for atleast 10 times of the timer
+      if(r_dt_miss>=5*(cfg_->hateb.ttcplus_timer)){ //Check if the misses are consecutive for atleast 5 times of the timer
         i=0;
         j=0;
         r_dt=0;
         r_dt_miss=0;
       }
-    	 if(C_sq > 4){
-        _error[0] = 0.0;
-     	}
+    	//  if(C_sq > 4){
+      //   _error[0] = 0.0;
+     	// }
       // _error[0] = penaltyBoundFromAbove(dir_cost, cfg_->hateb.dir_cost_threshold, cfg_->optim.penalty_epsilon);
     }
 

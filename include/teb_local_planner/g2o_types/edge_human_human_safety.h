@@ -68,6 +68,8 @@ public:
 
     ROS_DEBUG_THROTTLE(0.5, "human human external dist = %f", dist);
     _error[0] = penaltyBoundFromBelow(dist, cfg_->human.min_human_human_dist, cfg_->optim.penalty_epsilon);
+    // _error[0] = penaltyBoundFromBelowNonLinear(dist,  cfg_->human.min_human_human_dist, cfg_->optim.penalty_epsilon);
+
 
     ROS_ASSERT_MSG(std::isfinite(_error[0]), "EdgeHumanHumanSafety::computeError() _error[0]=%f\n", _error[0]);
   }

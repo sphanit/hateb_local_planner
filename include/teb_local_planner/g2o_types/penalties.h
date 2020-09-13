@@ -208,6 +208,18 @@ inline double penaltyBoundFromBelowExp(const double &var, const double &a,
   }
 }
 
+inline double penaltyBoundFromBelowNonLinear(const double &var, const double &a,
+                                       const double &epsilon) {
+  if (var >= a + epsilon) {
+    return 0.0;
+  } else if (var < 0.0) {
+    return (-var + (a + epsilon));
+  } else {
+    return std::max(((a + epsilon - var) / (var + 0.1)),
+                    0.00001); // for numerical stability
+  }
+}
+
 } // namespace teb_local_planner
 
 
