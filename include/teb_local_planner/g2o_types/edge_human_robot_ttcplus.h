@@ -93,11 +93,15 @@ public:
     else {
       Eigen::Vector2d V = robot_vel - human_vel;
       double C_dot_V = C.dot(V);
-      if (C_dot_V > 0) { // otherwise ttcplus is infinite
+      // std::cout << "human_vel" << human_vel.norm() << '\n';
+      if (C_dot_V > 0 && human_vel.norm() > 0) { // otherwise ttcplus is infinite
         double V_sq = V.dot(V);
         double f = (C_dot_V * C_dot_V) - (V_sq * (C_sq - radius_sum_sq_));
         if (f > 0) {         // otherwise ttcplus is infinite
            ttcplus = (C_dot_V - std::sqrt(f)) / V_sq;
+         }
+         else{
+           ttcplus = (C_dot_V)/(C.norm()*V.norm())*((C_dot_V - std::sqrt(f)) / V_sq);
          }
        }
       }

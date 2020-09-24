@@ -621,13 +621,12 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
 
     if (predict_humans_client_ && predict_humans_client_.call(predict_srv)) {
       tf2::Stamped<tf2::Transform> tf_human_plan_to_global;
-      // std::cout << "predict_srv.response.predicted_humans_poses "<< predict_srv.response.predicted_humans_poses[0].poses<< '\n';
       for (auto predicted_humans_poses :
            predict_srv.response.predicted_humans_poses) {
         // transform human plans
         HumanPlanCombined human_plan_combined;
         auto &transformed_vel = predicted_humans_poses.start_velocity;
-        //std::cout << "predicted_humans_poses.start_velocity " <<predicted_humans_poses.start_velocity<< '\n';
+        // std::cout << "predicted_humans_poses.poses" <<predicted_humans_poses.poses<< '\n';
         if (!transformHumanPlan(*tf_, robot_pose, *costmap_, global_frame_,
                                 predicted_humans_poses.poses,
                                 human_plan_combined, transformed_vel,
@@ -797,7 +796,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     updateViaPointsContainer(transformed_plan, cfg_.trajectory.global_plan_viapoint_sep);
   auto via_time = ros::Time::now() - via_start_time;
 
-  // Now perform the actual planning
+  // Now perform the actual
   auto plan_start_time = ros::Time::now();
   // bool success = planner_->plan(robot_pose_, robot_goal_, robot_vel_, cfg_.goal_tolerance.free_goal_vel); // straight line init
   teb_local_planner::OptimizationCostArray op_costs;
@@ -1575,7 +1574,6 @@ bool TebLocalPlannerROS::transformHumanPlan(
     tf2::Stamped<tf2::Transform> tf_pose_stamped;
     geometry_msgs::PoseStamped transformed_pose;
     tf2::Transform tf_pose;
-    // std::cout << "human_plan.size() " <<human_plan.size()<< '\n';
     for (auto &human_pose : human_plan) {
       tf2::fromMsg(human_pose.pose.pose, tf_pose);
       tf_pose_stamped.setData(human_plan_to_global_transform_ * tf_pose);
@@ -2233,6 +2231,8 @@ bool TebLocalPlannerROS::optimizeStandalone(
     PlanStartVelGoalVel plan_start_vel_goal_vel;
     plan_start_vel_goal_vel.plan = human_plan_combined.plan_to_optimize;
     plan_start_vel_goal_vel.start_vel = transformed_vel.twist;
+    // plan_start_vel_goal_vel.nominal_vel = std::max(0.3,human_nominal_vels[predicted_humans_poses.id-1]);
+    plan_start_vel_goal_vel.isMode = isMode;
     if (human_plan_combined.plan_after.size() > 0) {
       plan_start_vel_goal_vel.goal_vel = transformed_vel.twist;
     }
@@ -2259,6 +2259,8 @@ bool TebLocalPlannerROS::optimizeStandalone(
         "planner was not able to obtain a local plan for the current setting";
     return true;
   }
+  op_costs_pub_.publish(op_costs);
+
   auto plan_time = ros::Time::now() - plan_start_time;
   auto viz_start_time = ros::Time::now();
 

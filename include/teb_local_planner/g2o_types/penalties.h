@@ -220,6 +220,17 @@ inline double penaltyBoundFromBelowNonLinear(const double &var, const double &a,
   }
 }
 
+inline double penaltyBoundFromBelowQuad(const double &var, const double &a,
+                                       const double &epsilon) {
+  if (var >= a + epsilon) {
+    return 0.0;
+  }
+
+  else {
+  return std::pow((a+epsilon-var),2)+(a+epsilon-var);
+  }
+}
+
 } // namespace teb_local_planner
 
 

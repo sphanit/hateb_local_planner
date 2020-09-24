@@ -20,3 +20,4 @@ int8 HUMAN_ROBOT_TTCplus=17
 
 int8    type
 float64 cost
+float64[] costs_arr
