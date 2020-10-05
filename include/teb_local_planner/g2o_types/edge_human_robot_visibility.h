@@ -62,7 +62,7 @@ public:
     Eigen::Vector2d robotLookAt = {cos(robot_bandpt->theta()), sin(robot_bandpt->theta())};
     double deltaPsi = fabs(acos(humanLookAt.dot(d_htor) / (humanLookAt.norm() * d_htor.norm())));
     //ROS_DEBUG_THROTTLE(0.5, "robot_human_angle deg : %f", deltaPsi * 180 / M_PI);
-    double c_visibility;
+    double c_visibility = 0.0;
     double ang = humanLookAt.dot(robotLookAt);
     // std::cout << "ang " <<ang<< '\n';
 
