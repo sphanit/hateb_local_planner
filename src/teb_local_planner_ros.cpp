@@ -364,7 +364,7 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
     min_dist_human_pub_.publish(min_dist_human);
   }
 
-    auto human_radius = 0.08;
+    auto human_radius = 0.1;
     if(isMode==1)
       human_radius = 0.08;
 
@@ -382,13 +382,13 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
     human_pos_costmap.push_back(v3);
     human_pos_costmap.push_back(v4);
 
-    // if(!human_prev_pos_costmap.empty()){
-    //   costmap_->setConvexPolygonCost(human_prev_pos_costmap, 0.0);
-    // }
-    // human_prev_pos_costmap = human_pos_costmap;
-    //
-    // bool set_success = false;
-    // set_success = costmap_->setConvexPolygonCost(human_pos_costmap, 255);
+    if(!human_prev_pos_costmap.empty()){
+      costmap_->setConvexPolygonCost(human_prev_pos_costmap, 0.0);
+    }
+    human_prev_pos_costmap = human_pos_costmap;
+
+    bool set_success = false;
+    set_success = costmap_->setConvexPolygonCost(human_pos_costmap, 255);
     // ROS_INFO("Success :robot_pos_costmap %d",set_success);
 
   }
@@ -590,8 +590,8 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
 
       if (cfg_.hateb.predict_human_behind_robot && !flag) {
         predict_srv.request.type =
-            hanp_prediction::HumanPosePredictRequest::BEHIND_ROBOT;
-            // hanp_prediction::HumanPosePredictRequest::PREDICTED_GOAL;
+            hanp_prediction::HumanPosePredictRequest::BEHIND_ROBOT; //Uncomment this to predict the goal behind_human
+            // hanp_prediction::HumanPosePredictRequest::PREDICTED_GOAL; //uncomment this to use the goal prediction algo
             if(isDistMax)
               break;
       } else {

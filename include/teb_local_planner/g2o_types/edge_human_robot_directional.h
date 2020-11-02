@@ -77,7 +77,9 @@ public:
     Eigen::Vector2d d_rtoh = human_bandpt->position() - robot_bandpt->position();
     Eigen::Vector2d d_htor = robot_bandpt->position() - human_bandpt->position();
 
-    double dir_cost =  (std::max(robot_vel.dot(d_rtoh)+robot_vel.norm(),0.0)+1)/d_rtoh.norm();
+    double dir_cost =  (std::max((robot_vel-human_vel).dot(d_rtoh),0.0)+ robot_vel.norm()+1)/d_rtoh.norm(); //Working as
+    // double dir_cost =  (std::max(robot_vel.dot(d_rtoh),0.0)+robot_vel.norm()+1)/d_rtoh.norm(); //Working
+    // double dir_cost =  (std::max(robot_vel.dot(d_rtoh)+robot_vel.norm(),0.0)+1)/d_rtoh.norm(); //Wrong bracket for max
     // double dir_cost = (std::max(robot_vel.dot(d_rtoh), 0.0) + std::max(human_vel.dot(d_htor), 0.0)) / d_rtoh.dot(d_rtoh); // Problem: Human velocity is also slowed down
     // double dir_cost = robot_vel.norm()+ (1 / d_rtoh.dot(d_rtoh)); //One of the working ones (problem: direction of vel)
     // std::cout << "dir_cost "  << dir_cost << '\n';
