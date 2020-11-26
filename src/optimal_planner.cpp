@@ -2421,7 +2421,7 @@ void TebOptimalPlanner::extractVelocity(const PoseSE2& pose1, const PoseSE2& pos
   omega = orientdiff/dt;
 }
 
-bool TebOptimalPlanner::getVelocityCommand(double& vx, double& vy, double& omega, int look_ahead_poses, double dt_ref) const
+bool TebOptimalPlanner::getVelocityCommand(double& vx, double& vy, double& omega, int look_ahead_poses, double dt_ref, PoseSE2& expected_pose) const
 {
   if (teb_.sizePoses()<2)
   {
@@ -2453,8 +2453,10 @@ bool TebOptimalPlanner::getVelocityCommand(double& vx, double& vy, double& omega
     return false;
   }
 
+expected_pose = teb_.Pose(look_ahead_poses);
   // Get velocity from the first two configurations
 extractVelocity(teb_.Pose(0), teb_.Pose(look_ahead_poses), dt, vx, vy, omega);
+
   return true;
 }
 

@@ -220,6 +220,8 @@ void TebConfig::loadRosParamFromNodeHandle(const ros::NodeHandle& nh)
             hateb.use_external_prediction);
   nh.param("predict_human_behind_robot", hateb.predict_human_behind_robot,
             hateb.predict_human_behind_robot);
+  nh.param("predict_human_goal", hateb.predict_human_goal,
+            hateb.predict_human_goal);
   nh.param("ttc_threshold", hateb.ttc_threshold, hateb.ttc_threshold);
   nh.param("human_pose_prediction_reset_time", hateb.pose_prediction_reset_time,
             hateb.pose_prediction_reset_time);
@@ -431,6 +433,7 @@ void TebConfig::reconfigure(TebLocalPlannerReconfigureConfig& cfg)
   hateb.use_human_elastic_vel = cfg.use_human_elastic_vel;
   hateb.use_external_prediction = cfg.use_external_prediction;
   hateb.predict_human_behind_robot = cfg.predict_human_behind_robot;
+  hateb.predict_human_goal = cfg.predict_human_goal;
   hateb.ttc_threshold = cfg.ttc_threshold;
   hateb.ttclosest_threshold = cfg.ttclosest_threshold;							//michele
   hateb.ttcplus_threshold = cfg.ttcplus_threshold;

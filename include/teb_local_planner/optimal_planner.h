@@ -232,7 +232,7 @@ public:
    * @param[out] omega rotational velocity [rad/s]
    * @return \c true if command is valid, \c false otherwise
    */
-   virtual bool getVelocityCommand(double& vx, double& vy, double& omega, int look_ahead_poses, double dt_ref) const;
+   virtual bool getVelocityCommand(double& vx, double& vy, double& omega, int look_ahead_poses, double dt_ref, PoseSE2& expected_pose) const;
 
   /**
    * @brief Optimize a previously initialized trajectory (actual TEB optimization loop).

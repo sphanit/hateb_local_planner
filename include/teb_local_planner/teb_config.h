@@ -231,6 +231,7 @@ public:
     bool use_human_elastic_vel;
     bool use_external_prediction;
     bool predict_human_behind_robot;
+    bool predict_human_goal;
     double ttc_threshold;
     double ttcplus_threshold;                                        //michele
     double ttclosest_threshold;                                    //michele
@@ -469,6 +470,7 @@ public:
     hateb.use_human_elastic_vel = true;
     hateb.use_external_prediction = false;
     hateb.predict_human_behind_robot = false;
+    hateb.predict_human_goal = false;
     hateb.ttc_threshold = 5.0;
     hateb.ttcplus_threshold = 5.0;
     hateb.ttclosest_threshold = 0.5;                           //michele

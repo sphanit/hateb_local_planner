@@ -57,8 +57,10 @@
 
 // message types
 #include <nav_msgs/Path.h>
+#include <std_msgs/String.h>
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/Point.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <visualization_msgs/Marker.h>
 #include <costmap_converter/ObstacleMsg.h>
@@ -539,11 +541,14 @@ private:
   ros::Time last_call_time_;
   hanp_msgs::TrackedHumans tracked_humans_,prev_tracked_humans_;
   geometry_msgs::Pose robot_pos_msg, last_robot_pose;
+  PoseSE2 last_expected_pose;
   bool isDistunderThreshold, isDistMax;
   ros::Time last_position_time;
   int change_mode, isMode;
   bool human_still;
   bool flag;
+
+  std::string logs;
 
   std::vector<std::vector<double>> human_vels;
   std::vector<double> human_nominal_vels;
@@ -553,7 +558,7 @@ private:
   double last_omega_, min_dist_human;
 
   ros::Subscriber human_pos_sub_;
-  ros::Publisher op_costs_pub_,robot_pose_pub_,time_to_goal_pub_, min_dist_human_pub_, robot_vel_pub_;
+  ros::Publisher op_costs_pub_,robot_pose_pub_,time_to_goal_pub_, min_dist_human_pub_, robot_vel_pub_, expected_pose_pub_, log_pub_;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

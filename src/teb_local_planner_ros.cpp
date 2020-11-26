@@ -47,6 +47,7 @@
 #define OP_COSTS_TOPIC "optimization_costs"
 #define ROB_POS_TOPIC "Robot_Pose"
 #define ROB_VEL_TOPIC "robot_vel"
+#define HATEB_LOG "hateb_log"
 #define HUMAN_POS_SUB_TOPIC "/tracked_humans"
 #define DEFAULT_HUMAN_SEGMENT hanp_msgs::TrackedSegmentType::TORSO
 #define THROTTLE_RATE 5.0 // seconds
@@ -218,7 +219,8 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
 
     time_to_goal_pub_ = nh.advertise<std_msgs::Float64>("time_to_goal",100);
     min_dist_human_pub_ = nh.advertise<std_msgs::Float64>("min_dist_human",100);
-
+    expected_pose_pub_ = nh.advertise<geometry_msgs::Point>("expected_pose",100);
+    log_pub_ = nh.advertise<std_msgs::String>(HATEB_LOG,1);
     last_call_time_ = ros::Time::now() - ros::Duration(cfg_.hateb.pose_prediction_reset_time);
 
     last_omega_sign_change_ = ros::Time::now() - ros::Duration(cfg_.optim.omega_chage_time_seperation);
@@ -423,6 +425,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   // std::cout << "I am in TebLocalPlannerROS::computeVelocityCommands" << '\n';
 
   // check if plugin initialized
+  logs.clear();
   if(!initialized_)
   {
     ROS_ERROR("teb_local_planner has not been initialized, please call initialize() before using this planner");
@@ -452,6 +455,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     //   change_mode=0;
     // std::cout << "distance now" << std::hypot(robot_pose.pose.position.x-last_robot_pose.position.x, robot_pose.pose.position.y-last_robot_pose.position.y)<< '\n';
   }
+
   last_robot_pose  = robot_pose.pose;
 
   if((ros::Time::now()-last_position_time).toSec()>=2.0){
@@ -476,6 +480,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   robot_vel_.angular.z = tf2::getYaw(robot_vel_tf.pose.orientation);
   auto vel_get_time = ros::Time::now() - vel_get_start_time;
   robot_vel_pub_.publish(robot_vel_);
+  logs+="Velocity: x= " + std::to_string(robot_vel_.linear.x) + " y= " + std::to_string(robot_vel_.linear.y)+", ";
 
   // prune global plan to cut off parts of the past (spatially before the robot)
   auto prune_start_time = ros::Time::now();
@@ -590,12 +595,17 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
 
       if (cfg_.hateb.predict_human_behind_robot && !flag) {
         predict_srv.request.type =
-            hanp_prediction::HumanPosePredictRequest::BEHIND_ROBOT; //Uncomment this to predict the goal behind_human
-            // hanp_prediction::HumanPosePredictRequest::PREDICTED_GOAL; //uncomment this to use the goal prediction algo
+            hanp_prediction::HumanPosePredictRequest::BEHIND_ROBOT;
             if(isDistMax)
               break;
-      } else {
-        // std::cout << "I am in rthe external prediction" << '\n';
+      }
+      else if(cfg_.hateb.predict_human_goal && !flag) {
+        predict_srv.request.type =
+            hanp_prediction::HumanPosePredictRequest::PREDICTED_GOAL;
+            if(isDistMax)
+              break;
+      }
+      else {
         predict_srv.request.type =
             hanp_prediction::HumanPosePredictRequest::EXTERNAL;
       }
@@ -784,6 +794,10 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   default:
     break;
   }
+  std::string mode = isMode ? "SingleBand":"DualBand";
+  logs+="Mode: " + mode+", ";
+  log_pub_.publish(logs);
+
   auto human_time = ros::Time::now() - human_start_time;
 
   // update via-points container
@@ -906,9 +920,10 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   auto fsb_time = ros::Time::now() - fsb_start_time;
 
   // Get the velocity command for this sampling interval
+  PoseSE2 expected_pose;
   auto vel_start_time = ros::Time::now();
   // std::cout << "I am going into planner_->getVelocityCommand in computeVelocityCommands" << '\n';
-  if (!planner_->getVelocityCommand(cmd_vel.twist.linear.x, cmd_vel.twist.linear.y, cmd_vel.twist.angular.z, cfg_.trajectory.control_look_ahead_poses, dt_resize))
+  if (!planner_->getVelocityCommand(cmd_vel.twist.linear.x, cmd_vel.twist.linear.y, cmd_vel.twist.angular.z, cfg_.trajectory.control_look_ahead_poses, dt_resize, expected_pose))
   {
     planner_->clearPlanner();
     ROS_WARN("TebLocalPlannerROS: velocity command invalid. Resetting planner...");
@@ -918,6 +933,12 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     message = "teb_local_planner velocity command invalid";
     return mbf_msgs::ExePathResult::NO_VALID_CMD;
   }
+  geometry_msgs::Point exp_pos;
+  exp_pos.x = last_expected_pose.x();
+  exp_pos.y = last_expected_pose.y();
+  expected_pose_pub_.publish(exp_pos);
+
+  last_expected_pose = expected_pose;
 
   // Saturate velocity, if the optimization results violates the constraints (could be possible due to soft constraints).
   saturateVelocity(cmd_vel.twist.linear.x, cmd_vel.twist.linear.y, cmd_vel.twist.angular.z,
@@ -2307,10 +2328,11 @@ bool TebLocalPlannerROS::optimizeStandalone(
   }
   auto fsb_time = ros::Time::now() - fsb_start_time;
 
+  PoseSE2 expected_pose;
   // get the velocity command for this sampling interval
   auto vel_start_time = ros::Time::now();
   double dt_resize = 0.4;
-  if (!planner_->getVelocityCommand(cmd_vel.linear.x, cmd_vel.linear.y, cmd_vel.angular.z, cfg_.trajectory.control_look_ahead_poses, dt_resize)) {
+  if (!planner_->getVelocityCommand(cmd_vel.linear.x, cmd_vel.linear.y, cmd_vel.angular.z, cfg_.trajectory.control_look_ahead_poses, dt_resize, expected_pose)) {
     res.message += feasible ? "\nhowever," : "\nand";
     res.message += " velocity command is invalid";
   }
