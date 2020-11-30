@@ -41,7 +41,7 @@
   "/human_pose_prediction/reset_external_paths"
 #define PUBLISH_MARKERS_SRV_NAME                                               \
   "/human_pose_prediction/publish_prediction_markers"
-#define HUMAN_GOAL_SRV_NAME "/setGoalHuman_call"
+#define HUMAN_GOAL_SRV_NAME "/human_pose_prediction/set_human_goal_call"
 #define OPTIMIZE_SRV_NAME "optimize"
 #define APPROACH_SRV_NAME "set_approach_id"
 #define OP_COSTS_TOPIC "optimization_costs"
@@ -592,6 +592,8 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
       human_goal_client_.call(g_srv);
       if(g_srv.response.success && !flag)
         flag = true;
+
+      // std::cout << "flag" << flag << '\n';
 
       if (cfg_.hateb.predict_human_behind_robot && !flag) {
         predict_srv.request.type =
