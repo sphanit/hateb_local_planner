@@ -97,9 +97,9 @@ void TebOptimalPlanner::initialize(const TebConfig& cfg, ObstContainer* obstacle
   vel_goal_.second.angular.z = 0;
 
   robot_radius_ = robot_model_->getCircumscribedRadius();
-  std::cout << "robot_radius " <<robot_radius_<< '\n';
+  // std::cout << "robot_radius " <<robot_radius_<< '\n';
   human_radius_ = human_model_->getCircumscribedRadius();
-  std::cout << "human_model_ " << human_radius_<< '\n';
+  // std::cout << "human_model_ " << human_radius_<< '\n';
 
   initialized_ = true;
   isMode = 0;
@@ -338,7 +338,7 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
   human_nominal_vels.clear();
   isMode = 0;
 
-  double current_human_robot_min_dist = std::numeric_limits<double>::max();
+  current_human_robot_min_dist = std::numeric_limits<double>::max();
 
   switch (cfg_->planning_mode) {
   case 0:
@@ -1152,7 +1152,6 @@ void TebOptimalPlanner::AddEdgesViaPointsForHumans() {
     return;
 
   for (auto &human_via_points_kv : *humans_via_points_map_) {
-
     if (humans_tebs_map_.find(human_via_points_kv.first) == humans_tebs_map_.end()) {
       ROS_WARN_THROTTLE(THROTTLE_RATE, "inconsistant data between humans_tebs_map and humans_via_points_map (for id %ld)", human_via_points_kv.first);
       continue;
@@ -1741,22 +1740,24 @@ void TebOptimalPlanner::AddEdgesHumanRobotSafety() {
     weight_safety = 3.0;
   }
 
-  for (auto &human_teb_kv : humans_tebs_map_) {
-    auto &human_teb = human_teb_kv.second;
+  if(current_human_robot_min_dist < 2.0){
+    for (auto &human_teb_kv : humans_tebs_map_) {
+      auto &human_teb = human_teb_kv.second;
 
-    for (unsigned int i = 0;
-         (i < human_teb.sizePoses()) && (i < robot_teb_size); i++) {
-      Eigen::Matrix<double, 1, 1> information_human_robot;
-      information_human_robot.fill(weight_safety);
-      // const VertexPose *robot_bandpt = static_cast<const VertexPose *>(teb_.PoseVertex(i));
-      // std::cout << "teb_.Pose: "<<i <<" "<<robot_bandpt->pose() << '\n';
-      EdgeHumanRobotSafety *human_robot_safety_edge = new EdgeHumanRobotSafety;
-      human_robot_safety_edge->setVertex(0, teb_.PoseVertex(i));
-      human_robot_safety_edge->setVertex(1, human_teb.PoseVertex(i));
-      human_robot_safety_edge->setInformation(information_human_robot);
-      human_robot_safety_edge->setParameters(*cfg_, robot_model_.get(),
-                                             human_radius_, min_dist_);
-      optimizer_->addEdge(human_robot_safety_edge);
+      for (unsigned int i = 0;
+           (i < human_teb.sizePoses()) && (i < robot_teb_size); i++) {
+        Eigen::Matrix<double, 1, 1> information_human_robot;
+        information_human_robot.fill(weight_safety);
+        // const VertexPose *robot_bandpt = static_cast<const VertexPose *>(teb_.PoseVertex(i));
+        // std::cout << "teb_.Pose: "<<i <<" "<<robot_bandpt->pose() << '\n';
+        EdgeHumanRobotSafety *human_robot_safety_edge = new EdgeHumanRobotSafety;
+        human_robot_safety_edge->setVertex(0, teb_.PoseVertex(i));
+        human_robot_safety_edge->setVertex(1, human_teb.PoseVertex(i));
+        human_robot_safety_edge->setInformation(information_human_robot);
+        human_robot_safety_edge->setParameters(*cfg_, robot_model_.get(),
+                                               human_radius_, min_dist_);
+        optimizer_->addEdge(human_robot_safety_edge);
+      }
     }
   }
 }

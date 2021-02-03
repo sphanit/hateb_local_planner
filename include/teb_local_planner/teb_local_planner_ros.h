@@ -545,14 +545,15 @@ private:
   bool isDistunderThreshold, isDistMax;
   ros::Time last_position_time;
   int change_mode, isMode;
-  bool human_still;
+  std::vector<bool> human_still;
   bool flag;
+  std::vector<std::pair<double,int>> dist_idx;
 
   std::string logs;
 
   std::vector<std::vector<double>> human_vels;
   std::vector<double> human_nominal_vels;
-  std::vector<geometry_msgs::Point> human_prev_pos_costmap;
+  std::map<uint64_t, std::vector<geometry_msgs::Point>> human_prev_pos_costmap;
 
   ros::Time last_omega_sign_change_;
   double last_omega_, min_dist_human;

@@ -299,8 +299,8 @@ protected:
   ros::Publisher humans_tebs_poses_pub_, humans_tebs_fp_poses_pub_; //!< Publisher for the trajectory pose sequence
   ros::Publisher teb_marker_pub_,arrow_pub; //!< Publisher for visualization markers
   ros::Publisher feedback_pub_;   //!< Publisher for the feedback message for analysis and debug purposes
-  ros::Publisher robot_traj_time_pub_, robot_path_time_pub_;
-  ros::Publisher human_trajs_time_pub_, human_paths_time_pub_, marker_pub;
+  ros::Publisher robot_traj_time_pub_, robot_path_time_pub_, robot_next_pose_pub_;
+  ros::Publisher human_trajs_time_pub_, human_paths_time_pub_, marker_pub, human_next_pose_pub_;
   ros::Subscriber tracked_humans_sub_;
   uint32_t shape = visualization_msgs::Marker::CYLINDER;
   std::vector<double> vel_robot, vel_human;

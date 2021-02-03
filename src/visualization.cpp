@@ -110,8 +110,10 @@ void TebVisualization::initialize(ros::NodeHandle& nh, const TebConfig& cfg)
       nh.advertise<hanp_msgs::HumanTimeToGoalArray>(HUMAN_TRAJS_TIME_TOPIC, 1);
   human_paths_time_pub_ =
       nh.advertise<hanp_msgs::HumanTimeToGoalArray>(HUMAN_PATHS_TIME_TOPIC, 1);
-  marker_pub = nh.advertise<visualization_msgs::Marker>("human_test_marker", 1);
-  arrow_pub = nh.advertise<visualization_msgs::Marker>("human_test_arrow", 1);
+  marker_pub = nh.advertise<visualization_msgs::MarkerArray>("human_test_marker", 1);
+  arrow_pub = nh.advertise<visualization_msgs::MarkerArray>("human_test_arrow", 1);
+  robot_next_pose_pub_ = nh.advertise<geometry_msgs::PoseStamped>("robot_next_pose", 1);
+  human_next_pose_pub_ = nh.advertise<geometry_msgs::PoseStamped>("human_next_pose", 1);
 
   last_publish_robot_global_plan =
       cfg_->visualization.publish_robot_global_plan;
@@ -238,6 +240,10 @@ void TebVisualization::publishLocalPlanAndPoses(const TimedElasticBand& teb, con
     pose.pose.orientation = tf::createQuaternionMsgFromYaw(teb.Pose(i).theta());
     teb_path.poses.push_back(pose);
     teb_poses.poses.push_back(pose.pose);
+
+    if(i==0){
+      robot_next_pose_pub_.publish(pose);
+    }
 
     if (i < (teb.sizePoses() - 1)) {
       pose_time += teb.TimeDiff(i);
@@ -392,14 +398,24 @@ void TebVisualization::publishHumanLocalPlansAndPoses(
     return;
   }
 
+  auto now = ros::Time::now();
+  auto frame_id = cfg_->map_frame;
+
   // create pose array for all humans
   geometry_msgs::PoseArray humans_teb_poses;
-  humans_teb_poses.header.frame_id = cfg_->map_frame;
-  humans_teb_poses.header.stamp = ros::Time::now();
+  humans_teb_poses.header.frame_id = frame_id;
+  humans_teb_poses.header.stamp = now;
 
+  hanp_msgs::HumanPathArray human_path_array;
+  human_path_array.header.stamp = now;
+  human_path_array.header.frame_id = frame_id;
   for (auto &human_teb_kv : humans_tebs_map) {
     auto &human_id = human_teb_kv.first;
     auto &human_teb = human_teb_kv.second;
+
+    hanp_msgs::HumanPath path;
+    path.header.stamp = now;
+    path.header.frame_id = frame_id;
 
     if (human_teb.sizePoses() == 0) {
       continue;
@@ -407,17 +423,25 @@ void TebVisualization::publishHumanLocalPlansAndPoses(
 
     double pose_time = 0.0;
     for (unsigned int i = 0; i < human_teb.sizePoses(); i++) {
-      geometry_msgs::Pose pose;
-      pose.position.x = human_teb.Pose(i).x();
-      pose.position.y = human_teb.Pose(i).y();
-      pose.position.z = pose_time * cfg_->visualization.pose_array_z_scale;
-      pose.orientation =
+      geometry_msgs::PoseStamped pose;
+      pose.header.stamp = now;
+      pose.header.frame_id = frame_id;
+      pose.pose.position.x = human_teb.Pose(i).x();
+      pose.pose.position.y = human_teb.Pose(i).y();
+      pose.pose.position.z = pose_time * cfg_->visualization.pose_array_z_scale;
+      pose.pose.orientation =
           tf::createQuaternionMsgFromYaw(human_teb.Pose(i).theta());
-      humans_teb_poses.poses.push_back(pose);
+      humans_teb_poses.poses.push_back(pose.pose);
+      pose.pose.position.z = 0;
+      path.path.poses.push_back(pose);
       if (i < (human_teb.sizePoses() - 1)) {
         pose_time += human_teb.TimeDiff(i);
       }
+      if(i==0){
+        human_next_pose_pub_.publish(pose);
+      }
     }
+    human_path_array.paths.push_back(path);
   }
 
   // if (!teb_path.poses.empty() && cfg_->visualization.publish_robot_local_plan) {
@@ -427,13 +451,18 @@ void TebVisualization::publishHumanLocalPlansAndPoses(
   if (!humans_teb_poses.poses.empty()) {
     if (cfg_->visualization.publish_human_local_plan_poses) {
       humans_tebs_poses_pub_.publish(humans_teb_poses);
+
+    }
+
+    if(cfg_->visualization.publish_human_local_plans){
+    humans_local_plans_pub_.publish(human_path_array);
     }
 
     if (cfg_->visualization.publish_human_local_plan_fp_poses) {
       visualization_msgs::MarkerArray humans_teb_fp_poses;
       int idx = 0;
       // double fp_size =humans_teb_poses.poses.size();
-      auto now = ros::Time::now();
+      // auto now = ros::Time::now();
       for (auto &pose : humans_teb_poses.poses) {
         std::vector<visualization_msgs::Marker> human_fp_markers;
         human_model.visualizeRobot(pose, human_fp_markers, color);
@@ -590,21 +619,24 @@ void TebVisualization::publishHumanTrajectories(
 }
 
 void TebVisualization::publishTestHumans(const hanp_msgs::TrackedHumansConstPtr &humans){
-  visualization_msgs::Marker marker,arrow;
-    // Set the frame ID and timestamp.  See the TF tutorials for information on these.
-    marker.header.frame_id = "map";
-    marker.header.stamp = ros::Time::now();
-    arrow.header.frame_id = "map";
-    arrow.header.stamp = ros::Time::now();
+  visualization_msgs::MarkerArray marker_arr,arrow_arr;
+
+    int i=0;
     for(auto &human : humans->humans)
-    {
+    {  visualization_msgs::Marker marker,arrow;
+        // Set the frame ID and timestamp.  See the TF tutorials for information on these.
+        marker.header.frame_id = "map";
+        marker.header.stamp = ros::Time::now();
+        arrow.header.frame_id = "map";
+        arrow.header.stamp = ros::Time::now();
+
       for(auto segment : human.segments)
       {          // Set the namespace and id for this marker.  This serves to create a unique ID
           // Any marker sent with the same namespace and id will overwrite the old one
           marker.ns = "basic_shapes";
-          marker.id = 0;
-          arrow.ns = "basic_shapes";
-          arrow.id=0;
+          marker.id = i;
+          arrow.ns = "arrow";
+          arrow.id = i;
 
           // Set the marker type.  Initially this is CUBE, and cycles between that and SPHERE, ARROW, and CYLINDER
           marker.type = shape;
@@ -647,11 +679,13 @@ void TebVisualization::publishTestHumans(const hanp_msgs::TrackedHumansConstPtr 
 
           marker.lifetime = ros::Duration();
           arrow.lifetime = ros::Duration();
-          marker_pub.publish(marker);
-          arrow_pub.publish(arrow);
+          marker_arr.markers.push_back(marker);
+          arrow_arr.markers.push_back(arrow);
+          i++;
         }
     }
-
+    marker_pub.publish(marker_arr);
+    arrow_pub.publish(arrow_arr);
   }
 
   void TebVisualization::setMarkerColour(visualization_msgs::Marker &marker, double itr, double n){

@@ -759,6 +759,7 @@ protected:
   double human_radius_, robot_radius_;
   std::vector<double> human_nominal_vels;
   int isMode;
+  double current_human_robot_min_dist;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

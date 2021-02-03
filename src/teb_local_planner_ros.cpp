@@ -230,7 +230,7 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
     isDistMax = true;
     change_mode = 0;
     isMode = 0;
-    human_still = false;
+    human_still.clear();
     flag = false;
 
     // set initialized flag
@@ -290,9 +290,12 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
 
   tracked_humans_ = tracked_humans;
   std::vector<double> human_dists;
+  std::vector<double> humans_behind;
 
   auto xpos = robot_pos_msg.position.x;
   auto ypos = robot_pos_msg.position.y;
+  auto ryaw = tf2::getYaw(robot_pos_msg.orientation);
+  Eigen::Vector2d robot_vec(std::cos(ryaw),std::sin(ryaw));
   std::vector<double> hum_xpos;
   std::vector<double> hum_ypos;
 
@@ -307,7 +310,9 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
     }
     for (auto &segment : human.segments){
       if(segment.type==DEFAULT_HUMAN_SEGMENT){
-        human_dists.push_back(std::hypot(segment.pose.pose.position.x-xpos, segment.pose.pose.position.y-ypos));
+        Eigen::Vector2d hr_vec(xpos-segment.pose.pose.position.x,ypos-segment.pose.pose.position.y);
+        human_dists.push_back(hr_vec.norm());
+        humans_behind.push_back(hr_vec.dot(robot_vec));
         human_vels[itr_idx].push_back(std::hypot(segment.twist.twist.linear.x, segment.twist.twist.linear.x));
 
         auto n = human_vels[itr_idx].size();
@@ -335,40 +340,42 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
         hum_ypos.push_back(tracked_humans_.humans[i].segments[j].pose.pose.position.y);
 
         if(hum_move_dist<0.0001)
-          human_still=true;
+          human_still.push_back(true);
         else
-          human_still=false;
+          human_still.push_back(false);
       }
     }
   }
   prev_tracked_humans_ = tracked_humans_;
 
-
+  int i=1;
+  dist_idx.clear();
+  isDistMax = true;
   for(auto &dist: human_dists){
     // std::cout << "dist " << dist << '\n';
-    if(dist<=2.5){
-      isDistunderThreshold = true;
-      // system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ nominal_human_vel_x 0.5");
-      }
-    else{
-      isDistunderThreshold = false;
-      // system("rosrun dynamic_reconfigure dynparam set /move_base_node/TebLocalPlannerROS/ nominal_human_vel_x 0.5");
-    }
-    if(dist>=20.0){
-      isDistMax = true;
-    }
-    else{
+    if(dist<10.0 && humans_behind[i-1] <= 0){
       isDistMax = false;
-    }
+      dist_idx.push_back(std::make_pair(dist,i));
 
+      if(dist<=2.5){
+        isDistunderThreshold = true;
+        }
+      else{
+        isDistunderThreshold = false;
+      }
+    }
     if(min_dist_human>dist)
       min_dist_human = dist;
     min_dist_human_pub_.publish(min_dist_human);
-  }
 
-    auto human_radius = 0.1;
+    i++;
+  }
+  std::sort(dist_idx.begin(),dist_idx.end());
+
+    auto human_radius = 0.25;
     if(isMode==1)
-      human_radius = 0.08;
+      // human_radius = 0.08;
+      human_radius = 0.15;
 
     for(int i=0;i<hum_xpos.size();i++){
     geometry_msgs::Point v1,v2,v3,v4;
@@ -385,9 +392,9 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
     human_pos_costmap.push_back(v4);
 
     if(!human_prev_pos_costmap.empty()){
-      costmap_->setConvexPolygonCost(human_prev_pos_costmap, 0.0);
+      costmap_->setConvexPolygonCost(human_prev_pos_costmap[i], 0.0);
     }
-    human_prev_pos_costmap = human_pos_costmap;
+    human_prev_pos_costmap[i] = human_pos_costmap;
 
     bool set_success = false;
     set_success = costmap_->setConvexPolygonCost(human_pos_costmap, 255);
@@ -459,7 +466,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   last_robot_pose  = robot_pose.pose;
 
   if((ros::Time::now()-last_position_time).toSec()>=2.0){
-    if(human_still && isDistunderThreshold){
+    if(human_still[dist_idx[0].second] && isDistunderThreshold){
       if(change_mode==0)
         ROS_INFO("I am stuck because of human, Changing to VelObs mode");
       change_mode++;
@@ -523,6 +530,8 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     change_mode = 0;
     isMode  = 0;
     flag = false;
+    human_still.clear();
+    isDistunderThreshold = false;
     return mbf_msgs::ExePathResult::SUCCESS;
   }
 
@@ -584,8 +593,17 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   case 0:
     break;
   case 1: {
+    if(isDistMax || dist_idx.empty()){
+      updateHumanViaPointsContainers(transformed_human_plan_vel_map,
+                                     cfg_.trajectory.global_plan_viapoint_sep);
+      break;
+    }
 
     hanp_prediction::HumanPosePredict predict_srv;
+    for(int i=0;i<2 && i<dist_idx.size();i++){
+      predict_srv.request.ids.push_back(dist_idx[i].second);
+    }
+
     if (cfg_.hateb.use_external_prediction && change_mode<1) {
 
       std_srvs::Trigger g_srv;
@@ -593,19 +611,14 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
       if(g_srv.response.success && !flag)
         flag = true;
 
-      // std::cout << "flag" << flag << '\n';
-
       if (cfg_.hateb.predict_human_behind_robot && !flag) {
         predict_srv.request.type =
             hanp_prediction::HumanPosePredictRequest::BEHIND_ROBOT;
-            if(isDistMax)
-              break;
+
       }
       else if(cfg_.hateb.predict_human_goal && !flag) {
         predict_srv.request.type =
             hanp_prediction::HumanPosePredictRequest::PREDICTED_GOAL;
-            if(isDistMax)
-              break;
       }
       else {
         predict_srv.request.type =
@@ -635,10 +648,14 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
       tf2::Stamped<tf2::Transform> tf_human_plan_to_global;
       for (auto predicted_humans_poses :
            predict_srv.response.predicted_humans_poses) {
+        if(std::find(predict_srv.request.ids.begin(), predict_srv.request.ids.end(),predicted_humans_poses.id) == predict_srv.request.ids.end()){
+          continue;
+        }
+
         // transform human plans
         HumanPlanCombined human_plan_combined;
         auto &transformed_vel = predicted_humans_poses.start_velocity;
-        // std::cout << "predicted_humans_poses.poses" <<predicted_humans_poses.poses<< '\n';
+
         if (!transformHumanPlan(*tf_, robot_pose, *costmap_, global_frame_,
                                 predicted_humans_poses.poses,
                                 human_plan_combined, transformed_vel,
@@ -1245,8 +1262,9 @@ void TebLocalPlannerROS::updateHumanViaPointsContainers(
   auto itr = humans_via_points_map_.begin();
   while (itr != humans_via_points_map_.end())
   {
-    if (transformed_human_plan_vel_map.find(itr->first) != transformed_human_plan_vel_map.end())
+    if (transformed_human_plan_vel_map.find(itr->first) == transformed_human_plan_vel_map.end()){
       itr = humans_via_points_map_.erase(itr);
+    }
     else
       ++itr;
   }
@@ -1331,12 +1349,12 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
     }
 
     // get plan_to_global_transform from plan frame to global_frame
-    geometry_msgs::TransformStamped plan_to_global_transform = tf.lookupTransform(global_frame, ros::Time::now(), plan_pose.header.frame_id, plan_pose.header.stamp,
+    geometry_msgs::TransformStamped plan_to_global_transform = tf.lookupTransform(global_frame, ros::Time(0), plan_pose.header.frame_id, plan_pose.header.stamp,
                                                                                   plan_pose.header.frame_id, ros::Duration(0.5));
 
     //let's get the pose of the robot in the frame of the plan
     geometry_msgs::PoseStamped robot_pose;
-    tf.transform(global_pose, robot_pose, plan_pose.header.frame_id);
+    tf.transform(global_pose, robot_pose, plan_pose.header.frame_id,ros::Duration(0.05));
 
     //we'll discard points on the plan that are outside the local costmap
     double dist_threshold = std::max(costmap.getSizeInCellsX() * costmap.getResolution() / 2.0,
@@ -1588,7 +1606,7 @@ bool TebLocalPlannerROS::transformHumanPlan(
     // tf.waitForTransform(global_frame, human_plan.front().header.frame_id,
                         // ros::Time(0), ros::Duration(0.5));
     human_plan_to_global_transform = tf2.lookupTransform(global_frame, human_plan.front().header.frame_id,
-                                                                        ros::Time::now(),ros::Duration(0.5));
+                                                                        ros::Time(0),ros::Duration(0.5));
     tf2::Stamped< tf2::Transform > human_plan_to_global_transform_;
     tf2::fromMsg(human_plan_to_global_transform,human_plan_to_global_transform_);
 
@@ -1610,7 +1628,7 @@ bool TebLocalPlannerROS::transformHumanPlan(
     // transform human twist to local planning frame
     geometry_msgs::Twist human_to_global_twist;
     lookupTwist(global_frame, transformed_human_twist.header.frame_id,
-                   ros::Time(0), ros::Duration(0.1), human_to_global_twist);
+                   ros::Time(0), ros::Duration(0.5), human_to_global_twist);
     transformed_human_twist.twist.linear.x -= human_to_global_twist.linear.x;
     transformed_human_twist.twist.linear.y -= human_to_global_twist.linear.y;
     transformed_human_twist.twist.angular.z -= human_to_global_twist.angular.z;
@@ -1703,7 +1721,7 @@ bool TebLocalPlannerROS::transformHumanPose(
     geometry_msgs::TransformStamped human_plan_to_global_transform;
     // tf.waitForTransform(global_frame, human_pose.header.frame_id, ros::Time(0),
                         // ros::Duration(0.5));
-    human_plan_to_global_transform = tf2.lookupTransform(global_frame, human_pose.header.frame_id, ros::Time::now(),
+    human_plan_to_global_transform = tf2.lookupTransform(global_frame, human_pose.header.frame_id, ros::Time(0),
                        ros::Duration(0.5));
     tf2::Stamped< tf2::Transform > human_plan_to_global_transform_;
     tf2::fromMsg(human_plan_to_global_transform,human_plan_to_global_transform_);
