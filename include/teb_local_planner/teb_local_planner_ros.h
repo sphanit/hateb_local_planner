@@ -76,6 +76,7 @@
 #include <std_srvs/Trigger.h>
 #include <std_srvs/TriggerRequest.h>
 #include <std_srvs/TriggerResponse.h>
+#include <hanp_msgs/StateArray.h>
 
 // transforms
 #include <tf2/utils.h>
@@ -101,8 +102,13 @@
 #include <boost/shared_ptr.hpp>
 
 
+// Backoff recovery
+#include <teb_local_planner/backoff.h>
+
+
 namespace teb_local_planner
 {
+enum HumanState {STATIC,MOVING,STOPPED,BLOCKED};
 
 /**
   * @class TebLocalPlannerROS
@@ -466,6 +472,7 @@ protected:
                    const ros::Time& time, const ros::Duration& averaging_interval,
                    geometry_msgs::Twist& twist) const;
 
+   // bool static isEqual(const std::pair<std::string, int>& element){return element.first ==  User.name;}
 
 private:
   // Definition of member variables
@@ -484,6 +491,7 @@ private:
   boost::shared_ptr<base_local_planner::CostmapModel> costmap_model_;
   TebConfig cfg_; //!< Config class that stores and manages all related parameters
   FailureDetector failure_detector_; //!< Detect if the robot got stucked
+  backoff::Backoff backoff_recovery_;
 
   std::vector<geometry_msgs::PoseStamped> global_plan_; //!< Store the current global plan
 
@@ -546,20 +554,27 @@ private:
   ros::Time last_position_time;
   int change_mode, isMode;
   std::vector<bool> human_still;
-  bool flag;
+  // std::vector<bool> stuck;
+  bool stuck;
+  bool sucs, reset_states;
+  bool flag, backed_flag;
   std::vector<std::pair<double,int>> dist_idx;
+  // std::map<double,int> dist_idx;
 
   std::string logs;
 
   std::vector<std::vector<double>> human_vels;
   std::vector<double> human_nominal_vels;
   std::map<uint64_t, std::vector<geometry_msgs::Point>> human_prev_pos_costmap;
+  int nearest_human_id;
 
   ros::Time last_omega_sign_change_;
   double last_omega_, min_dist_human;
+  std::vector<HumanState> humans_states_;
+  hanp_msgs::StateArray states_;
 
   ros::Subscriber human_pos_sub_;
-  ros::Publisher op_costs_pub_,robot_pose_pub_,time_to_goal_pub_, min_dist_human_pub_, robot_vel_pub_, expected_pose_pub_, log_pub_;
+  ros::Publisher op_costs_pub_,robot_pose_pub_,time_to_goal_pub_, min_dist_human_pub_, robot_vel_pub_, expected_pose_pub_, log_pub_, humans_states_pub_;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

@@ -220,6 +220,7 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
     time_to_goal_pub_ = nh.advertise<std_msgs::Float64>("time_to_goal",100);
     min_dist_human_pub_ = nh.advertise<std_msgs::Float64>("min_dist_human",100);
     expected_pose_pub_ = nh.advertise<geometry_msgs::Point>("expected_pose",100);
+    humans_states_pub_ = nh.advertise<hanp_msgs::StateArray>("humans_states",1);
     log_pub_ = nh.advertise<std_msgs::String>(HATEB_LOG,1);
     last_call_time_ = ros::Time::now() - ros::Duration(cfg_.hateb.pose_prediction_reset_time);
 
@@ -230,8 +231,15 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
     isDistMax = true;
     change_mode = 0;
     isMode = 0;
+    stuck = false;
     human_still.clear();
     flag = false;
+    backoff_recovery_.initialize(costmap_ros);
+    backed_flag = false;
+    sucs = true;
+    humans_states_.clear();
+    states_.states.clear();
+    reset_states = true;
 
     // set initialized flag
     initialized_ = true;
@@ -272,6 +280,7 @@ bool TebLocalPlannerROS::setPlan(const std::vector<geometry_msgs::PoseStamped>& 
 }
 
 void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_humans){
+  // std::cout << "I am checkdist" << '\n';
   //Code block for changing dynamic reconfigure
   // dynamic_reconfigure::ReconfigureRequest srv_req;
   // dynamic_reconfigure::ReconfigureResponse srv_resp;
@@ -302,7 +311,12 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
   // auto robot_radius = 0.300;
 
   int itr_idx = 0;
+
   for(auto &human: tracked_humans_.humans){
+    if(humans_states_.size()<tracked_humans_.humans.size()){
+      humans_states_.push_back(teb_local_planner::HumanState::STATIC);
+      states_.states.push_back(0);
+    }
     if(human_vels.size()< human.track_id){
       std::vector<double> h_vels;
       human_vels.push_back(h_vels);
@@ -313,7 +327,15 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
         Eigen::Vector2d hr_vec(xpos-segment.pose.pose.position.x,ypos-segment.pose.pose.position.y);
         human_dists.push_back(hr_vec.norm());
         humans_behind.push_back(hr_vec.dot(robot_vec));
-        human_vels[itr_idx].push_back(std::hypot(segment.twist.twist.linear.x, segment.twist.twist.linear.x));
+        human_vels[itr_idx].push_back(std::hypot(segment.twist.twist.linear.x, segment.twist.twist.linear.y));
+
+        if((abs(segment.twist.twist.linear.x)+abs(segment.twist.twist.linear.y)+abs(segment.twist.twist.angular.z)) > 0.0001){
+          if(humans_states_[itr_idx]!=teb_local_planner::HumanState::BLOCKED){
+            humans_states_[itr_idx] = teb_local_planner::HumanState::MOVING;
+            states_.states[itr_idx] = 1;
+          }
+            // std::cout << "segment.twist.twist.angular.z " << segment.twist.twist.angular.z<< '\n';
+        }
 
         auto n = human_vels[itr_idx].size();
         float average = 0.0f;
@@ -331,6 +353,7 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
   }
   ROS_INFO_ONCE("human_vels.size(), %d ", (int)human_vels.size());
 
+  human_still.clear();
   for(int i=0;i<prev_tracked_humans_.humans.size();i++){
     for (int j=0;j<prev_tracked_humans_.humans[i].segments.size();j++){
       if(prev_tracked_humans_.humans[i].segments[j].type==DEFAULT_HUMAN_SEGMENT){
@@ -339,10 +362,16 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
         hum_xpos.push_back(tracked_humans_.humans[i].segments[j].pose.pose.position.x);
         hum_ypos.push_back(tracked_humans_.humans[i].segments[j].pose.pose.position.y);
 
-        if(hum_move_dist<0.0001)
+        if(hum_move_dist<0.0001){
           human_still.push_back(true);
-        else
+          if(humans_states_[i]==teb_local_planner::HumanState::MOVING){
+            humans_states_[i] = teb_local_planner::HumanState::STOPPED;
+            states_.states[i] = 2;
+          }
+        }
+        else{
           human_still.push_back(false);
+        }
       }
     }
   }
@@ -357,13 +386,8 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
       isDistMax = false;
       dist_idx.push_back(std::make_pair(dist,i));
 
-      if(dist<=2.5){
-        isDistunderThreshold = true;
-        }
-      else{
-        isDistunderThreshold = false;
-      }
     }
+
     if(min_dist_human>dist)
       min_dist_human = dist;
     min_dist_human_pub_.publish(min_dist_human);
@@ -372,10 +396,18 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
   }
   std::sort(dist_idx.begin(),dist_idx.end());
 
+  if(human_dists[dist_idx[0].second-1]<=2.5){
+    isDistunderThreshold = true;
+    }
+  else{
+    isDistunderThreshold = false;
+  }
+
+
     auto human_radius = 0.25;
     if(isMode==1)
-      // human_radius = 0.08;
-      human_radius = 0.15;
+      human_radius = 0.08;
+      // human_radius = 0.15;
 
     for(int i=0;i<hum_xpos.size();i++){
     geometry_msgs::Point v1,v2,v3,v4;
@@ -440,6 +472,13 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     return mbf_msgs::ExePathResult::NOT_INITIALIZED;
   }
 
+  if(reset_states){
+    for(int i=0;i<states_.states.size();i++){
+      states_.states[i]=0;
+    }
+    reset_states=false;
+    // std::cout << "I am here" << '\n';
+  }
   static uint32_t seq = 0;
   cmd_vel.header.seq = seq++;
   cmd_vel.header.stamp = ros::Time::now();
@@ -456,7 +495,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   robot_pose_.toPoseMsg(robot_pos_msg);
   robot_pose_pub_.publish(robot_pos_msg);
   // std::cout << "last_robot_pose" <<last_robot_pose<< '\n';
-  if(std::hypot(robot_pose.pose.position.x-last_robot_pose.position.x, robot_pose.pose.position.y-last_robot_pose.position.y)>0.05){
+  if(std::hypot(robot_pose.pose.position.x-last_robot_pose.position.x, robot_pose.pose.position.y-last_robot_pose.position.y)>0.06){
     last_position_time = ros::Time::now();
     // if(change_mode<4)
     //   change_mode=0;
@@ -466,15 +505,26 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   last_robot_pose  = robot_pose.pose;
 
   if((ros::Time::now()-last_position_time).toSec()>=2.0){
-    if(human_still[dist_idx[0].second] && isDistunderThreshold){
-      if(change_mode==0)
+    if(human_still[dist_idx[0].second-1] && isDistunderThreshold && !stuck){
+      if(change_mode==0){
         ROS_INFO("I am stuck because of human, Changing to VelObs mode");
+        nearest_human_id = dist_idx[0].second;
+      }
       change_mode++;
       isMode = 1;
+
+      if(change_mode>20){
+        // ROS_INFO("I am stuck");
+        if(!stuck)
+          ROS_INFO("I am stuck");
+        stuck = true;
+        humans_states_[dist_idx[0].second-1] = teb_local_planner::HumanState::BLOCKED;
+        states_.states[dist_idx[0].second-1] = 3;
+      }
     }
-    // ROS_INFO_ONCE("I am stuck")
-    // std::cout << "(ros::Time::now()-last_position_time).toSec() " <<(ros::Time::now()-last_position_time).toSec() << '\n';
   }
+  // std::cout << "(ros::Time::now()-last_position_time).toSec() " <<(ros::Time::now()-last_position_time).toSec() << '\n';
+
 
   auto pose_get_time = ros::Time::now() - pose_get_start_time;
 
@@ -522,16 +572,14 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   double dx = global_goal.pose.position.x - robot_pose_.x();
   double dy = global_goal.pose.position.y - robot_pose_.y();
   double delta_orient = g2o::normalize_theta( tf2::getYaw(global_goal.pose.orientation) - robot_pose_.theta() );
+  // std::cout << "humans_states_[0]" <<humans_states_[0] << '\n';
   if(fabs(std::sqrt(dx*dx+dy*dy)) < cfg_.goal_tolerance.xy_goal_tolerance
     && fabs(delta_orient) < cfg_.goal_tolerance.yaw_goal_tolerance
-    && (!cfg_.goal_tolerance.complete_global_plan || via_points_.size() == 0))
+    && (!cfg_.goal_tolerance.complete_global_plan || via_points_.size() == 0) && sucs)
   {
     goal_reached_ = true;
-    change_mode = 0;
-    isMode  = 0;
-    flag = false;
-    human_still.clear();
-    isDistunderThreshold = false;
+    // reset_states = true;
+    // last_position_time = ros::Time::now();
     return mbf_msgs::ExePathResult::SUCCESS;
   }
 
@@ -589,15 +637,41 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   auto human_start_time = ros::Time::now();
   std::vector<HumanPlanCombined> transformed_human_plans;
   HumanPlanVelMap transformed_human_plan_vel_map;
+  humans_states_pub_.publish(states_);
+
   switch (cfg_.planning_mode) {
   case 0:
+    sucs = true;
     break;
   case 1: {
-    if(isDistMax || dist_idx.empty()){
+    bool found=false;
+    for(int i=0;i<2 && i<dist_idx.size();i++){
+      if(dist_idx[i].second==nearest_human_id)
+        found = true;
+    }
+    if(isDistMax || !found){
       updateHumanViaPointsContainers(transformed_human_plan_vel_map,
                                      cfg_.trajectory.global_plan_viapoint_sep);
+      if(backed_flag){
+        bool recov_suc = backoff_recovery_.setback_goal();
+        if (recov_suc){
+          isMode = 0;
+          change_mode = 0;
+          backed_flag = false;
+          stuck = false;
+        }
+      }
+      else
+        sucs = true;
       break;
     }
+
+    if(backoff_recovery_.NEW_GOAL){
+      sucs = true;
+      // std::cout << "backoff_recovery_.NEW_GOAL "<<backoff_recovery_.NEW_GOAL << '\n';
+    }
+
+    // std::cout << "isMode " <<isMode<< '\n';
 
     hanp_prediction::HumanPosePredict predict_srv;
     for(int i=0;i<2 && i<dist_idx.size();i++){
@@ -633,6 +707,19 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
       }
       predict_srv.request.type =
           hanp_prediction::HumanPosePredictRequest::VELOCITY_OBSTACLE;
+      //humans_states_[0]==teb_local_planner::HumanState::BLOCKED
+      if(!backed_flag && stuck){
+        backed_flag = backoff_recovery_.recovery();
+        sucs = false;
+      }
+
+      // if(!stuck){
+      //   sucs=true;
+      // }
+      // else{
+      //   sucs = backoff_recovery_.setback_goal();
+      // }
+      // std::cout << "stuck "<<backoff_recovery_.STUCK << '\n';
     }
 
     std_srvs::SetBool publish_predicted_markers_srv;
@@ -1046,6 +1133,17 @@ bool TebLocalPlannerROS::isGoalReached()
     planner_->clearPlanner();
     resetHumansPrediction();
     min_dist_human = std::numeric_limits<double>::infinity();
+    change_mode = 0;
+    isMode  = 0;
+    flag = false;
+    stuck = false;
+    sucs = true;
+    human_still.clear();
+    humans_states_.clear();
+    states_.states.clear();
+    isDistunderThreshold = false;
+    backed_flag =  false;
+    reset_states=true;
     return true;
   }
   return false;
