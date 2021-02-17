@@ -64,6 +64,9 @@
    last_flag = false;
    count = 0;
    orient = 0;
+   RAND_ROTATE=false;
+   last_time = ros::Time::now();
+   last_rot_time = ros::Time::now();
 
   ROS_DEBUG_NAMED(NODE_NAME, "node %s initialized", NODE_NAME);
  }
@@ -73,12 +76,14 @@
    if(reset_){
      current_goal_ = tmp_goal;
      NEW_GOAL = false;
+     // RAND_ROTATE = false;
      count = 0;
    }
    else if(current_goal_.header.stamp!=tmp_goal.header.stamp && exec_goal){
      if(!last_flag){
        current_goal_ = tmp_goal;
        NEW_GOAL = true;
+       // RAND_ROTATE = false;
        count = 0;
        exec_goal = false;
        last_time = ros::Time::now();
@@ -99,7 +104,6 @@
    reset_ = false;
    NEW_GOAL = false;
    // get robot pose
-   tf::StampedTransform robot_to_map_tf;
    bool transform_found = false;
    try {
      tf_.lookupTransform(MAP_FRAME_ID, ROBOT_FRAME_ID, ros::Time(0),
@@ -118,9 +122,10 @@
    }
    auto now = ros::Time::now();
 
-   tf::Transform start_pose_tr ,behind_tr, right_tr, left_tr, front_tr;
-
    if(transform_found){
+     start_pose_tr.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
+     start_pose_tr.setRotation(tf::createQuaternionFromYaw(0.0));
+     start_pose_tr = robot_to_map_tf * start_pose_tr;
 
      behind_tr.setOrigin(tf::Vector3(-0.5, 0.0, 0.0));
      behind_tr.setRotation(tf::createQuaternionFromYaw(0.0));
@@ -137,6 +142,7 @@
      tf::transformTFToMsg(behind_tr, behind_pose);
      tf::transformTFToMsg(right_tr, right_pose);
      tf::transformTFToMsg(left_tr, left_pose);
+     tf::transformTFToMsg(start_pose_tr, start_pose);
 
      // Another working way but throws errors
      //
@@ -148,9 +154,16 @@
      get_plan_srv.request.goal.header.stamp = now;
      get_plan_srv.request.goal.header.frame_id = MAP_FRAME_ID;
 
+     if(abs(prev_start_pose.translation.x-start_pose.translation.x)<0.001 && abs(prev_start_pose.translation.y-start_pose.translation.y)<0.001)
+       count++;
+     else
+       count=0;
+
+     prev_start_pose = start_pose;
+
      // make plan for robot
      if (get_plan_client_) {
-       behind_tr.setOrigin(tf::Vector3(-1.0, 0.0, 0.0));
+       behind_tr.setOrigin(tf::Vector3(-0.5, 0.0, 0.0));
        behind_tr.setRotation(tf::createQuaternionFromYaw(0.0));
        behind_tr = robot_to_map_tf * behind_tr;
        geometry_msgs::Transform temp_pose;
@@ -250,31 +263,28 @@
     if(costmap_->worldToMap(behind_pose.translation.x,behind_pose.translation.y,mx,my)){
       auto cost=costmap_->getCost(mx,my);
       if(cost == costmap_2d::FREE_SPACE){
-        // if(abs(goal_.pose.position.x-behind_pose.translation.x)<0.00001 && abs(goal_.pose.position.y-behind_pose.translation.y)<0.00001)
-        //   count++;
-        // else
-        //   count=0;
         goal_.pose.position.x = behind_pose.translation.x;
         goal_.pose.position.y = behind_pose.translation.y;
         goal_.pose.orientation = behind_pose.rotation;
 
         if(count>2){
-          double MIN = -0.05;
-          double MAX = 0.05;
-          orient = MIN + (double)(rand()) / ((double)(RAND_MAX/(MAX - MIN)));
-          // robot_to_map_tf
-          auto q_tr = robot_to_map_tf.getRotation();
-          geometry_msgs::Quaternion qt;
-          tf::quaternionTFToMsg(q_tr,qt);
-          auto pr_orient = tf2::getYaw(qt);
-          start_pose_tr.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
-          start_pose_tr.setRotation(tf::createQuaternionFromYaw(pr_orient+orient));
-          start_pose_tr = robot_to_map_tf * start_pose_tr;
-          tf::transformTFToMsg(start_pose_tr, start_pose);
-          goal_.pose.position.x = start_pose.translation.x;
-          goal_.pose.position.y = start_pose.translation.y;
-          goal_.pose.orientation = start_pose.rotation;
-          std::cout << "orient" <<orient<< '\n';
+          // double MIN = -0.05;
+          // double MAX = 0.05;
+          // orient = MIN + (double)(rand()) / ((double)(RAND_MAX/(MAX - MIN)));
+          // // robot_to_map_tf
+          // auto q_tr = robot_to_map_tf.getRotation();
+          // geometry_msgs::Quaternion qt;
+          // tf::quaternionTFToMsg(q_tr,qt);
+          // auto pr_orient = tf2::getYaw(qt);
+          // start_pose_tr.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
+          // start_pose_tr.setRotation(tf::createQuaternionFromYaw(pr_orient+orient));
+          // start_pose_tr = robot_to_map_tf * start_pose_tr;
+          // tf::transformTFToMsg(start_pose_tr, start_pose);
+          // goal_.pose.position.x = start_pose.translation.x;
+          // goal_.pose.position.y = start_pose.translation.y;
+          // goal_.pose.orientation = start_pose.rotation;
+          set_random_rotate();
+          // std::cout << "orient" <<orient<< '\n';
           count = 0;
         }
 
@@ -293,7 +303,46 @@
    goal_.header.stamp=ros::Time::now();
    goal_pub_.publish(goal_);
    reset_ = true;
+   // RAND_ROTATE = false;
    return true;
+ }
+
+
+ bool Backoff::set_random_rotate(){
+   double MIN = -0.05;
+   double MAX = 0.05;
+   orient = MIN + (double)(rand()) / ((double)(RAND_MAX/(MAX - MIN)));
+   // robot_to_map_tf
+   auto q_tr = robot_to_map_tf.getRotation();
+   geometry_msgs::Quaternion qt;
+   tf::quaternionTFToMsg(q_tr,qt);
+   auto pr_orient = tf2::getYaw(qt);
+   start_pose_tr.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
+   start_pose_tr.setRotation(tf::createQuaternionFromYaw(normalize_theta(pr_orient+orient)));
+   start_pose_tr = robot_to_map_tf * start_pose_tr;
+   tf::transformTFToMsg(start_pose_tr, start_pose);
+   goal_.pose.position.x = start_pose.translation.x;
+   goal_.pose.position.y = start_pose.translation.y;
+   goal_.pose.orientation = start_pose.rotation;
+   RAND_ROTATE = true;
+   last_rot_time = ros::Time::now();
+   goal_pub_.publish(goal_);
+   ROS_INFO("Setting Random rotation on base");
+   return true;
+ }
+
+ double Backoff::normalize_theta(double theta)
+ {
+   if (theta >= -M_PI && theta < M_PI)
+     return theta;
+
+   double multiplier = floor(theta / (2*M_PI));
+   theta = theta - multiplier*2*M_PI;
+   if (theta >= M_PI)
+     theta -= 2*M_PI;
+   if (theta < -M_PI)
+     theta += 2*M_PI;
+   return theta;
  }
 
  bool Backoff::check_new_goal(){
@@ -302,6 +351,14 @@
   }
   // std::cout << "(last_time-ros::Time::now()).toSec() " <<(last_time-ros::Time::now()).toSec()<< '\n';
    return NEW_GOAL;
+ }
+
+ bool Backoff::check_random_rot(){
+   if((ros::Time::now()-last_rot_time).toSec() > 10.0){
+    RAND_ROTATE = false;
+  }
+  // std::cout << "RAND_ROTATE " <<RAND_ROTATE<< '\n';
+  return RAND_ROTATE;
  }
 
 } // end namespace backoff

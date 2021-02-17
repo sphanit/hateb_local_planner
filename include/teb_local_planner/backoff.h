@@ -49,7 +49,7 @@
  #include <nav_msgs/GetPlan.h>
  #include <move_base_msgs/MoveBaseActionResult.h>
  #include <tf2/utils.h>
- 
+
 
  // #include <geometry_msgs/PoseStamped.h>
 
@@ -62,7 +62,10 @@
    bool recovery();
    bool setback_goal();
    bool check_new_goal();
+   bool set_random_rotate();
+   bool check_random_rot();
    bool NEW_GOAL;
+   bool RAND_ROTATE;
 
  private:
    geometry_msgs::PoseStamped goal_;
@@ -77,14 +80,17 @@
    ros::ServiceClient get_plan_client_;
    geometry_msgs::PoseStamped current_goal_;
    // move_base_msgs::MoveBaseActionResult g_res_;
-   geometry_msgs::Transform behind_pose, right_pose, left_pose, start_pose;
+   geometry_msgs::Transform behind_pose, right_pose, left_pose, start_pose, prev_start_pose;
    bool reset_;
    bool exec_goal, last_flag;
    int count;
-   ros::Time last_time;
+   ros::Time last_time, last_rot_time;
    double orient;
+   tf::Transform start_pose_tr ,behind_tr, right_tr, left_tr, front_tr;
+   tf::StampedTransform robot_to_map_tf;
 
    void currentgoalCB(const geometry_msgs::PoseStamped::ConstPtr &goal);
+   double normalize_theta(double theta);
    // void goalresultCB(const move_base_msgs::MoveBaseActionResult::ConstPtr &gres);
 
 };

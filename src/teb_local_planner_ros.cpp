@@ -316,6 +316,7 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
     if(humans_states_.size()<tracked_humans_.humans.size()){
       humans_states_.push_back(teb_local_planner::HumanState::STATIC);
       states_.states.push_back(0);
+      nearest_human_id = human.track_id;
     }
     if(human_vels.size()< human.track_id){
       std::vector<double> h_vels;
@@ -648,6 +649,9 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     for(int i=0;i<2 && i<dist_idx.size();i++){
       if(dist_idx[i].second==nearest_human_id)
         found = true;
+    }
+    if(backoff_recovery_.check_random_rot()){
+      found = true;
     }
     if(isDistMax || !found){
       updateHumanViaPointsContainers(transformed_human_plan_vel_map,
@@ -1016,16 +1020,17 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   bool feasible = planner_->isTrajectoryFeasible(costmap_model_.get(), footprint_spec_, robot_inscribed_radius_, robot_circumscribed_radius, cfg_.trajectory.feasibility_check_no_poses);
   if (!feasible)
   {
-    cmd_vel.twist.linear.x = cmd_vel.twist.linear.y = cmd_vel.twist.angular.z = 0;
-    // now we reset everything to start again with the initialization of new trajectories.
-    planner_->clearPlanner();
-    ROS_WARN("TebLocalPlannerROS: trajectory is not feasible. Resetting planner...");
+      cmd_vel.twist.linear.x = cmd_vel.twist.linear.y = cmd_vel.twist.angular.z = 0;
+      // now we reset everything to start again with the initialization of new trajectories.
+      planner_->clearPlanner();
+      ROS_WARN("TebLocalPlannerROS: trajectory is not feasible. Resetting planner...");
 
-    ++no_infeasible_plans_; // increase number of infeasible solutions in a row
-    time_last_infeasible_plan_ = ros::Time::now();
-    last_cmd_ = cmd_vel.twist;
-    message = "teb_local_planner trajectory is not feasible";
-    return mbf_msgs::ExePathResult::NO_VALID_CMD;
+      ++no_infeasible_plans_; // increase number of infeasible solutions in a row
+      time_last_infeasible_plan_ = ros::Time::now();
+      last_cmd_ = cmd_vel.twist;
+
+      message = "teb_local_planner trajectory is not feasible";
+      return mbf_msgs::ExePathResult::NO_VALID_CMD;
   }
   auto fsb_time = ros::Time::now() - fsb_start_time;
 
