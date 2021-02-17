@@ -48,6 +48,8 @@
  #include <costmap_2d/costmap_2d_ros.h>
  #include <nav_msgs/GetPlan.h>
  #include <move_base_msgs/MoveBaseActionResult.h>
+ #include <tf2/utils.h>
+ 
 
  // #include <geometry_msgs/PoseStamped.h>
 
@@ -59,6 +61,7 @@
    void initialize(costmap_2d::Costmap2DROS* costmap_ros);
    bool recovery();
    bool setback_goal();
+   bool check_new_goal();
    bool NEW_GOAL;
 
  private:
@@ -74,9 +77,12 @@
    ros::ServiceClient get_plan_client_;
    geometry_msgs::PoseStamped current_goal_;
    // move_base_msgs::MoveBaseActionResult g_res_;
-   geometry_msgs::Transform behind_pose, right_pose, left_pose;
+   geometry_msgs::Transform behind_pose, right_pose, left_pose, start_pose;
    bool reset_;
    bool exec_goal, last_flag;
+   int count;
+   ros::Time last_time;
+   double orient;
 
    void currentgoalCB(const geometry_msgs::PoseStamped::ConstPtr &goal);
    // void goalresultCB(const move_base_msgs::MoveBaseActionResult::ConstPtr &gres);

@@ -62,6 +62,8 @@
    exec_goal = false;
    NEW_GOAL = false;
    last_flag = false;
+   count = 0;
+   orient = 0;
 
   ROS_DEBUG_NAMED(NODE_NAME, "node %s initialized", NODE_NAME);
  }
@@ -71,11 +73,15 @@
    if(reset_){
      current_goal_ = tmp_goal;
      NEW_GOAL = false;
+     count = 0;
    }
    else if(current_goal_.header.stamp!=tmp_goal.header.stamp && exec_goal){
      if(!last_flag){
        current_goal_ = tmp_goal;
        NEW_GOAL = true;
+       count = 0;
+       exec_goal = false;
+       last_time = ros::Time::now();
      }
      last_flag = false;
    }
@@ -112,12 +118,9 @@
    }
    auto now = ros::Time::now();
 
-   if(transform_found){
+   tf::Transform start_pose_tr ,behind_tr, right_tr, left_tr, front_tr;
 
-     tf::Transform start_pose_tr ,behind_tr, right_tr, left_tr, front_tr;
-     start_pose_tr.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
-     start_pose_tr.setRotation(tf::createQuaternionFromYaw(0.0));
-     start_pose_tr = robot_to_map_tf * start_pose_tr;
+   if(transform_found){
 
      behind_tr.setOrigin(tf::Vector3(-0.5, 0.0, 0.0));
      behind_tr.setRotation(tf::createQuaternionFromYaw(0.0));
@@ -137,75 +140,83 @@
 
      // Another working way but throws errors
      //
-     // nav_msgs::GetPlan get_plan_srv;
-     // get_plan_srv.request.start.header.frame_id = MAP_FRAME_ID;
-     // get_plan_srv.request.start.header.stamp = now;
-     // tf::poseTFToMsg(robot_to_map_tf, get_plan_srv.request.start.pose);
-     //
-     // get_plan_srv.request.goal.header.stamp = now;
-     // get_plan_srv.request.goal.header.frame_id = MAP_FRAME_ID;
+     nav_msgs::GetPlan get_plan_srv;
+     get_plan_srv.request.start.header.frame_id = MAP_FRAME_ID;
+     get_plan_srv.request.start.header.stamp = now;
+     tf::poseTFToMsg(robot_to_map_tf, get_plan_srv.request.start.pose);
+
+     get_plan_srv.request.goal.header.stamp = now;
+     get_plan_srv.request.goal.header.frame_id = MAP_FRAME_ID;
 
      // make plan for robot
-     // if (get_plan_client_) {
-     //   get_plan_srv.request.goal.pose.position.x = right_pose.translation.x;
-     //   get_plan_srv.request.goal.pose.position.y = right_pose.translation.y;
-     //   get_plan_srv.request.goal.pose.position.z = right_pose.translation.z;
-     //   get_plan_srv.request.goal.pose.orientation = right_pose.rotation;
-     //   try{
-     //     get_plan_client_.call(get_plan_srv);
-     //
-     //     if (get_plan_srv.response.plan.poses.size() > 0) {
-     //      // ROS_INFO("feasible !!");
-     //      goal_pub_.publish(get_plan_srv.request.goal);
-     //      return true;
-     //     }
-     //     get_plan_srv.request.goal.pose.position.x = left_pose.translation.x;
-     //     get_plan_srv.request.goal.pose.position.y = left_pose.translation.y;
-     //     get_plan_srv.request.goal.pose.position.z = left_pose.translation.z;
-     //     get_plan_srv.request.goal.pose.orientation = left_pose.rotation;
-     //   }
-     //   catch (ros::Exception &e){
-     //     // ROS_ERROR("Error occured: %s ", e.what());
-     //     ROS_DEBUG("Right not feasible");
-     //   }
-     //
-     //   try {
-     //     get_plan_client_.call(get_plan_srv);
-     //
-     //     if (get_plan_srv.response.plan.poses.size() > 0) {
-     //      // ROS_INFO("feasible !!");
-     //      goal_pub_.publish(get_plan_srv.request.goal);
-     //      return true;
-     //     }
-     //     get_plan_srv.request.goal.pose.position.x = behind_pose.translation.x;
-     //     get_plan_srv.request.goal.pose.position.y = behind_pose.translation.y;
-     //     get_plan_srv.request.goal.pose.position.z = behind_pose.translation.z;
-     //     get_plan_srv.request.goal.pose.orientation = behind_pose.rotation;
-     //   }
-     //   catch (ros::Exception &e){
-     //     ROS_DEBUG("left not feasible");
-     //   }
-     //
-     //   if (get_plan_client_.call(get_plan_srv)) {
-     //     if (get_plan_srv.response.plan.poses.size() > 0) {
-     //      ROS_INFO("Going Back !!");
-     //      goal_pub_.publish(get_plan_srv.request.goal);
-     //      return false;
-     //     }
-     //   }
-     //
-     //   else {
-     //     ROS_WARN_NAMED(NODE_NAME, "Failed to call %s service",
-     //                    GET_PLAN_SRV_NAME);
-     //   }
-     //
-     // } else {
-     //   ROS_WARN_NAMED(NODE_NAME,
-     //                  "%s service does not exist, re-trying to subscribe",
-     //                  GET_PLAN_SRV_NAME);
-     //   ros::NodeHandle nh("~/");
-     //   get_plan_client_ = nh.serviceClient<nav_msgs::GetPlan>(GET_PLAN_SRV_NAME, true);
-     // }
+     if (get_plan_client_) {
+       behind_tr.setOrigin(tf::Vector3(-1.0, 0.0, 0.0));
+       behind_tr.setRotation(tf::createQuaternionFromYaw(0.0));
+       behind_tr = robot_to_map_tf * behind_tr;
+       geometry_msgs::Transform temp_pose;
+       tf::transformTFToMsg(behind_tr, temp_pose);
+
+       get_plan_srv.request.goal.pose.position.x = temp_pose.translation.x;
+       get_plan_srv.request.goal.pose.position.y = temp_pose.translation.y;
+       get_plan_srv.request.goal.pose.position.z = temp_pose.translation.z;
+       get_plan_srv.request.goal.pose.orientation = temp_pose.rotation;
+       // try{
+       //   get_plan_client_.call(get_plan_srv);
+       //
+       //   if (get_plan_srv.response.plan.poses.size() > 0) {
+       //    // ROS_INFO("feasible !!");
+       //    goal_pub_.publish(get_plan_srv.request.goal);
+       //    return true;
+       //   }
+       //   get_plan_srv.request.goal.pose.position.x = left_pose.translation.x;
+       //   get_plan_srv.request.goal.pose.position.y = left_pose.translation.y;
+       //   get_plan_srv.request.goal.pose.position.z = left_pose.translation.z;
+       //   get_plan_srv.request.goal.pose.orientation = left_pose.rotation;
+       // }
+       // catch (ros::Exception &e){
+       //   // ROS_ERROR("Error occured: %s ", e.what());
+       //   ROS_DEBUG("Right not feasible");
+       // }
+       //
+       // try {
+       //   get_plan_client_.call(get_plan_srv);
+       //
+       //   if (get_plan_srv.response.plan.poses.size() > 0) {
+       //    // ROS_INFO("feasible !!");
+       //    goal_pub_.publish(get_plan_srv.request.goal);
+       //    return true;
+       //   }
+       //   get_plan_srv.request.goal.pose.position.x = behind_pose.translation.x;
+       //   get_plan_srv.request.goal.pose.position.y = behind_pose.translation.y;
+       //   get_plan_srv.request.goal.pose.position.z = behind_pose.translation.z;
+       //   get_plan_srv.request.goal.pose.orientation = behind_pose.rotation;
+       // }
+       // catch (ros::Exception &e){
+       //   ROS_DEBUG("left not feasible");
+       // }
+
+       if (get_plan_client_.call(get_plan_srv)) {
+         if (get_plan_srv.response.plan.poses.size() > 0) {
+          // ROS_INFO("Going Back !!");
+          // goal_pub_.publish(get_plan_srv.request.goal);
+          // return false;
+         }
+         else
+          count = 10;
+       }
+
+       else {
+         ROS_WARN_NAMED(NODE_NAME, "Failed to call %s service",
+                        GET_PLAN_SRV_NAME);
+       }
+
+     } else {
+       ROS_WARN_NAMED(NODE_NAME,
+                      "%s service does not exist, re-trying to subscribe",
+                      GET_PLAN_SRV_NAME);
+       ros::NodeHandle nh("~/");
+       get_plan_client_ = nh.serviceClient<nav_msgs::GetPlan>(GET_PLAN_SRV_NAME, true);
+     }
  }
     unsigned int mx,my;
     goal_.header.frame_id = MAP_FRAME_ID;
@@ -239,13 +250,39 @@
     if(costmap_->worldToMap(behind_pose.translation.x,behind_pose.translation.y,mx,my)){
       auto cost=costmap_->getCost(mx,my);
       if(cost == costmap_2d::FREE_SPACE){
+        // if(abs(goal_.pose.position.x-behind_pose.translation.x)<0.00001 && abs(goal_.pose.position.y-behind_pose.translation.y)<0.00001)
+        //   count++;
+        // else
+        //   count=0;
         goal_.pose.position.x = behind_pose.translation.x;
         goal_.pose.position.y = behind_pose.translation.y;
         goal_.pose.orientation = behind_pose.rotation;
+
+        if(count>2){
+          double MIN = -0.05;
+          double MAX = 0.05;
+          orient = MIN + (double)(rand()) / ((double)(RAND_MAX/(MAX - MIN)));
+          // robot_to_map_tf
+          auto q_tr = robot_to_map_tf.getRotation();
+          geometry_msgs::Quaternion qt;
+          tf::quaternionTFToMsg(q_tr,qt);
+          auto pr_orient = tf2::getYaw(qt);
+          start_pose_tr.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
+          start_pose_tr.setRotation(tf::createQuaternionFromYaw(pr_orient+orient));
+          start_pose_tr = robot_to_map_tf * start_pose_tr;
+          tf::transformTFToMsg(start_pose_tr, start_pose);
+          goal_.pose.position.x = start_pose.translation.x;
+          goal_.pose.position.y = start_pose.translation.y;
+          goal_.pose.orientation = start_pose.rotation;
+          std::cout << "orient" <<orient<< '\n';
+          count = 0;
+        }
+
         goal_pub_.publish(goal_);
         exec_goal = false;
         return false;
       }
+
     }
 
     return false;
@@ -257,6 +294,14 @@
    goal_pub_.publish(goal_);
    reset_ = true;
    return true;
+ }
+
+ bool Backoff::check_new_goal(){
+   if((ros::Time::now()-last_time).toSec() > 0.5){
+    NEW_GOAL = false;
+  }
+  // std::cout << "(last_time-ros::Time::now()).toSec() " <<(last_time-ros::Time::now()).toSec()<< '\n';
+   return NEW_GOAL;
  }
 
 } // end namespace backoff

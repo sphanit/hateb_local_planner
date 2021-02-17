@@ -666,8 +666,12 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
       break;
     }
 
-    if(backoff_recovery_.NEW_GOAL){
+    if(backoff_recovery_.check_new_goal()){
       sucs = true;
+      isMode = 0;
+      change_mode = 0;
+      backed_flag = false;
+      stuck = false;
       // std::cout << "backoff_recovery_.NEW_GOAL "<<backoff_recovery_.NEW_GOAL << '\n';
     }
 
