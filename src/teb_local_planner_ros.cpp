@@ -360,8 +360,15 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
       if(prev_tracked_humans_.humans[i].segments[j].type==DEFAULT_HUMAN_SEGMENT){
         double hum_move_dist = std::hypot(tracked_humans_.humans[i].segments[j].pose.pose.position.x-prev_tracked_humans_.humans[i].segments[j].pose.pose.position.x,
                                           tracked_humans_.humans[i].segments[j].pose.pose.position.y-prev_tracked_humans_.humans[i].segments[j].pose.pose.position.y);
-        hum_xpos.push_back(tracked_humans_.humans[i].segments[j].pose.pose.position.x);
-        hum_ypos.push_back(tracked_humans_.humans[i].segments[j].pose.pose.position.y);
+
+        auto tm_x = tracked_humans_.humans[i].segments[j].pose.pose.position.x;
+        auto tm_y = tracked_humans_.humans[i].segments[j].pose.pose.position.y;
+
+        hum_xpos.push_back(tm_x);
+        hum_ypos.push_back(tm_y);
+        auto n_dist = std::hypot(tm_y - ypos,tm_x - xpos);
+        ang_theta = std::atan2((tm_y - ypos)/n_dist, (tm_x - xpos)/n_dist);
+        // std::cout << "ang_theta "<<ang_theta  << '\n';
 
         if(hum_move_dist<0.0001){
           human_still.push_back(true);
@@ -383,7 +390,7 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
   isDistMax = true;
   for(auto &dist: human_dists){
     // std::cout << "dist " << dist << '\n';
-    if(dist<10.0 && humans_behind[i-1] <= 0){
+    if(dist<10.0 && humans_behind[i-1] <= 0 && humans_states_[i-1]>0){
       isDistMax = false;
       dist_idx.push_back(std::make_pair(dist,i));
 
@@ -717,7 +724,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
           hanp_prediction::HumanPosePredictRequest::VELOCITY_OBSTACLE;
       //humans_states_[0]==teb_local_planner::HumanState::BLOCKED
       if(!backed_flag && stuck){
-        backed_flag = backoff_recovery_.recovery();
+        backed_flag = backoff_recovery_.recovery(ang_theta);
         sucs = false;
       }
 

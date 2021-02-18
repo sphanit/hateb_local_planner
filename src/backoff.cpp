@@ -100,7 +100,7 @@
  //   }
  // }
 
- bool Backoff::recovery(){
+ bool Backoff::recovery(double ang_theta){
    reset_ = false;
    NEW_GOAL = false;
    // get robot pose
@@ -154,10 +154,11 @@
      get_plan_srv.request.goal.header.stamp = now;
      get_plan_srv.request.goal.header.frame_id = MAP_FRAME_ID;
 
-     if(abs(prev_start_pose.translation.x-start_pose.translation.x)<0.001 && abs(prev_start_pose.translation.y-start_pose.translation.y)<0.001)
+     if(abs(prev_start_pose.translation.x-start_pose.translation.x)<0.01 && abs(prev_start_pose.translation.y-start_pose.translation.y)<0.01)
        count++;
      else
        count=0;
+     // std::cout << "count " <<count<< '\n';
 
      prev_start_pose = start_pose;
 
@@ -234,7 +235,7 @@
     unsigned int mx,my;
     goal_.header.frame_id = MAP_FRAME_ID;
     goal_.header.stamp = now;
-
+    // std::cout << "I have reached to step 1" << '\n';
     if(costmap_->worldToMap(right_pose.translation.x,right_pose.translation.y,mx,my)){
       auto cost=costmap_->getCost(mx,my);
       if(cost == costmap_2d::FREE_SPACE && !exec_goal){
@@ -244,9 +245,12 @@
         goal_pub_.publish(goal_);
         exec_goal = true;
         last_flag = true;
+        // std::cout << "I have reached to step 1.1" << '\n';
         return true;
       }
     }
+    // std::cout << "I have reached to step 2" << '\n';
+
     if(costmap_->worldToMap(left_pose.translation.x,left_pose.translation.y,mx,my)){
       auto cost=costmap_->getCost(mx,my);
       if(cost == costmap_2d::FREE_SPACE && !exec_goal){
@@ -259,35 +263,47 @@
         return true;
       }
     }
+    // std::cout << "I have reached to step 3" << '\n';
 
     if(costmap_->worldToMap(behind_pose.translation.x,behind_pose.translation.y,mx,my)){
       auto cost=costmap_->getCost(mx,my);
+      // std::cout << "I have reached to step 4" << '\n';
+
       if(cost == costmap_2d::FREE_SPACE){
         goal_.pose.position.x = behind_pose.translation.x;
         goal_.pose.position.y = behind_pose.translation.y;
         goal_.pose.orientation = behind_pose.rotation;
+        // std::cout << "I have reached to step 5" << '\n';
 
-        if(count>2){
-          // double MIN = -0.05;
-          // double MAX = 0.05;
-          // orient = MIN + (double)(rand()) / ((double)(RAND_MAX/(MAX - MIN)));
-          // // robot_to_map_tf
-          // auto q_tr = robot_to_map_tf.getRotation();
-          // geometry_msgs::Quaternion qt;
-          // tf::quaternionTFToMsg(q_tr,qt);
-          // auto pr_orient = tf2::getYaw(qt);
-          // start_pose_tr.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
-          // start_pose_tr.setRotation(tf::createQuaternionFromYaw(pr_orient+orient));
-          // start_pose_tr = robot_to_map_tf * start_pose_tr;
-          // tf::transformTFToMsg(start_pose_tr, start_pose);
-          // goal_.pose.position.x = start_pose.translation.x;
-          // goal_.pose.position.y = start_pose.translation.y;
-          // goal_.pose.orientation = start_pose.rotation;
-          set_random_rotate();
-          // std::cout << "orient" <<orient<< '\n';
+        if(count>1){
+          set_random_rotate(ang_theta);
+          // std::cout << "orient" <<ang_theta<< '\n';
           count = 0;
         }
 
+        goal_pub_.publish(goal_);
+        exec_goal = false;
+        return false;
+      }
+      else if(count>2){
+        // double MIN = -0.05;
+        // double MAX = 0.05;
+        // orient = MIN + (double)(rand()) / ((double)(RAND_MAX/(MAX - MIN)));
+        // // robot_to_map_tf
+        // auto q_tr = robot_to_map_tf.getRotation();
+        // geometry_msgs::Quaternion qt;
+        // tf::quaternionTFToMsg(q_tr,qt);
+        // auto pr_orient = tf2::getYaw(qt);
+        // start_pose_tr.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
+        // start_pose_tr.setRotation(tf::createQuaternionFromYaw(pr_orient+orient));
+        // start_pose_tr = robot_to_map_tf * start_pose_tr;
+        // tf::transformTFToMsg(start_pose_tr, start_pose);
+        // goal_.pose.position.x = start_pose.translation.x;
+        // goal_.pose.position.y = start_pose.translation.y;
+        // goal_.pose.orientation = start_pose.rotation;
+        set_random_rotate(ang_theta);
+        // std::cout << "orient" <<ang_theta<< '\n';
+        count = 0;
         goal_pub_.publish(goal_);
         exec_goal = false;
         return false;
@@ -308,18 +324,20 @@
  }
 
 
- bool Backoff::set_random_rotate(){
-   double MIN = -0.05;
-   double MAX = 0.05;
-   orient = MIN + (double)(rand()) / ((double)(RAND_MAX/(MAX - MIN)));
-   // robot_to_map_tf
-   auto q_tr = robot_to_map_tf.getRotation();
-   geometry_msgs::Quaternion qt;
-   tf::quaternionTFToMsg(q_tr,qt);
-   auto pr_orient = tf2::getYaw(qt);
-   start_pose_tr.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
-   start_pose_tr.setRotation(tf::createQuaternionFromYaw(normalize_theta(pr_orient+orient)));
+ bool Backoff::set_random_rotate(double ang_theta){
+   // double MIN = -0.05;
+   // double MAX = 0.05;
+   // orient = MIN + (double)(rand()) / ((double)(RAND_MAX/(MAX - MIN)));
+   // auto q_tr = robot_to_map_tf.getRotation();
+   // geometry_msgs::Quaternion qt;
+   // tf::quaternionTFToMsg(q_tr,qt);
+   // auto pr_orient = tf2::getYaw(qt);
+   // start_pose_tr.setRotation(tf::createQuaternionFromYaw(normalize_theta(pr_orient+orient)));
+
+   start_pose_tr.setOrigin(tf::Vector3(0.1, 0.0, 0.0));
+   start_pose_tr.setRotation(tf::createQuaternionFromYaw(0.0));
    start_pose_tr = robot_to_map_tf * start_pose_tr;
+   start_pose_tr.setRotation(tf::createQuaternionFromYaw(ang_theta));
    tf::transformTFToMsg(start_pose_tr, start_pose);
    goal_.pose.position.x = start_pose.translation.x;
    goal_.pose.position.y = start_pose.translation.y;
@@ -327,7 +345,7 @@
    RAND_ROTATE = true;
    last_rot_time = ros::Time::now();
    goal_pub_.publish(goal_);
-   ROS_INFO("Setting Random rotation on base");
+   ROS_INFO("Setting robot in proper orientation = %f",ang_theta);
    return true;
  }
 

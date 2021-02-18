@@ -59,10 +59,10 @@
    Backoff();
    ~Backoff();
    void initialize(costmap_2d::Costmap2DROS* costmap_ros);
-   bool recovery();
+   bool recovery(double ang_theta);
    bool setback_goal();
    bool check_new_goal();
-   bool set_random_rotate();
+   bool set_random_rotate(double ang_theta);
    bool check_random_rot();
    bool NEW_GOAL;
    bool RAND_ROTATE;
