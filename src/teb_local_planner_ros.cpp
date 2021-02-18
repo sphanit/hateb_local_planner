@@ -388,12 +388,11 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
   int i=1;
   dist_idx.clear();
   isDistMax = true;
+  // std::cout << "humans_states_ " <<humans_states_[0]<< '\n';
   for(auto &dist: human_dists){
-    // std::cout << "dist " << dist << '\n';
-    if(dist<10.0 && humans_behind[i-1] <= 0 && humans_states_[i-1]>0){
+    if(dist<10.0 && humans_behind[i-1] <= 0 && humans_states_[i-1] >0){
       isDistMax = false;
       dist_idx.push_back(std::make_pair(dist,i));
-
     }
 
     if(min_dist_human>dist)
@@ -402,13 +401,16 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
 
     i++;
   }
-  std::sort(dist_idx.begin(),dist_idx.end());
 
-  if(human_dists[dist_idx[0].second-1]<=2.5){
-    isDistunderThreshold = true;
+  if(dist_idx.size()>0){
+    std::sort(dist_idx.begin(),dist_idx.end());
+
+    if(human_dists[dist_idx[0].second-1]<=2.5){
+      isDistunderThreshold = true;
+      }
+    else{
+      isDistunderThreshold = false;
     }
-  else{
-    isDistunderThreshold = false;
   }
 
 
