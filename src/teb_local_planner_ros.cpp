@@ -316,7 +316,6 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
     if(humans_states_.size()<tracked_humans_.humans.size()){
       humans_states_.push_back(teb_local_planner::HumanState::STATIC);
       states_.states.push_back(0);
-      nearest_human_id = human.track_id;
     }
     if(human_vels.size()< human.track_id){
       std::vector<double> h_vels;
@@ -388,9 +387,9 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
   int i=1;
   dist_idx.clear();
   isDistMax = true;
-  // std::cout << "humans_states_ " <<humans_states_[0]<< '\n';
   for(auto &dist: human_dists){
-    if(dist<10.0 && humans_behind[i-1] <= 0 && humans_states_[i-1] >0){
+    // std::cout << "humans_states_ " <<humans_states_[i-1]<< '\n';
+    if(dist<10.0 && humans_behind[i-1] <= 0){
       isDistMax = false;
       dist_idx.push_back(std::make_pair(dist,i));
     }
@@ -402,8 +401,10 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
     i++;
   }
 
+  // std::cout << "dist_idx.size() " <<dist_idx.size()<< '\n';
   if(dist_idx.size()>0){
     std::sort(dist_idx.begin(),dist_idx.end());
+    nearest_human_id = dist_idx[0].second;
 
     if(human_dists[dist_idx[0].second-1]<=2.5){
       isDistunderThreshold = true;
@@ -515,24 +516,29 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   last_robot_pose  = robot_pose.pose;
 
   if((ros::Time::now()-last_position_time).toSec()>=2.0){
-    if(human_still[dist_idx[0].second-1] && isDistunderThreshold && !stuck){
-      if(change_mode==0){
-        ROS_INFO("I am stuck because of human, Changing to VelObs mode");
-        nearest_human_id = dist_idx[0].second;
-      }
-      change_mode++;
-      isMode = 1;
+    if(dist_idx.size()>0){
+      if(human_still[dist_idx[0].second-1] && isDistunderThreshold && !stuck){
+        if(change_mode==0){
+          ROS_INFO("I am stuck because of human, Changing to VelObs mode");
+        }
+        change_mode++;
+        isMode = 1;
 
-      if(change_mode>20){
-        // ROS_INFO("I am stuck");
-        if(!stuck)
-          ROS_INFO("I am stuck");
-        stuck = true;
-        humans_states_[dist_idx[0].second-1] = teb_local_planner::HumanState::BLOCKED;
-        states_.states[dist_idx[0].second-1] = 3;
+        if(change_mode>20){
+          // ROS_INFO("I am stuck");
+          if(!stuck)
+            ROS_INFO("I am stuck");
+          stuck = true;
+          humans_states_[dist_idx[0].second-1] = teb_local_planner::HumanState::BLOCKED;
+          states_.states[dist_idx[0].second-1] = 3;
+          stuck_human_id = dist_idx[0].second;
+        }
       }
     }
   }
+
+  if(!stuck)
+    stuck_human_id=-1;
   // std::cout << "(ros::Time::now()-last_position_time).toSec() " <<(ros::Time::now()-last_position_time).toSec() << '\n';
 
 
@@ -654,28 +660,42 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     sucs = true;
     break;
   case 1: {
-    bool found=false;
-    for(int i=0;i<2 && i<dist_idx.size();i++){
-      if(dist_idx[i].second==nearest_human_id)
-        found = true;
+    bool found=true;
+
+    if(stuck_human_id!=-1){
+      if(dist_idx.size()>=2){
+        if((dist_idx[0].second==stuck_human_id || dist_idx[1].second==stuck_human_id))
+          found = true;
+        else
+          found = false;
+      }
+      else if(dist_idx.size()>0){
+        if(dist_idx[0].second!=stuck_human_id)
+          found = false;
+      }
     }
+
     if(backoff_recovery_.check_random_rot()){
-      found = true;
+      found = false;
     }
+
     if(isDistMax || !found){
+      if(dist_idx.size() > 0){
       updateHumanViaPointsContainers(transformed_human_plan_vel_map,
                                      cfg_.trajectory.global_plan_viapoint_sep);
-      if(backed_flag){
-        bool recov_suc = backoff_recovery_.setback_goal();
-        if (recov_suc){
-          isMode = 0;
-          change_mode = 0;
-          backed_flag = false;
-          stuck = false;
-        }
       }
-      else
-        sucs = true;
+        if(backed_flag){
+          bool recov_suc = backoff_recovery_.setback_goal();
+          if (recov_suc){
+            isMode = 0;
+            change_mode = 0;
+            backed_flag = false;
+            stuck = false;
+          }
+        }
+        else
+          sucs = true;
+
       break;
     }
 
@@ -688,11 +708,12 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
       // std::cout << "backoff_recovery_.NEW_GOAL "<<backoff_recovery_.NEW_GOAL << '\n';
     }
 
-    // std::cout << "isMode " <<isMode<< '\n';
-
     hanp_prediction::HumanPosePredict predict_srv;
     for(int i=0;i<2 && i<dist_idx.size();i++){
-      predict_srv.request.ids.push_back(dist_idx[i].second);
+      // std::cout << "states_.states[i].size() " <<(int)states_.states[dist_idx[i].second-1]<< '\n';
+      if((int)states_.states[dist_idx[i].second-1]>0){
+        predict_srv.request.ids.push_back(dist_idx[i].second);
+      }
     }
 
     if (cfg_.hateb.use_external_prediction && change_mode<1) {

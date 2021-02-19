@@ -566,7 +566,7 @@ private:
   std::vector<std::vector<double>> human_vels;
   std::vector<double> human_nominal_vels;
   std::map<uint64_t, std::vector<geometry_msgs::Point>> human_prev_pos_costmap;
-  int nearest_human_id;
+  int nearest_human_id,stuck_human_id;
   double ang_theta;
 
   ros::Time last_omega_sign_change_;
