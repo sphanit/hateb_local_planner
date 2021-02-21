@@ -112,6 +112,7 @@ void TebVisualization::initialize(ros::NodeHandle& nh, const TebConfig& cfg)
       nh.advertise<hanp_msgs::HumanTimeToGoalArray>(HUMAN_PATHS_TIME_TOPIC, 1);
   marker_pub = nh.advertise<visualization_msgs::MarkerArray>("human_test_marker", 1);
   arrow_pub = nh.advertise<visualization_msgs::MarkerArray>("human_test_arrow", 1);
+  mode_text_pub = nh.advertise<visualization_msgs::Marker>("mode_text", 1);
   robot_next_pose_pub_ = nh.advertise<geometry_msgs::PoseStamped>("robot_next_pose", 1);
   human_next_pose_pub_ = nh.advertise<geometry_msgs::PoseStamped>("human_next_pose", 1);
 
@@ -618,6 +619,49 @@ void TebVisualization::publishHumanTrajectories(
   }
 }
 
+void TebVisualization::publishMode(int Mode, geometry_msgs::Transform robot_pose){
+  visualization_msgs::Marker mode_text;
+  mode_text.header.frame_id = "map";
+  mode_text.header.stamp = ros::Time::now();
+  mode_text.ns = "mode";
+  mode_text.id = 1;
+  mode_text.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+  mode_text.action = visualization_msgs::Marker::ADD;
+  mode_text.pose.position.x = robot_pose.translation.x;
+  mode_text.pose.position.y = robot_pose.translation.y;
+  mode_text.pose.position.z = 2.0;
+  mode_text.pose.orientation = robot_pose.rotation;
+  // mode_text.pose.orientation.x = 0.0;
+  // mode_text.pose.orientation.y = 0.0;
+  // mode_text.pose.orientation.z = 0.0;
+  // mode_text.pose.orientation.w = 1.0;
+
+  if(Mode==-1)
+    mode_text.text = "SingleBand";
+  else if(Mode == 0)
+    mode_text.text = "DualBand";
+  else if(Mode == 1)
+    mode_text.text = "VelObs";
+  else if(Mode == 2)
+    mode_text.text = "Backoff";
+  else
+    mode_text.text = "No Mode yet";
+
+  mode_text.scale.x = 10.0;
+  mode_text.scale.y = 10.0;
+  mode_text.scale.z = 0.3;
+
+  // Set the color -- be sure to set alpha to something non-zero!
+  mode_text.color.r = 0.0f;
+  mode_text.color.g = 0.0f;
+  mode_text.color.b = 0.0f;
+  mode_text.color.a = 0.9;
+
+  mode_text.lifetime = ros::Duration(2.0);
+  mode_text_pub.publish(mode_text);
+
+}
+
 void TebVisualization::publishTestHumans(const hanp_msgs::TrackedHumansConstPtr &humans){
   visualization_msgs::MarkerArray marker_arr,arrow_arr;
 
@@ -677,8 +721,8 @@ void TebVisualization::publishTestHumans(const hanp_msgs::TrackedHumansConstPtr 
           arrow.color.b = 0.0f;
           arrow.color.a = 1.0;
 
-          marker.lifetime = ros::Duration();
-          arrow.lifetime = ros::Duration();
+          marker.lifetime = ros::Duration(2.0);
+          arrow.lifetime = ros::Duration(2.0);
           marker_arr.markers.push_back(marker);
           arrow_arr.markers.push_back(arrow);
           i++;

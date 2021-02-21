@@ -366,7 +366,8 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
         hum_xpos.push_back(tm_x);
         hum_ypos.push_back(tm_y);
         auto n_dist = std::hypot(tm_y - ypos,tm_x - xpos);
-        ang_theta = std::atan2((tm_y - ypos)/n_dist, (tm_x - xpos)/n_dist);
+        if(tracked_humans_.humans[i].track_id == stuck_human_id)
+          ang_theta = std::atan2((tm_y - ypos)/n_dist, (tm_x - xpos)/n_dist);
         // std::cout << "ang_theta "<<ang_theta  << '\n';
 
         if(hum_move_dist<0.0001){
@@ -416,7 +417,7 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
 
 
     auto human_radius = 0.25;
-    if(isMode==1)
+    if(isMode>=1)
       human_radius = 0.08;
       // human_radius = 0.15;
 
@@ -532,6 +533,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
           humans_states_[dist_idx[0].second-1] = teb_local_planner::HumanState::BLOCKED;
           states_.states[dist_idx[0].second-1] = 3;
           stuck_human_id = dist_idx[0].second;
+          isMode = 2;
         }
       }
     }
@@ -676,7 +678,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     }
 
     if(backoff_recovery_.check_random_rot()){
-      found = false;
+      break;
     }
 
     if(isDistMax || !found){
@@ -709,10 +711,14 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     }
 
     hanp_prediction::HumanPosePredict predict_srv;
+    if(isMode==0)
+      isMode = -1;
     for(int i=0;i<2 && i<dist_idx.size();i++){
       // std::cout << "states_.states[i].size() " <<(int)states_.states[dist_idx[i].second-1]<< '\n';
       if((int)states_.states[dist_idx[i].second-1]>0){
         predict_srv.request.ids.push_back(dist_idx[i].second);
+        if(isMode==-1)
+          isMode = 0;
       }
     }
 
@@ -938,7 +944,19 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   default:
     break;
   }
-  std::string mode = isMode ? "SingleBand":"DualBand";
+  std::string mode;
+  if(isMode==0 && isDistMax){
+    mode = "SingleBand";
+  }
+  else if(isMode==0){
+    mode = "DualBand";
+  }
+  else if(isMode == 1){
+    mode = "VelObs";
+  }
+  else if(isMode == 2){
+    mode = "Backoff";
+  }
   logs+="Mode: " + mode+", ";
   log_pub_.publish(logs);
 
@@ -1126,6 +1144,11 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   visualization_->publishObstacles(obstacles_);
   visualization_->publishViaPoints(via_points_);
   visualization_->publishGlobalPlan(global_plan_);
+  if(isDistMax)
+    visualization_->publishMode(-1, backoff_recovery_.get_behind_pose());
+  else
+    visualization_->publishMode(isMode, backoff_recovery_.get_behind_pose());
+
   auto viz_time = ros::Time::now() - viz_start_time;
   // std::cout << "I am out of visualization" << '\n';
   auto total_time = ros::Time::now() - start_time;

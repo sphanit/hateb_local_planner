@@ -349,6 +349,34 @@
    return true;
  }
 
+ geometry_msgs::Transform Backoff::get_behind_pose(){
+   bool transform_found = false;
+   try {
+     tf_.lookupTransform(MAP_FRAME_ID, ROBOT_FRAME_ID, ros::Time(0),
+                         robot_to_map_tf);
+     transform_found = true;
+   } catch (tf::LookupException &ex) {
+     ROS_ERROR_NAMED(NODE_NAME, "No Transform available Error: %s\n",
+                     ex.what());
+   } catch (tf::ConnectivityException &ex) {
+     ROS_ERROR_NAMED(NODE_NAME, "Connectivity Error: %s\n", ex.what());
+   } catch (tf::ExtrapolationException &ex) {
+     ROS_ERROR_NAMED(NODE_NAME, "Extrapolation Error: %s\n", ex.what());
+   }
+   catch(...){
+     std::cout << "Something else" << '\n';
+   }
+
+   geometry_msgs::Transform beh_pose;
+   if(transform_found){
+     start_pose_tr.setOrigin(tf::Vector3(-1.0, 0.0, 0.0));
+     start_pose_tr.setRotation(tf::createQuaternionFromYaw(0.0));
+     start_pose_tr = robot_to_map_tf * start_pose_tr;
+     tf::transformTFToMsg(start_pose_tr, beh_pose);
+   }
+   return beh_pose;
+ }
+
  double Backoff::normalize_theta(double theta)
  {
    if (theta >= -M_PI && theta < M_PI)
@@ -372,7 +400,7 @@
  }
 
  bool Backoff::check_random_rot(){
-   if((ros::Time::now()-last_rot_time).toSec() > 10.0){
+   if((ros::Time::now()-last_rot_time).toSec() > 1.0){
     RAND_ROTATE = false;
   }
   // std::cout << "RAND_ROTATE " <<RAND_ROTATE<< '\n';

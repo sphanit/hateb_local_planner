@@ -64,6 +64,7 @@
    bool check_new_goal();
    bool set_random_rotate(double ang_theta);
    bool check_random_rot();
+   geometry_msgs::Transform get_behind_pose();
    bool NEW_GOAL;
    bool RAND_ROTATE;
 
