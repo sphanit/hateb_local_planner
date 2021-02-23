@@ -300,6 +300,7 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
   tracked_humans_ = tracked_humans;
   std::vector<double> human_dists;
   std::vector<double> humans_behind;
+  // std::vector<bool> humans_behind_ids;
 
   auto xpos = robot_pos_msg.position.x;
   auto ypos = robot_pos_msg.position.y;
@@ -315,7 +316,7 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
   for(auto &human: tracked_humans_.humans){
     if(humans_states_.size()<tracked_humans_.humans.size()){
       humans_states_.push_back(teb_local_planner::HumanState::STATIC);
-      states_.states.push_back(0);
+      states_.states.push_back(9);
     }
     if(human_vels.size()< human.track_id){
       std::vector<double> h_vels;
@@ -325,8 +326,10 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
     for (auto &segment : human.segments){
       if(segment.type==DEFAULT_HUMAN_SEGMENT){
         Eigen::Vector2d hr_vec(xpos-segment.pose.pose.position.x,ypos-segment.pose.pose.position.y);
-        human_dists.push_back(hr_vec.norm());
+
         humans_behind.push_back(hr_vec.dot(robot_vec));
+        human_dists.push_back(hr_vec.norm());
+
         human_vels[itr_idx].push_back(std::hypot(segment.twist.twist.linear.x, segment.twist.twist.linear.y));
 
         if((abs(segment.twist.twist.linear.x)+abs(segment.twist.twist.linear.y)+abs(segment.twist.twist.angular.z)) > 0.0001){
@@ -385,21 +388,19 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
   }
   prev_tracked_humans_ = tracked_humans_;
 
-  int i=1;
+
   dist_idx.clear();
   isDistMax = true;
-  for(auto &dist: human_dists){
-    // std::cout << "humans_states_ " <<humans_states_[i-1]<< '\n';
-    if(dist<10.0 && humans_behind[i-1] <= 0){
+  for(int i=0;i<human_dists.size();i++){
+    auto dist = human_dists[i];
+    if(dist<10.0 && humans_behind[i] <= 0.1){
       isDistMax = false;
-      dist_idx.push_back(std::make_pair(dist,i));
+      dist_idx.push_back(std::make_pair(dist,i+1));
     }
 
     if(min_dist_human>dist)
       min_dist_human = dist;
     min_dist_human_pub_.publish(min_dist_human);
-
-    i++;
   }
 
   // std::cout << "dist_idx.size() " <<dist_idx.size()<< '\n';
@@ -412,6 +413,49 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
       }
     else{
       isDistunderThreshold = false;
+    }
+
+  }
+
+  if(!stuck){
+    auto temp_idx = dist_idx;
+    dist_idx.clear();
+    for(int it=0;it<temp_idx.size();it++){
+      //Ray Tracing
+      double tm_x =tracked_humans_.humans[temp_idx[it].second-1].segments[0].pose.pose.position.x;
+      double tm_y =tracked_humans_.humans[temp_idx[it].second-1].segments[0].pose.pose.position.y;
+      auto Dx = (tm_x-xpos)/100;
+      auto Dy = (tm_y-ypos)/100;
+
+      //Checking using raytracing
+      bool cell_collision = false;
+      double rob_x = xpos;
+      double rob_y = ypos;
+
+      for(int j=0;j<100;j++){
+        unsigned int mx;
+        unsigned int my;
+        if( costmap_->worldToMap(rob_x,rob_y,mx,my)){
+          auto cellcost = costmap_->getCost(mx,my);
+          if((int)cellcost==254){
+            cell_collision = true;
+            break;
+          }
+          rob_x += Dx;
+          rob_y += Dy;
+        }
+      }
+
+      if(!cell_collision){
+        dist_idx.push_back(std::make_pair(temp_idx[it].first,temp_idx[it].second));
+        if((int)states_.states[temp_idx[it].second-1]==9){
+          states_.states[temp_idx[it].second-1] = 0;
+        }
+      }
+
+      // if(dist_idx.size()==2){
+      //   break;
+      // }
     }
   }
 
@@ -486,7 +530,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
 
   if(reset_states){
     for(int i=0;i<states_.states.size();i++){
-      states_.states[i]=0;
+      states_.states[i]=9;
     }
     reset_states=false;
     // std::cout << "I am here" << '\n';
@@ -675,6 +719,8 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
         if(dist_idx[0].second!=stuck_human_id)
           found = false;
       }
+      else if(dist_idx.size()==0)
+        found = false;
     }
 
     if(backoff_recovery_.check_random_rot()){
@@ -713,8 +759,38 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     hanp_prediction::HumanPosePredict predict_srv;
     if(isMode==0)
       isMode = -1;
+
+    double rb_x = robot_pose.pose.position.x;
+    double rb_y = robot_pose.pose.position.y;
     for(int i=0;i<2 && i<dist_idx.size();i++){
-      // std::cout << "states_.states[i].size() " <<(int)states_.states[dist_idx[i].second-1]<< '\n';
+      // //Ray Tracing
+      // double tm_x =tracked_humans_.humans[dist_idx[i].second].segments[0].pose.pose.position.x;
+      // double tm_y =tracked_humans_.humans[dist_idx[i].second].segments[0].pose.pose.position.y;
+      // auto Dx = (tm_x-rb_x)/1000;
+      // auto Dy = (tm_y-rb_y)/1000;
+      //
+      // //Checking using raytracing
+      // bool cell_collision = false;
+      // auto rob_x = rb_x;
+      // auto rob_y = rb_y;
+      // for(int j=0;j<1000;j++){
+      //   int mx;
+      //   int my;
+      //   costmap_->worldToMapEnforceBounds(rob_x,rob_y,mx,my);
+      //     auto cellcost = costmap_->getCost(mx,my);
+      //     if((int)cellcost!=0){
+      //       cell_collision = true;
+      //       break;
+      //     }
+      //   rob_x += Dx;
+      //   rob_y += Dy;
+      // }
+      // if(cell_collision){
+      //   continue;
+      // }
+      // if(predict_srv.request.ids.size()==2){
+      //   break;
+      // }
       if((int)states_.states[dist_idx[i].second-1]>0){
         predict_srv.request.ids.push_back(dist_idx[i].second);
         if(isMode==-1)
@@ -744,6 +820,9 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
       }
     }
     else {
+      if(!stuck){
+        isMode =1;
+      }
       double traj_size = 10, predict_time = 5.0; // TODO: make these values configurable
       for (double i = 1.0; i <= traj_size; ++i) {
         predict_srv.request.predict_times.push_back(predict_time *
@@ -1776,6 +1855,13 @@ bool TebLocalPlannerROS::transformHumanPlan(
     geometry_msgs::PoseStamped transformed_pose;
     tf2::Transform tf_pose;
     for (auto &human_pose : human_plan) {
+      if(isMode>=1){
+        unsigned int mx, my;
+        if(costmap_->worldToMap(human_pose.pose.pose.position.x,human_pose.pose.pose.position.y,mx,my)){
+          if(costmap_->getCost(mx,my)>=254)
+            break;
+        }
+      }
       tf2::fromMsg(human_pose.pose.pose, tf_pose);
       tf_pose_stamped.setData(human_plan_to_global_transform_ * tf_pose);
       tf_pose_stamped.stamp_ = human_plan_to_global_transform_.stamp_;
