@@ -570,7 +570,7 @@ private:
   double ang_theta;
 
   ros::Time last_omega_sign_change_;
-  double last_omega_, min_dist_human;
+  double last_omega_, min_dist_human, current_human_dist;
   std::vector<HumanState> humans_states_;
   hanp_msgs::StateArray states_;
 

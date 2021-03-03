@@ -393,6 +393,7 @@ void  TebLocalPlannerROS::CheckDist(const hanp_msgs::TrackedHumans &tracked_huma
   isDistMax = true;
   for(int i=0;i<human_dists.size();i++){
     auto dist = human_dists[i];
+    current_human_dist = human_dists[0];
     if(dist<10.0 && humans_behind[i] <= 0.1){
       isDistMax = false;
       dist_idx.push_back(std::make_pair(dist,i+1));
@@ -599,7 +600,8 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   robot_vel_.angular.z = tf2::getYaw(robot_vel_tf.pose.orientation);
   auto vel_get_time = ros::Time::now() - vel_get_start_time;
   robot_vel_pub_.publish(robot_vel_);
-  logs+="Velocity: x= " + std::to_string(robot_vel_.linear.x) + " y= " + std::to_string(robot_vel_.linear.y)+", ";
+  logs+="Velocity: x= " + std::to_string(robot_vel_.linear.x) +", " + " y= " + std::to_string(robot_vel_.linear.y)+", ";
+  logs+="dist " + std::to_string(current_human_dist)+", ";
 
   // prune global plan to cut off parts of the past (spatially before the robot)
   auto prune_start_time = ros::Time::now();
@@ -1024,7 +1026,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     break;
   }
   std::string mode;
-  if(isMode==0 && isDistMax){
+  if(isMode==-1 || isDistMax){
     mode = "SingleBand";
   }
   else if(isMode==0){
